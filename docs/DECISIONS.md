@@ -36,8 +36,8 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 ## D8 — Gentle Mode is the default
 **Status:** Final.
 
-## D9 — The extension signs in with its own email code
-**Decision:** The extension gets its own Supabase session (email OTP) instead of borrowing the web app's.
+## D9 — The extension signs in with its own session
+**Decision:** The extension gets its own Supabase session instead of borrowing the web app's. (Originally via email code; now via password, see D14.)
 **Reason:** Supabase rotates refresh tokens. If two clients share one, the first refresh invalidates the other and can trigger reuse detection that ends both sessions.
 **Status:** Final.
 
@@ -56,3 +56,9 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 ## D13 — Points and timestamps are computed in the database
 **Decision:** Committing a day, reviewing it, points, focus sessions, and device heartbeats all go through Postgres functions. The browser cannot write these tables directly (enforced by RLS and tested in `supabase/tests/rls_test.sql`). `packages/shared/src/scoring.ts` mirrors the points rules for display and must be kept in sync with `review_day()`.
 **Status:** Final.
+
+## D14 — Email + password sign-in (link kept as a secondary option)
+**Decision:** Primary sign-in is email + password, with "Confirm email" off in Supabase. The extension connects by sending the password once to Supabase and keeping only its own tokens.
+**Reason:** Supabase's built-in email sender allows only a few emails per hour, and its templates can't be edited without custom SMTP, so the default email contains a link but no code. The code-based extension connect step could not work, and a prototype shouldn't require an email provider.
+**Trade-off:** Anyone can create an account with an unverified address. Fine for a local prototype; before real users, connect SMTP and turn "Confirm email" back on.
+**Status:** Prototype.
