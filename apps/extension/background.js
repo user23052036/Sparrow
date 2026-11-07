@@ -162,6 +162,21 @@ async function handle(msg, sender) {
       return { ok: true };
     }
 
+    case "SPARROW_CONNECT_PASSWORD": {
+      if (!sender.tab) return { ok: false, error: "Connect from the Sparrow website." };
+      const { supabaseUrl, anonKey, email, password } = msg;
+      if (!isAllowedSupabaseUrl(supabaseUrl) || !anonKey || !email || !password) return { ok: false, error: "Missing connection details." };
+      const config = { url: supabaseUrl.replace(/\/$/, ""), anonKey };
+      try {
+        const auth = await api.signInWithPassword(config, email, password);
+        await set({ config, auth, pending: null, lastError: null, appOrigin: new URL(sender.url).origin });
+      } catch (e) {
+        return { ok: false, error: `Couldn't connect: ${e.message}` };
+      }
+      await sync();
+      return status();
+    }
+
     case "SPARROW_CONNECT_VERIFY": {
       const { pending } = await get("pending");
       if (!pending) return { ok: false, error: "Start again: ask for a new code." };
