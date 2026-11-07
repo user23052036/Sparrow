@@ -145,7 +145,7 @@ Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 - Google Play reviews apps using the Accessibility API; prepare the required declaration and prominent in-app disclosure, and check current policy at submission time.
 - For personal testing, install the APK directly / via `adb`. Google has announced developer-verification requirements for apps installed outside Play; check whether and when they apply in your region.
 
-### M6 — Accountability buddy
+### M6 — Accountability partner (built; see DECISIONS D15)
 - Invite via link; accept/decline; share selected proofs; buddy can `approve` or `question` (gentle wording); optional sharing of tamper events; see buddy's shared streak.
 - **No penalties of any kind on the buddy** (see DECISIONS.md).
 - **Done when:** two test accounts complete the full invite → share → verify loop; RLS tests prove non-shared proofs stay invisible.
