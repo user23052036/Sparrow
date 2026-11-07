@@ -13,6 +13,8 @@ A gentle daily accountability app for people who struggle with focus, motivation
 - **Evening review:** partial days count, missed tasks are met kindly, points are awarded by the server. Unreviewed past days can be closed later.
 - **Focus sessions:** choose sites to block, start a session, and the extension blocks those sites in your browser. Ending early asks you to wait 30 seconds and say what you'll do instead. Sites can be added, but not removed, while a session runs.
 - **Tamper visibility:** if the extension goes quiet during a session, it's noted on the Focus page.
+- **Accountability partner:** invite one person with a link. Each of you sees what you choose to share (your day, focus moments, and proofs one at a time). They can approve a proof or ask a question.
+- **Partner key:** lock a focus session so only your partner can end it early. You ask, they decide. Ending the partnership releases any lock immediately.
 - **Privacy:** every table has Row-Level Security; proofs are private by default.
 
 ## Project layout
@@ -32,7 +34,7 @@ You need Node.js 20+ and a free [Supabase](https://supabase.com) account.
 ### 1. Create the Supabase project
 
 1. Create a new project in Supabase.
-2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0004`).
+2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0005`).
 3. **Authentication → URL Configuration:** set Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to Redirect URLs.
 4. **Authentication → Sign In / Providers → User Signups:** turn **Confirm email** off, so new accounts work immediately without an email service. (Turn it back on once you connect your own SMTP provider for real users.)
 
@@ -70,7 +72,8 @@ bash supabase/tests/run.sh   # migrations + 40+ privacy/RLS checks on a local Po
 
 - Blocking is friction, not a lock: the extension can be disabled, and another browser isn't covered. That's why going quiet mid-session is logged.
 - A session started on another device can take up to ~30 seconds to reach this browser.
-- No buddy screens yet (database support exists; UI is milestone M6). No Android app yet (M5b).
+- Partner pings are in-app only (a badge and the Partner page); there is no email or push notification yet. No Android app yet (M5b).
+- The partner flow needs two accounts, so try it with a friend (or a second email).
 - Photo "proof" raises the effort of faking; it doesn't prove anything. Re-used photos are flagged.
 
 ## Docs
