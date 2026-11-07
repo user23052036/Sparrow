@@ -1,0 +1,58 @@
+# Sparrow — Decision Log
+
+Each entry: decision, reason, status. Do not reverse a decision without adding a new entry explaining why.
+
+## D1 — No real money in the MVP
+**Decision:** Stakes are `none` or `points` only. No deposits, escrow, payouts, or charity transfers.
+**Reason:** Holding deposits and forwarding penalties to charity can trigger escrow/payment, fundraising, KYC, and tax rules that vary by country. Requires legal review first.
+**Status:** Deferred to Phase 3 (charge-on-failure pledges, low caps, legal review).
+
+## D2 — Completion bonus is points, never money
+**Reason:** A money bonus must be funded either by the company (unsustainable, encourages fake completions) or by other users' losses (a betting pool, and contradicts "penalties go to charity").
+**Status:** Final.
+
+## D3 — No penalty on accountability partners
+**Decision:** The brief's "secondary motivator penalty" (User2 pays when User1 misses) is cut.
+**Reason:** It gives the verifier a financial incentive to approve fake proofs, which breaks verification. It also puts blame and pressure on partners, which is harmful for users dealing with depression.
+**Status:** Final.
+
+## D4 — Crypto, paid motivator marketplace, public star ratings, leaderboards: cut from MVP
+**Reason:** Each is a separate product with legal, moderation, and mental-health risk. Public ratings of people are risky for the target audience.
+**Status:** Cut; revisit only with beta evidence.
+
+## D5 — Verification = friction + social trust, not proof
+**Decision:** In-app capture, server timestamps, duplicate-image detection, buddy confirmation. AI scoring later and assistive only.
+**Reason:** Photos can be staged or reused and EXIF is often stripped; no automated check can prove a task was done.
+**Status:** Final for MVP.
+
+## D6 — Blocking = friction + visibility, not a lock
+**Decision:** Bypass is possible on personal devices; make it slow, deliberate, and logged (`tamper_events`), optionally visible to a buddy.
+**Status:** Final.
+
+## D7 — Platforms: Web PWA + Chromium extension + Android first; iOS later
+**Reason:** Founder uses desktop and Android. A web app cannot block anything; the extension covers desktop browsers; Android allows app blocking via Accessibility Service. iOS needs Apple's Family Controls entitlement and Swift work.
+**Status:** Final for MVP.
+
+## D8 — Gentle Mode is the default
+**Status:** Final.
+
+## D9 — The extension signs in with its own email code
+**Decision:** The extension gets its own Supabase session (email OTP) instead of borrowing the web app's.
+**Reason:** Supabase rotates refresh tokens. If two clients share one, the first refresh invalidates the other and can trigger reuse detection that ends both sessions.
+**Status:** Final.
+
+## D10 — Extension polls every 30 s instead of using Realtime
+**Reason:** MV3 service workers are suspended when idle, so a Realtime websocket isn't reliable. The extension polls via `chrome.alarms` (30 s is Chrome's minimum period) and syncs instantly when the Sparrow website in the same browser tells it to. Worst case: a session started on another device takes up to ~30 s to reach this browser.
+**Status:** Prototype. Revisit if 30 s proves too slow.
+
+## D11 — Extension is plain JavaScript with no build step
+**Reason:** "Load unpacked" works directly from `apps/extension`, which keeps setup simple. Pure logic lives in `lib/` and is unit-tested with `node --test`. `lib/domains.js` duplicates `packages/shared/src/domains.ts`; tests in both places pin the same behaviour.
+**Status:** Prototype. Move to TypeScript + a bundler when the extension grows.
+
+## D12 — Plain CSS design tokens instead of Tailwind
+**Reason:** One small token file (`apps/web/app/globals.css`) is easier to keep consistent between the web app and extension pages than a Tailwind setup.
+**Status:** Final for the prototype.
+
+## D13 — Points and timestamps are computed in the database
+**Decision:** Committing a day, reviewing it, points, focus sessions, and device heartbeats all go through Postgres functions. The browser cannot write these tables directly (enforced by RLS and tested in `supabase/tests/rls_test.sql`). `packages/shared/src/scoring.ts` mirrors the points rules for display and must be kept in sync with `review_day()`.
+**Status:** Final.
