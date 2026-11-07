@@ -24,6 +24,20 @@ export const copy = {
   duplicatePhoto:
     "This photo looks like one you've used before. You can still save it — it'll be marked so your buddy knows.",
   proofPrivate: "Your proof stays private unless you choose to share it.",
+  partnerIntro:
+    "A partner is one person who sees what you choose to share and holds the key to your locked focus sessions. You do the same for them.",
+  partnerLockExplainer: (name: string) =>
+    `Locked: only ${name} can end this session early. It still ends on its own when time is up.`,
+  partnerKeyRequest: (name: string) => `Ask ${name} to end the session`,
+  partnerWaiting: (name: string) => `You asked ${name}. Take a breath while you wait.`,
+  partnerKeepGoing: (name: string) => `${name} asked you to keep going. You've got this.`,
+  partnerLetGo: (name: string) => `${name} said it's okay to stop. Be kind to yourself.`,
+  partnerDecideHint:
+    "Stopping is okay when it's the right call. Encouraging them to keep going is kind when it's just the urge talking.",
+  eventEarlyExit: "ended a focus session early",
+  eventApproved: "ended a focus session early with their partner's okay",
+  eventQuiet: "had blocking go quiet during a session",
+  eventDisabled: "switched blocking off during a session",
 } as const;
 
 export const BANNED_WORDS = ["failed", "failure", "lazy", "broken", "wasted", "pathetic"];
