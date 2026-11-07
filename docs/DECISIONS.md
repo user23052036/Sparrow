@@ -62,3 +62,9 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Reason:** Supabase's built-in email sender allows only a few emails per hour, and its templates can't be edited without custom SMTP, so the default email contains a link but no code. The code-based extension connect step could not work, and a prototype shouldn't require an email provider.
 **Trade-off:** Anyone can create an account with an unverified address. Fine for a local prototype; before real users, connect SMTP and turn "Confirm email" back on.
 **Status:** Prototype.
+
+## D15 — Accountability partner and the partner key
+**Decision:** One partner per person, with mutual visibility. Either side can end the partnership at any time. Activity sharing (today's tasks, focus moments, streak) is a per-person switch; proofs are shared one at a time. A focus session can be *locked* (up to 120 minutes): the owner can't end it early on their own, they ask their partner, who approves or encourages them to keep going. Ending the partnership releases any lock immediately, so nobody is trapped.
+**Reason:** The original brief's core idea is that someone else is on the hook with you. For internet addiction in particular, an impulse to quit a session is exactly when a second person helps most. Everything is enforced in Postgres (partner functions plus RLS), covered by the privacy tests.
+**Not built, on purpose:** the "partner pays a penalty" rule (D3), public star ratings and leaderboards (D4), and real-money stakes (D1). Partner pings are in-app only for now.
+**Status:** Prototype. Needs two real accounts to try end to end.
