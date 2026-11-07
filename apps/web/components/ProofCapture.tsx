@@ -4,11 +4,13 @@ import { copy } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 import { compressImage, imageDHash } from "@/lib/image";
 
-export function ProofCapture({ itemId, userId, onSaved }: { itemId: string; userId: string; onSaved: () => void }) {
+export function ProofCapture({ itemId, userId, onSaved, partnerName }: { itemId: string; userId: string; onSaved: () => void; partnerName?: string | null }) {
   const [mode, setMode] = useState<"closed" | "photo" | "text">("closed");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [share, setShare] = useState(true);
+  const visibility = share && partnerName ? "buddy" : "private";
 
   async function savePhoto(file: File) {
     setBusy(true); setMsg(null);
@@ -19,7 +21,7 @@ export function ProofCapture({ itemId, userId, onSaved }: { itemId: string; user
       const up = await sb.storage.from("proofs").upload(path, blob, { contentType: "image/jpeg" });
       if (up.error) throw up.error;
       const { data, error } = await sb.from("proofs")
-        .insert({ plan_item_id: itemId, kind: "photo", storage_path: path, image_phash: hash })
+        .insert({ plan_item_id: itemId, kind: "photo", storage_path: path, image_phash: hash, visibility })
         .select("flagged_similar").single();
       if (error) throw error;
       setMsg(data?.flagged_similar ? copy.duplicatePhoto : "Photo saved.");
@@ -31,7 +33,7 @@ export function ProofCapture({ itemId, userId, onSaved }: { itemId: string; user
   async function saveText() {
     if (!text.trim()) return;
     setBusy(true); setMsg(null);
-    const { error } = await supabase().from("proofs").insert({ plan_item_id: itemId, kind: "text", text_body: text.trim() });
+    const { error } = await supabase().from("proofs").insert({ plan_item_id: itemId, kind: "text", text_body: text.trim(), visibility });
     setBusy(false);
     if (error) { setMsg(errorText(error)); return; }
     setText(""); setMode("closed"); setMsg("Note saved."); onSaved();
@@ -39,6 +41,12 @@ export function ProofCapture({ itemId, userId, onSaved }: { itemId: string; user
 
   return (
     <div className="stack">
+      {partnerName && (
+        <label className="check">
+          <input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} />
+          Share this proof with {partnerName}
+        </label>
+      )}
       {mode === "closed" && (
         <div className="row">
           <button type="button" onClick={() => setMode("photo")}>Add photo proof</button>
