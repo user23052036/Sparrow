@@ -8,5 +8,5 @@ createdb "$DB"
 trap 'dropdb --if-exists "$DB"' EXIT
 psql -q -v ON_ERROR_STOP=1 -d "$DB" -f supabase_stub.sql
 for f in ../migrations/*.sql; do psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$f"; done
-psql -q -v ON_ERROR_STOP=1 -d "$DB" -f rls_test.sql -o /dev/null 2>&1 | sed -n "s/.*NOTICE:  //p; /FAIL/p"
+psql -q -v ON_ERROR_STOP=1 -d "$DB" -f rls_test.sql -o /dev/null 2>&1 | sed -n "s/.*NOTICE:  //p; /FAIL/p; /ERROR/p"
 echo "ALL RLS TESTS PASSED"
