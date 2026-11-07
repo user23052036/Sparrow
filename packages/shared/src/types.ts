@@ -58,6 +58,7 @@ export interface FocusSession {
   ends_at: string;
   ended_at: string | null;
   ended_early: boolean;
+  locked: boolean;
 }
 
 export interface Device {
@@ -68,3 +69,51 @@ export interface Device {
   last_heartbeat_at: string | null;
   protection_enabled: boolean;
 }
+
+export type PartnerEventKind = "early_exit" | "heartbeat_lost" | "protection_disabled";
+
+export interface PartnerEvent {
+  kind: PartnerEventKind;
+  at: string;
+  detail: string | null;
+}
+
+export interface PartnerProof {
+  id: string;
+  kind: "photo" | "text";
+  text: string | null;
+  path: string | null;
+  flagged: boolean;
+  created_at: string;
+  task: string;
+  verdict: "approve" | "question" | null;
+  comment: string | null;
+}
+
+export interface PartnerEndRequest {
+  id: string;
+  reason: string;
+  created_at: string;
+  session_ends_at: string;
+}
+
+export interface PartnerActivity {
+  today: { date: string; committed: boolean; reviewed: boolean; items: { title: string; status: ItemStatus }[] };
+  streak: number;
+  events: PartnerEvent[];
+  focus: { sessions: number; minutes: number };
+  active_session: { ends_at: string; locked: boolean } | null;
+}
+
+export type PartnerOverview =
+  | { state: "none" }
+  | { state: "pending"; link_id: string; invite_code: string }
+  | {
+      state: "active";
+      link_id: string;
+      partner: { name: string; shares: boolean };
+      i_share: boolean;
+      pending_end_requests: PartnerEndRequest[];
+      proofs: PartnerProof[];
+      activity: PartnerActivity | null;
+    };
