@@ -6,7 +6,7 @@ A gentle daily accountability app for people who struggle with focus, motivation
 
 ## What works in this prototype
 
-- **Sign in** with an emailed code (or magic link), then a short onboarding (name, time zone, Gentle Mode).
+- **Sign in** with email + password (or an emailed link), then a short onboarding (name, time zone, Gentle Mode).
 - **Tasks** broken into small steps, each with a "Start now" timer.
 - **Morning commitment:** mood check-in, pick 1–5 tasks, optional points stake (only when Gentle Mode is off; never money).
 - **During the day:** tasks shown as birds on a branch, step checklists, Done / Partly buttons, photo or note proof.
@@ -34,15 +34,9 @@ You need Node.js 20+ and a free [Supabase](https://supabase.com) account.
 1. Create a new project in Supabase.
 2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0004`).
 3. **Authentication → URL Configuration:** set Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to Redirect URLs.
-4. **Authentication → Email Templates → Magic Link:** make sure the email shows the code by adding `{{ .Token }}`, for example:
-   ```html
-   <h2>Your Sparrow sign-in</h2>
-   <p>Your code: <strong>{{ .Token }}</strong></p>
-   <p>Or <a href="{{ .ConfirmationURL }}">sign in with this link</a> on the same device.</p>
-   ```
-   The browser extension signs in with this code, so this step is required.
+4. **Authentication → Sign In / Providers → User Signups:** turn **Confirm email** off, so new accounts work immediately without an email service. (Turn it back on once you connect your own SMTP provider for real users.)
 
-> Supabase's built-in email sender is heavily rate-limited (a few emails per hour). That's fine for testing alone; for a beta, connect your own SMTP provider in Authentication settings.
+> Supabase's built-in email sender is heavily rate-limited and its templates can't be edited without custom SMTP. That's why Sparrow signs in with email + password; the emailed link remains available as a secondary option.
 
 ### 2. Run the website
 
@@ -58,7 +52,7 @@ The URL and anon (publishable) key are in Supabase under **Project Settings → 
 
 1. Open `chrome://extensions` (Edge: `edge://extensions`, Brave: `brave://extensions`).
 2. Turn on **Developer mode**, click **Load unpacked**, choose `apps/extension`.
-3. In Sparrow go to **Settings → Connect the extension**, request a code, and enter it.
+3. In Sparrow go to **Settings → Connect the extension** and enter your Sparrow password. It's used once to sign the extension in and isn't stored.
 
 To use a deployed site instead of localhost, add its origin to `content_scripts.matches` in `apps/extension/manifest.json` and reload the extension.
 
