@@ -18,6 +18,8 @@ interface Data {
   proofCounts: Record<string, number>;
   balance: number;
   heavyStretch: boolean;
+  verdicts: Record<string, { verdict: string; comment: string | null }>;
+  partnerName: string | null;
 }
 
 async function loadData(): Promise<Data> {
@@ -25,18 +27,30 @@ async function loadData(): Promise<Data> {
   const today = await sb.rpc("get_today");
   if (today.error) throw today.error;
   const plan = today.data as DailyPlan;
-  const [unrev, tasks, items, steps, proofs, bal, recent] = await Promise.all([
+  const [unrev, tasks, items, steps, proofs, bal, recent, vers, po] = await Promise.all([
     sb.rpc("unreviewed_days"),
     sb.from("tasks").select("*").eq("archived", false).order("created_at"),
     sb.from("plan_items").select("*"),
     sb.from("task_steps").select("*").order("position"),
-    sb.from("proofs").select("plan_item_id"),
+    sb.from("proofs").select("id, plan_item_id"),
     sb.rpc("points_balance"),
     sb.rpc("recent_completion", { p_days: 3 }),
+    sb.from("verifications").select("proof_id, verdict, comment, created_at").order("created_at"),
+    sb.rpc("partner_overview"),
   ]);
   for (const r of [unrev, tasks, items, steps, proofs, bal, recent]) if (r.error) throw r.error;
   const proofCounts: Record<string, number> = {};
-  for (const p of (proofs.data ?? []) as { plan_item_id: string }[]) proofCounts[p.plan_item_id] = (proofCounts[p.plan_item_id] ?? 0) + 1;
+  const itemOfProof: Record<string, string> = {};
+  for (const p of (proofs.data ?? []) as { id: string; plan_item_id: string }[]) {
+    proofCounts[p.plan_item_id] = (proofCounts[p.plan_item_id] ?? 0) + 1;
+    itemOfProof[p.id] = p.plan_item_id;
+  }
+  const verdicts: Data["verdicts"] = {};
+  for (const v of (vers.data ?? []) as { proof_id: string; verdict: string; comment: string | null }[]) {
+    const item = itemOfProof[v.proof_id];
+    if (item) verdicts[item] = { verdict: v.verdict, comment: v.comment };
+  }
+  const ov = po.data as { state?: string; partner?: { name: string } } | null;
   const rc = (recent.data ?? []) as { completion: number }[];
   return {
     plan,
@@ -47,6 +61,8 @@ async function loadData(): Promise<Data> {
     proofCounts,
     balance: (bal.data as number) ?? 0,
     heavyStretch: rc.length === 3 && rc.every((r) => Number(r.completion) < 0.34),
+    verdicts,
+    partnerName: ov?.state === "active" ? ov.partner?.name ?? null : null,
   };
 }
 
@@ -122,8 +138,9 @@ function Morning({ data, gentle, reload }: { data: Data; gentle: boolean; reload
 }
 
 /* ------------------------------------------------------------ during the day */
-function ItemCard({ item, task, steps, date, proofs, userId, reload }: {
+function ItemCard({ item, task, steps, date, proofs, userId, reload, verdict, partnerName }: {
   item: PlanItem; task: Task; steps: TaskStep[]; date: string; proofs: number; userId: string; reload: () => void;
+  verdict?: { verdict: string; comment: string | null }; partnerName: string | null;
 }) {
   const [timerFor, setTimerFor] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -178,7 +195,12 @@ function ItemCard({ item, task, steps, date, proofs, userId, reload }: {
       {(item.status === "done" || item.status === "partial" || task.proof_required) && (
         proofs > 0
           ? <p className="small status-done">{proofs} proof{proofs === 1 ? "" : "s"} saved</p>
-          : <ProofCapture itemId={item.id} userId={userId} onSaved={reload} />
+          : <ProofCapture itemId={item.id} userId={userId} onSaved={reload} partnerName={partnerName} />
+      )}
+      {verdict && partnerName && (
+        <p className="note small" role="status">
+          {verdict.verdict === "approve" ? `${partnerName} says this looks good.` : `${partnerName} asked: ${verdict.comment ?? "can you tell me more?"}`}
+        </p>
       )}
       {err && <p className="error" role="alert">{err}</p>}
     </li>
@@ -288,7 +310,8 @@ export default function Today() {
               const t = taskOf(i.task_id);
               return t ? (
                 <ItemCard key={i.id} item={i} task={t} steps={data.steps.filter((s) => s.task_id === t.id)} date={plan.date}
-                  proofs={data.proofCounts[i.id] ?? 0} userId={session.user.id} reload={reload} />
+                  proofs={data.proofCounts[i.id] ?? 0} userId={session.user.id} reload={reload}
+                  verdict={data.verdicts[i.id]} partnerName={data.partnerName} />
               ) : null;
             })}
           </ul>
