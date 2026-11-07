@@ -7,8 +7,7 @@ import { extRequest, extStatus, type ExtStatus } from "@/lib/extension";
 export default function ExtensionPage() {
   const { session } = useAuth();
   const [st, setSt] = useState<ExtStatus | null>(null);
-  const [stage, setStage] = useState<"idle" | "code">("idle");
-  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const email = session?.user.email ?? "";
@@ -16,20 +15,18 @@ export default function ExtensionPage() {
   const refresh = useCallback(async () => setSt(await extStatus()), []);
   useEffect(() => { void refresh(); }, [refresh]);
 
-  async function startConnect() {
-    setBusy(true); setErr(null);
-    try {
-      await extRequest("SPARROW_CONNECT_START", { supabaseUrl: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY, email }, 15000);
-      setStage("code");
-    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
-  }
-  async function verify(e: React.FormEvent) {
+  async function connect(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr(null);
     try {
-      await extRequest("SPARROW_CONNECT_VERIFY", { code: code.trim() }, 15000);
-      setStage("idle"); setCode(""); await refresh();
-    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+      await extRequest("SPARROW_CONNECT_PASSWORD", { supabaseUrl: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY, email, password }, 20000);
+      setPassword("");
+      await refresh();
+    } catch (e2) {
+      setErr((e2 as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
   async function disconnect() {
     await extRequest("SPARROW_SIGN_OUT").catch(() => {});
@@ -53,18 +50,17 @@ export default function ExtensionPage() {
           <button onClick={refresh}>Check again</button>
         </div>
       )}
-      {st.installed && !st.connected && stage === "idle" && (
-        <div className="panel stack">
+      {st.installed && !st.connected && (
+        <form className="panel stack" onSubmit={connect}>
           <h3>Connect it to your account</h3>
-          <p className="quiet">The extension signs in separately, so we'll email a fresh code to {email}.</p>
-          <button className="primary" disabled={busy} onClick={startConnect}>Email me a code for the extension</button>
-        </div>
-      )}
-      {st.installed && !st.connected && stage === "code" && (
-        <form className="panel stack" onSubmit={verify}>
-          <label htmlFor="code">Code from the email</label>
-          <input id="code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
-          <button className="primary" disabled={busy || code.length < 6}>Connect</button>
+          <p className="quiet">The extension keeps its own sign-in. Enter your Sparrow password for {email}. It's used once to sign in and isn't stored.</p>
+          <div>
+            <label htmlFor="ext-password">Password</label>
+            <input id="ext-password" type="password" autoComplete="current-password" required
+              value={password} onChange={(e) => setPassword(e.target.value)} />
+          </div>
+          <button className="primary" disabled={busy || !password}>Connect</button>
+          <p className="small quiet">Signed in with an email link and never set a password? Create one by using "Create an account" on the sign-in page with a different email, or ask for a password reset in Supabase.</p>
         </form>
       )}
       {st.installed && st.connected && (
