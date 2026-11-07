@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { copy, normalizeDomainList, type Device } from "@sparrow/shared";
@@ -7,7 +7,8 @@ import { supabase, errorText } from "@/lib/supabase";
 import { clock, timeAgo } from "@/lib/format";
 import { extSyncNow } from "@/lib/extension";
 
-interface FocusState { active: boolean; session_id: string | null; ends_at: string | null; server_now: string; domains: string[] }
+interface FocusState { active: boolean; session_id: string | null; ends_at: string | null; server_now: string; domains: string[]; locked: boolean }
+interface EndReq { status: string }
 interface Tamper { id: number; kind: string; device_id: string | null; created_at: string; detail: string | null }
 
 const SUGGESTED = ["youtube.com", "instagram.com", "x.com", "reddit.com", "facebook.com", "tiktok.com", "netflix.com"];
@@ -50,6 +51,36 @@ function EarlyExit({ sessionId, onEnded, onCancel }: { sessionId: string; onEnde
   );
 }
 
+/** Locked sessions: only the partner can end them early. */
+function LockedExit({ sessionId, name, req, onChanged }: { sessionId: string; name: string; req: EndReq | null; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  async function ask() {
+    const { error } = await supabase().rpc("request_end_session", { p_session_id: sessionId, p_reason: reason });
+    if (error) setErr(errorText(error)); else { setOpen(false); setReason(""); setErr(null); onChanged(); }
+  }
+  if (req?.status === "pending") return <p className="note" role="status">{copy.partnerWaiting(name)}</p>;
+  return (
+    <div className="stack">
+      {req?.status === "denied" && <p className="note" role="status">{copy.partnerKeepGoing(name)}</p>}
+      {open ? (
+        <div className="stack">
+          <label htmlFor="key-reason">{`Tell ${name} why you want to stop`}</label>
+          <input id="key-reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
+          <div className="row">
+            <button className="primary" disabled={reason.trim().length < 3} onClick={ask}>{copy.partnerKeyRequest(name)}</button>
+            <button className="ghost" onClick={() => setOpen(false)}>Keep focusing</button>
+          </div>
+        </div>
+      ) : (
+        <div><button className="ghost" onClick={() => setOpen(true)}>{copy.partnerKeyRequest(name)}</button></div>
+      )}
+      {err && <p className="error" role="alert">{err}</p>}
+    </div>
+  );
+}
+
 function FocusInner() {
   const itemId = useSearchParams().get("item");
   const [state, setState] = useState<FocusState | null>(null);
@@ -63,6 +94,10 @@ function FocusInner() {
   const [exiting, setExiting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [partnerName, setPartnerName] = useState<string | null>(null);
+  const [lockIt, setLockIt] = useState(false);
+  const [endReq, setEndReq] = useState<EndReq | null>(null);
+  const stateRef = useRef<FocusState | null>(null);
 
   const load = useCallback(async () => {
     const sb = supabase();
@@ -70,7 +105,23 @@ function FocusInner() {
     const [fs, dev] = await Promise.all([sb.rpc("get_focus_state"), sb.from("devices").select("*").order("last_heartbeat_at", { ascending: false })]);
     if (fs.error) { setErr(errorText(fs.error)); return; }
     const s = fs.data as FocusState;
+    const prev = stateRef.current;
+    stateRef.current = s;
     setState(s);
+    const po = await sb.rpc("partner_overview");
+    const ov = po.data as { state?: string; partner?: { name: string } } | null;
+    const pname = ov?.state === "active" ? ov.partner?.name ?? null : null;
+    setPartnerName(pname);
+    if (s.locked && s.session_id) {
+      const er = await sb.from("end_requests").select("status").eq("session_id", s.session_id).order("created_at", { ascending: false }).limit(1);
+      setEndReq((er.data as EndReq[] | null)?.[0] ?? null);
+    } else {
+      setEndReq(null);
+      if (prev?.active && prev.locked && !s.active && prev.session_id) {
+        const er = await sb.from("end_requests").select("status").eq("session_id", prev.session_id).order("created_at", { ascending: false }).limit(1);
+        if ((er.data as EndReq[] | null)?.[0]?.status === "approved") setMsg(copy.partnerLetGo(pname ?? "Your partner"));
+      }
+    }
     setSkew(new Date(s.server_now).getTime() - Date.now());
     setDomains(s.domains ?? []);
     setDevices((dev.data as Device[]) ?? []);
@@ -88,9 +139,9 @@ function FocusInner() {
   }, [itemId]);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
-    const p = setInterval(() => { if (state?.active) void load(); }, 30000);
+    const p = setInterval(() => { if (state?.active) void load(); }, state?.locked ? 5000 : 30000);
     return () => { clearInterval(t); clearInterval(p); };
-  }, [load, state?.active]);
+  }, [load, state?.active, state?.locked]);
 
   const remaining = state?.active && state.ends_at ? new Date(state.ends_at).getTime() - (now + skew) : 0;
   useEffect(() => {
@@ -104,7 +155,7 @@ function FocusInner() {
   async function start(minutes: number) {
     setErr(null); setMsg(null);
     if (domains.length === 0) { setErr("Add at least one site to block first."); return; }
-    const { error } = await supabase().rpc("start_focus_session", { p_minutes: minutes, p_item_id: itemId });
+    const { error } = await supabase().rpc("start_focus_session", { p_minutes: minutes, p_item_id: itemId, p_locked: lockIt && partnerName !== null });
     if (error) setErr(errorText(error)); else { extSyncNow(); await load(); }
   }
   async function saveDomains(next: string[]) {
@@ -147,7 +198,12 @@ function FocusInner() {
           {events.filter((e) => e.kind !== "early_exit").map((e) => (
             <p key={e.id} className="note small">{deviceName(e.device_id)} {eventText[e.kind]} at {new Date(e.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.</p>
           ))}
-          {exiting
+          {state.locked ? (
+            <>
+              <p className="note small">{copy.partnerLockExplainer(partnerName ?? "your partner")}</p>
+              <LockedExit sessionId={state.session_id} name={partnerName ?? "your partner"} req={endReq} onChanged={() => void load()} />
+            </>
+          ) : exiting
             ? <EarlyExit sessionId={state.session_id} onCancel={() => setExiting(false)}
                 onEnded={() => { setExiting(false); extSyncNow(); void load(); }} />
             : <div><button className="ghost" onClick={() => setExiting(true)}>End early</button></div>}
@@ -158,6 +214,12 @@ function FocusInner() {
           <div className="row">
             {DURATIONS.map((m) => <button key={m} className={m === 25 ? "primary" : ""} onClick={() => start(m)}>{m} min</button>)}
           </div>
+          {partnerName && (
+            <label className="check">
+              <input type="checkbox" checked={lockIt} onChange={(e) => setLockIt(e.target.checked)} />
+              Lock it with {partnerName}: only they can end it early (up to 2 hours)
+            </label>
+          )}
           {blockers.length === 0 && (
             <p className="note small">No blocking device connected yet. <Link href="/extension">Connect the browser extension</Link> so sites are actually blocked.</p>
           )}
