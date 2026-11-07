@@ -43,6 +43,16 @@ export async function verifyOtp(config, email, token) {
   return toAuth(await res.json());
 }
 
+export async function signInWithPassword(config, email, password) {
+  const res = await fetch(`${config.url}/auth/v1/token?grant_type=password`, {
+    method: "POST",
+    headers: headers(config),
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  return toAuth(await res.json());
+}
+
 export async function refresh(config, auth) {
   const res = await fetch(`${config.url}/auth/v1/token?grant_type=refresh_token`, {
     method: "POST",
