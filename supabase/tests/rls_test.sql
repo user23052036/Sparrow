@@ -642,3 +642,84 @@ reset role;
 select pg_temp.as_user('44444444-0000-0000-0000-000000000003');
 select pg_temp.check((partner_support_nudge() ->> 'level')::int = 0, 'the person having hard days is never nudged about themselves');
 reset role;
+
+-- ------------------------------------------------- rating and leaderboard (0015)
+-- W: 8 reviewed days, 4 done and 4 missed (average 0.5), a partner X, and support on 3 different days
+insert into auth.users values ('22222222-0000-0000-0000-000000000001', 'w@test'), ('22222222-0000-0000-0000-000000000002', 'x@test');
+insert into profiles (id) values ('22222222-0000-0000-0000-000000000001'), ('22222222-0000-0000-0000-000000000002') on conflict (id) do nothing;
+insert into tasks (id, user_id, title) values ('22222222-2222-0000-0000-000000000001', '22222222-0000-0000-0000-000000000001', 'W task'), ('22222222-2222-0000-0000-000000000002', '22222222-0000-0000-0000-000000000002', 'X task');
+insert into daily_plans (id, user_id, date, committed_at, reviewed_at)
+  select ('22222222-1111-0000-0000-' || lpad(g::text, 12, '0'))::uuid, '22222222-0000-0000-0000-000000000001', (now() at time zone 'UTC')::date - g, now(), now() from generate_series(1, 8) g;
+insert into plan_items (daily_plan_id, user_id, task_id, status)
+  select id, '22222222-0000-0000-0000-000000000001', '22222222-2222-0000-0000-000000000001', case when (now() at time zone 'UTC')::date - date <= 4 then 'done' else 'missed' end
+    from daily_plans where user_id = '22222222-0000-0000-0000-000000000001';
+select pg_temp.as_user('22222222-0000-0000-0000-000000000001');
+select pg_temp.check((my_rating() ->> 'reliability')::numeric = 3.0, 'half the days done: reliability is 3.0 of 5');
+select pg_temp.check((my_rating() -> 'support') = 'null'::jsonb, 'no partner yet: no support rating');
+reset role;
+insert into buddy_links (requester_id, partner_id, status, mutual) values ('22222222-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'active', true);
+select set_config('request.jwt.claim.sub', '22222222-0000-0000-0000-000000000002', false);
+insert into daily_plans (id, user_id, date, committed_at) values ('22222222-1111-0000-0000-0000000000a1', '22222222-0000-0000-0000-000000000002', (now() at time zone 'UTC')::date, now());
+insert into plan_items (id, daily_plan_id, user_id, task_id) values ('22222222-5555-0000-0000-000000000001', '22222222-1111-0000-0000-0000000000a1', '22222222-0000-0000-0000-000000000002', '22222222-2222-0000-0000-000000000002');
+insert into proofs (id, plan_item_id, user_id, kind, text_body, visibility) values
+  ('22222222-3333-0000-0000-000000000001', '22222222-5555-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'text', 'a', 'buddy'),
+  ('22222222-3333-0000-0000-000000000002', '22222222-5555-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'text', 'b', 'buddy'),
+  ('22222222-3333-0000-0000-000000000003', '22222222-5555-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'text', 'c', 'buddy');
+select set_config('request.jwt.claim.sub', '22222222-0000-0000-0000-000000000001', false);
+insert into verifications (proof_id, verifier_id, verdict, created_at) values
+  ('22222222-3333-0000-0000-000000000001', '22222222-0000-0000-0000-000000000001', 'approve', now()),
+  ('22222222-3333-0000-0000-000000000002', '22222222-0000-0000-0000-000000000001', 'approve', now() - interval '1 day'),
+  ('22222222-3333-0000-0000-000000000003', '22222222-0000-0000-0000-000000000001', 'approve', now() - interval '2 days');
+select pg_temp.as_user('22222222-0000-0000-0000-000000000001');
+select pg_temp.check((my_rating() ->> 'support')::numeric = 1.8, '3 days of support in 30: support rating 1.8');
+select pg_temp.check((my_rating() ->> 'shared')::boolean = false, 'ratings are not shared by default');
+reset role;
+select pg_temp.as_user('22222222-0000-0000-0000-000000000002');
+select pg_temp.check((partner_rating() ->> 'shared')::boolean = false and not (partner_rating() ? 'reliability'), 'the partner sees no rating unless it is shared');
+select pg_temp.check((my_rating() -> 'reliability') = 'null'::jsonb and (my_rating() ->> 'days_counted')::int = 0, 'too few days: no reliability yet');
+reset role;
+select pg_temp.as_user('22222222-0000-0000-0000-000000000001');
+update profiles set share_rating = true;
+reset role;
+select pg_temp.as_user('22222222-0000-0000-0000-000000000002');
+select pg_temp.check((partner_rating() ->> 'reliability')::numeric = 3.0 and (partner_rating() ->> 'name') is not null, 'once shared, the partner sees the rating');
+reset role;
+set role anon;
+select pg_temp.expect_error($q$select my_rating()$q$, 'anonymous visitors cannot read ratings');
+select pg_temp.expect_error($q$select monthly_leaderboard()$q$, 'anonymous visitors cannot read the leaderboard');
+reset role;
+
+-- leaderboard: 20 people with one reviewed day today; 12 done, 8 missed
+insert into auth.users select ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid, 'l' || i || '@test' from generate_series(1, 20) i;
+insert into profiles (id) select ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid from generate_series(1, 20) i on conflict (id) do nothing;
+insert into tasks (id, user_id, title) select ('33333333-2222-0000-0000-' || lpad(i::text, 12, '0'))::uuid, ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid, 'L task' from generate_series(1, 20) i;
+insert into daily_plans (id, user_id, date, committed_at, reviewed_at)
+  select ('33333333-1111-0000-0000-' || lpad(i::text, 12, '0'))::uuid, ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid, (now() at time zone 'UTC')::date, now(), now() from generate_series(1, 20) i;
+insert into plan_items (daily_plan_id, user_id, task_id, status)
+  select ('33333333-1111-0000-0000-' || lpad(i::text, 12, '0'))::uuid, ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
+         ('33333333-2222-0000-0000-' || lpad(i::text, 12, '0'))::uuid, case when i <= 12 then 'done' else 'missed' end from generate_series(1, 20) i;
+-- the 8 "missed" people did nothing that counts, so make 4 of them partly done to have a ranked tail
+update plan_items set status = 'partial' where user_id in (select ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid from generate_series(13, 16) i);
+select pg_temp.as_user('33333333-0000-0000-0000-000000000001');
+select pg_temp.check((monthly_leaderboard() ->> 'state') = 'not_joined', 'the leaderboard is hidden until you join');
+select pg_temp.expect_error($q$select join_leaderboard('x')$q$, 'a handle must be 3 to 20 letters, numbers or underscores');
+select pg_temp.expect_error($q$select join_leaderboard('has space')$q$, 'a handle cannot contain spaces');
+reset role;
+-- nine people join: not enough to show anything
+update profiles set leaderboard_optin = true, leaderboard_handle = 'ghost_' || right(id::text, 2) where id::text like '33333333-0000-0000-0000-0000000000%' and right(id::text, 2)::int between 1 and 9;
+select pg_temp.as_user('33333333-0000-0000-0000-000000000001');
+select pg_temp.check((monthly_leaderboard() ->> 'state') = 'waiting' and (monthly_leaderboard() ->> 'have')::int = 9, 'with 9 people the leaderboard stays hidden');
+reset role;
+select pg_temp.as_user('33333333-0000-0000-0000-000000000010');
+select pg_temp.expect_error($q$select join_leaderboard('Ghost_01')$q$, 'a taken handle is refused, case-insensitively');
+select join_leaderboard('fresh_10');
+reset role;
+select pg_temp.as_user('33333333-0000-0000-0000-000000000001');
+select pg_temp.check((monthly_leaderboard() ->> 'state') = 'ready', 'with 10 people the board shows');
+select pg_temp.check((monthly_leaderboard() ->> 'band') in ('top10', 'top_quarter', 'top_half', 'keep_going'), 'I get a band, not an exact low rank');
+select pg_temp.check(jsonb_array_length(monthly_leaderboard() -> 'rows') <= 10, 'at most the top 10 are listed');
+select pg_temp.check(not (monthly_leaderboard()::text ~ '33333333-0000'), 'no user ids appear on the board');
+select leave_leaderboard();
+select pg_temp.check((monthly_leaderboard() ->> 'state') = 'not_joined', 'leaving removes me from the board');
+select pg_temp.check((select leaderboard_handle from profiles where id = auth.uid()) is null, 'leaving frees my handle');
+reset role;
