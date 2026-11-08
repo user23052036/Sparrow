@@ -313,3 +313,36 @@ reset role;
 set role anon;
 select pg_temp.expect_error($q$select set_push_token('dddddddd-0000-0000-0000-0000000000e1', 'x')$q$, 'anonymous visitors cannot set tokens');
 reset role;
+
+-- ------------------------------------------------- M8: feedback, scheduled checks, metrics (0008)
+select pg_temp.as_user('eeeeeeee-0000-0000-0000-000000000005');
+insert into feedback (message, helpful, page) values ('Lovely and calm', 5, '/today');
+select pg_temp.check((select count(*) from feedback) = 1, 'a user can leave and read their own feedback');
+select pg_temp.expect_error($q$insert into feedback (user_id, message) values ('aaaaaaaa-0000-0000-0000-000000000001', 'as someone else')$q$,
+  'feedback cannot be written as another user');
+select pg_temp.expect_error($q$insert into feedback (message) values ('   ')$q$, 'blank feedback is refused');
+select pg_temp.expect_error($q$insert into feedback (message, helpful) values ('x', 9)$q$, 'helpfulness is 1 to 5');
+update feedback set message = 'edited';
+select pg_temp.check((select message from feedback) = 'Lovely and calm', 'feedback cannot be edited');
+select pg_temp.expect_error($q$select beta_metrics(30)$q$, 'users cannot call beta_metrics');
+select pg_temp.expect_error($q$select check_all_heartbeats()$q$, 'users cannot call the scheduled heartbeat job');
+reset role;
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.check((select count(*) from feedback) = 0, 'other users cannot read E''s feedback');
+reset role;
+set role anon;
+select pg_temp.expect_error($q$select beta_metrics(30)$q$, 'anonymous visitors cannot call beta_metrics');
+reset role;
+select pg_temp.check((select (beta_metrics(30) ->> 'active_users')::int) >= 1, 'beta_metrics runs for the owner and counts active users');
+select pg_temp.check(jsonb_typeof(beta_metrics(30) -> 'retention') = 'object', 'beta_metrics reports retention');
+select pg_temp.check(check_all_heartbeats() >= 0, 'scheduled heartbeat check runs');
+-- a quiet blocking device during a running session is recorded by the scheduled job, with nobody logged in
+insert into auth.users values ('ffffffff-0000-0000-0000-000000000006', 'f@test');
+insert into devices (id, user_id, platform, last_heartbeat_at) values ('dddddddd-0000-0000-0000-0000000000f1', 'ffffffff-0000-0000-0000-000000000006', 'extension', now() - interval '10 minutes');
+insert into focus_sessions (user_id, planned_minutes, started_at, ends_at) values ('ffffffff-0000-0000-0000-000000000006', 25, now() - interval '9 minutes', now() + interval '16 minutes');
+select pg_temp.check(check_all_heartbeats() >= 1, 'scheduled job records a lost heartbeat');
+select pg_temp.check((select count(*) from tamper_events where user_id = 'ffffffff-0000-0000-0000-000000000006' and kind = 'heartbeat_lost') = 1,
+  'the lost heartbeat is stored once');
+select check_all_heartbeats();
+select pg_temp.check((select count(*) from tamper_events where user_id = 'ffffffff-0000-0000-0000-000000000006' and kind = 'heartbeat_lost') = 1,
+  'running the job again does not duplicate it');

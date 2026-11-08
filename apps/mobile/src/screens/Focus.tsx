@@ -6,7 +6,14 @@ import { Button, Err } from "../ui";
 import { s } from "../theme";
 import { clock } from "../format";
 
-interface FocusState { active: boolean; session_id: string | null; ends_at: string | null; server_now: string; domains: string[]; locked?: boolean }
+interface FocusState {
+  active: boolean;
+  session_id: string | null;
+  ends_at: string | null;
+  server_now: string;
+  domains: string[];
+  locked?: boolean;
+}
 const DURATIONS = [15, 25, 45, 60, 90];
 
 export function Focus() {
@@ -23,14 +30,30 @@ export function Focus() {
   const load = useCallback(async () => {
     const { data, error } = await supabase.rpc("get_focus_state");
     if (!alive.current) return;
-    if (error) { setErr(errorText(error)); return; }
+    if (error) {
+      setErr(errorText(error));
+      return;
+    }
     const st = data as FocusState;
-    setErr(null); setState(st); setSkew(new Date(st.server_now).getTime() - Date.now());
+    setErr(null);
+    setState(st);
+    setSkew(new Date(st.server_now).getTime() - Date.now());
     if (!st.active) setExiting(false);
   }, []);
 
-  useEffect(() => { alive.current = true; void load(); const t = setInterval(load, 10000); return () => { alive.current = false; clearInterval(t); }; }, [load]);
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    alive.current = true;
+    void load();
+    const t = setInterval(load, 10000);
+    return () => {
+      alive.current = false;
+      clearInterval(t);
+    };
+  }, [load]);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
   useEffect(() => {
     if (!exiting || wait <= 0) return;
     const t = setTimeout(() => setWait((w) => w - 1), 1000);
@@ -39,12 +62,18 @@ export function Focus() {
 
   async function start() {
     const { error } = await supabase.rpc("start_focus_session", { p_minutes: minutes });
-    if (error) setErr(errorText(error)); else void load();
+    if (error) setErr(errorText(error));
+    else void load();
   }
   async function end() {
     if (!state?.session_id) return;
     const { error } = await supabase.rpc("end_focus_session", { p_session_id: state.session_id, p_reason: reason });
-    if (error) setErr(errorText(error)); else { setExiting(false); setReason(""); void load(); }
+    if (error) setErr(errorText(error));
+    else {
+      setExiting(false);
+      setReason("");
+      void load();
+    }
   }
 
   const left = state?.ends_at ? new Date(state.ends_at).getTime() - (now + skew) : 0;
@@ -60,7 +89,13 @@ export function Focus() {
           {state.locked ? (
             <Text style={s.quiet}>This session is locked. Only your partner can end it early; ask them in Sparrow on the website.</Text>
           ) : !exiting ? (
-            <Button label="End early" onPress={() => { setWait(30); setExiting(true); }} />
+            <Button
+              label="End early"
+              onPress={() => {
+                setWait(30);
+                setExiting(true);
+              }}
+            />
           ) : wait > 0 ? (
             <View style={{ gap: 10 }}>
               <Text style={s.h2}>Take a breath first</Text>
@@ -82,12 +117,18 @@ export function Focus() {
       ) : (
         <View style={s.panel}>
           <Text style={s.h2}>Start a session</Text>
-          <View style={s.row}>{DURATIONS.map((d) => <Button key={d} label={`${d} min`} on={minutes === d} onPress={() => setMinutes(d)} />)}</View>
+          <View style={s.row}>
+            {DURATIONS.map((d) => (
+              <Button key={d} label={`${d} min`} on={minutes === d} onPress={() => setMinutes(d)} />
+            ))}
+          </View>
           <Button primary label="Start focusing" onPress={start} />
         </View>
       )}
       <View style={s.note}>
-        <Text style={s.quiet}>Blocking apps on this phone is coming next. For now, sessions you start here block sites in your browser extension, and the timer stays in sync.</Text>
+        <Text style={s.quiet}>
+          Blocking apps on this phone is coming next. For now, sessions you start here block sites in your browser extension, and the timer stays in sync.
+        </Text>
       </View>
     </ScrollView>
   );

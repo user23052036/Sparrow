@@ -17,28 +17,52 @@ globalThis.chrome = {
         const list = typeof keys === "string" ? [keys] : Array.isArray(keys) ? keys : Object.keys(keys ?? {});
         return Object.fromEntries(list.filter((k) => k in store).map((k) => [k, store[k]]));
       },
-      async set(obj) { Object.assign(store, obj); },
+      async set(obj) {
+        Object.assign(store, obj);
+      },
     },
   },
-  alarms: { async get() { return null; }, create() {}, async clear() {}, onAlarm: { addListener() {} } },
+  alarms: {
+    async get() {
+      return null;
+    },
+    create() {},
+    async clear() {},
+    onAlarm: { addListener() {} },
+  },
   runtime: {
     onInstalled: { addListener() {} },
     onStartup: { addListener() {} },
-    onMessage: { addListener(fn) { onMessage = fn; } },
+    onMessage: {
+      addListener(fn) {
+        onMessage = fn;
+      },
+    },
     getManifest: () => ({ version: "0.1.0" }),
     getPlatformInfo: async () => ({ os: "mac" }),
     getURL: (p) => `chrome-extension://abc${p}`,
   },
   declarativeNetRequest: {
-    async getDynamicRules() { return rules; },
+    async getDynamicRules() {
+      return rules;
+    },
     async updateDynamicRules({ removeRuleIds = [], addRules = [] }) {
       rules = rules.filter((r) => !removeRuleIds.includes(r.id)).concat(addRules);
     },
   },
-  action: { async setBadgeText({ text }) { badge.text = text; }, async setBadgeBackgroundColor() {} },
+  action: {
+    async setBadgeText({ text }) {
+      badge.text = text;
+    },
+    async setBadgeBackgroundColor() {},
+  },
   tabs: {
-    async query() { return openTabs; },
-    async update(id, props) { tabsUpdated.push({ id, ...props }); },
+    async query() {
+      return openTabs;
+    },
+    async update(id, props) {
+      tabsUpdated.push({ id, ...props });
+    },
     async create() {},
   },
 };
@@ -61,11 +85,17 @@ globalThis.fetch = async (url, init = {}) => {
     if (u.endsWith("/get_focus_state")) {
       const now = Date.now();
       return json(200, {
-        server_now: new Date(now).toISOString(), active: server.active, session_id: server.active ? "s1" : null,
-        ends_at: new Date(now + server.minutes * 60000).toISOString(), domains: server.domains,
+        server_now: new Date(now).toISOString(),
+        active: server.active,
+        session_id: server.active ? "s1" : null,
+        ends_at: new Date(now + server.minutes * 60000).toISOString(),
+        domains: server.domains,
       });
     }
-    if (u.endsWith("/heartbeat")) { server.heartbeats++; return json(200, {}); }
+    if (u.endsWith("/heartbeat")) {
+      server.heartbeats++;
+      return json(200, {});
+    }
   }
   return json(404, { message: "not found" });
 };
@@ -73,9 +103,16 @@ globalThis.fetch = async (url, init = {}) => {
 await import("../background.js");
 
 const send = (msg, sender = { tab: { id: 1 }, url: "http://localhost:3000/extension" }) =>
-  new Promise((resolve) => { onMessage(msg, sender, resolve); });
+  new Promise((resolve) => {
+    onMessage(msg, sender, resolve);
+  });
 const connectMsg = (over = {}) => ({
-  type: "SPARROW_CONNECT_PASSWORD", supabaseUrl: "https://abc.supabase.co", anonKey: "pk", email: "me@x.com", password: server.password, ...over,
+  type: "SPARROW_CONNECT_PASSWORD",
+  supabaseUrl: "https://abc.supabase.co",
+  anonKey: "pk",
+  email: "me@x.com",
+  password: server.password,
+  ...over,
 });
 
 test("starts disconnected", async () => {
@@ -98,7 +135,10 @@ test("wrong password is rejected with a readable message and nothing is stored",
 });
 
 test("connecting signs in, syncs, blocks the listed sites and sends redirects for open tabs", async () => {
-  openTabs = [{ id: 7, url: "https://www.youtube.com/watch?v=1" }, { id: 8, url: "https://example.com/" }];
+  openTabs = [
+    { id: 7, url: "https://www.youtube.com/watch?v=1" },
+    { id: 8, url: "https://example.com/" },
+  ];
   const r = await send(connectMsg());
   assert.equal(r.ok, true);
   assert.equal(r.connected, true);
@@ -108,7 +148,10 @@ test("connecting signs in, syncs, blocks the listed sites and sends redirects fo
   assert.equal(rules.length, 2);
   assert.deepEqual(rules[0].condition.requestDomains, ["youtube.com"]);
   assert.equal(badge.text, "10");
-  assert.deepEqual(tabsUpdated.map((t) => t.id), [7]);
+  assert.deepEqual(
+    tabsUpdated.map((t) => t.id),
+    [7],
+  );
   assert.ok(server.heartbeats >= 1);
   assert.equal(store.password, undefined);
   assert.ok(!JSON.stringify(store).includes(server.password), "password must never be stored");

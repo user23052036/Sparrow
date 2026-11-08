@@ -16,6 +16,7 @@ A gentle daily accountability app for people who struggle with focus, motivation
 - **Accountability partner:** invite one person with a link. Each of you sees what you choose to share (your day, focus moments, and proofs one at a time). They can approve a proof or ask a question.
 - **Partner key:** lock a focus session so only your partner can end it early. You ask, they decide. Ending the partnership releases any lock immediately.
 - **Lighter days:** a low mood check-in, or three hard days in a row, offers a small day (one or two things, no stake). The support page is one tap from Settings and the evening review.
+- **Install and feedback:** the website installs as an app (PWA), has a feedback button, and a plain-language privacy page.
 - **Privacy:** every table has Row-Level Security; proofs are private by default.
 
 ## Project layout
@@ -80,9 +81,11 @@ Today it signs in, shows your plan, starts and stops focus sessions, and lets yo
 ```bash
 npm test                  # shared logic: points, domains, image hash, gentle wording
 npm run test:extension    # extension logic: rules, clock skew, domain matching
+npm run lint && npm run format:check
+npm run test:e2e          # Playwright in Chromium against a fake Supabase (first run: npx playwright install chromium)
 npm run typecheck
 npm run build
-bash supabase/tests/run.sh   # migrations + 40+ privacy/RLS checks on a local PostgreSQL 15+
+bash supabase/tests/run.sh   # migrations (0001 to 0008) + privacy/RLS checks on a local PostgreSQL 15+
 ```
 
 ## Known limits
@@ -97,6 +100,8 @@ bash supabase/tests/run.sh   # migrations + 40+ privacy/RLS checks on a local Po
 
 - [`docs/PLAN.md`](docs/PLAN.md): implementation plan and milestones
 - [`docs/DECISIONS.md`](docs/DECISIONS.md): what was cut or deferred, and why
+- [`docs/BETA.md`](docs/BETA.md): closed beta runbook and metrics
+- [`docs/STORE_LISTING.md`](docs/STORE_LISTING.md): Chrome Web Store listing draft
 
 ## License
 

@@ -1,12 +1,28 @@
 {
   "name": "sparrow",
   "private": true,
-  "workspaces": ["apps/web", "apps/mobile", "packages/shared"],
+  "workspaces": [
+    "apps/web",
+    "apps/mobile",
+    "packages/shared"
+  ],
   "scripts": {
     "dev": "npm run dev -w apps/web",
     "build": "npm run build -w apps/web",
     "typecheck": "npm run typecheck -w packages/shared && npm run typecheck -w apps/web && npm run typecheck -w apps/mobile",
     "test": "npm run test -w packages/shared",
-    "test:extension": "node --test apps/extension/tests/*.test.js"
+    "test:extension": "node --test apps/extension/tests/*.test.js",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:e2e": "npm run test:e2e -w apps/web"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.14.0",
+    "prettier": "^3.9.10",
+    "typescript-eslint": "^8.72.1"
   }
 }

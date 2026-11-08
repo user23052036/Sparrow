@@ -14,7 +14,10 @@ import { s } from "./theme";
 
 type Tab = "today" | "focus" | "apps" | "account";
 const TABS: { id: Tab; label: string }[] = [
-  { id: "today", label: "Today" }, { id: "focus", label: "Focus" }, { id: "apps", label: "Apps" }, { id: "account", label: "Account" },
+  { id: "today", label: "Today" },
+  { id: "focus", label: "Focus" },
+  { id: "apps", label: "Apps" },
+  { id: "account", label: "Account" },
 ];
 
 export default function App() {
@@ -24,14 +27,25 @@ export default function App() {
   const [tab, setTab] = useState<Tab>("today");
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true); });
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setReady(true);
+    });
     const { data } = supabase.auth.onAuthStateChange((_e, sess) => setSession(sess));
     return () => data.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (!session) { setProfile(null); return; }
-    supabase.from("profiles").select("*").eq("id", session.user.id).maybeSingle().then(({ data }) => setProfile((data as Profile) ?? null));
+    if (!session) {
+      setProfile(null);
+      return;
+    }
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .maybeSingle()
+      .then(({ data }) => setProfile((data as Profile) ?? null));
     void registerDevice(false);
   }, [session]);
 
@@ -43,7 +57,12 @@ export default function App() {
       </SafeAreaView>
     );
   }
-  if (!ready) return <SafeAreaView style={s.screen}><Text style={[s.quiet, { padding: 24 }]}>Loading…</Text></SafeAreaView>;
+  if (!ready)
+    return (
+      <SafeAreaView style={s.screen}>
+        <Text style={[s.quiet, { padding: 24 }]}>Loading…</Text>
+      </SafeAreaView>
+    );
   if (!session) return <Login />;
 
   return (

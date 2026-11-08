@@ -13,11 +13,14 @@ export default function ExtensionPage() {
   const email = session?.user.email ?? "";
 
   const refresh = useCallback(async () => setSt(await extStatus()), []);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   async function connect(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true); setErr(null);
+    setBusy(true);
+    setErr(null);
     try {
       await extRequest("SPARROW_CONNECT_PASSWORD", { supabaseUrl: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY, email, password }, 20000);
       setPassword("");
@@ -42,9 +45,15 @@ export default function ExtensionPage() {
         <div className="panel stack">
           <h3>Install it on this computer</h3>
           <ol>
-            <li>Open <code>chrome://extensions</code> (or <code>edge://extensions</code>, <code>brave://extensions</code>).</li>
-            <li>Turn on <strong>Developer mode</strong>.</li>
-            <li>Click <strong>Load unpacked</strong> and choose the <code>apps/extension</code> folder from the Sparrow project.</li>
+            <li>
+              Open <code>chrome://extensions</code> (or <code>edge://extensions</code>, <code>brave://extensions</code>).
+            </li>
+            <li>
+              Turn on <strong>Developer mode</strong>.
+            </li>
+            <li>
+              Click <strong>Load unpacked</strong> and choose the <code>apps/extension</code> folder from the Sparrow project.
+            </li>
             <li>Come back to this page and reload it.</li>
           </ol>
           <button onClick={refresh}>Check again</button>
@@ -56,11 +65,15 @@ export default function ExtensionPage() {
           <p className="quiet">The extension keeps its own sign-in. Enter your Sparrow password for {email}. It's used once to sign in and isn't stored.</p>
           <div>
             <label htmlFor="ext-password">Password</label>
-            <input id="ext-password" type="password" autoComplete="current-password" required
-              value={password} onChange={(e) => setPassword(e.target.value)} />
+            <input id="ext-password" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
-          <button className="primary" disabled={busy || !password}>Connect</button>
-          <p className="small quiet">Signed in with an email link and never set a password? Create one by using "Create an account" on the sign-in page with a different email, or ask for a password reset in Supabase.</p>
+          <button className="primary" disabled={busy || !password}>
+            Connect
+          </button>
+          <p className="small quiet">
+            Signed in with an email link and never set a password? Create one by using "Create an account" on the sign-in page with a different email, or ask
+            for a password reset in Supabase.
+          </p>
         </form>
       )}
       {st.installed && st.connected && (
@@ -68,10 +81,18 @@ export default function ExtensionPage() {
           <h3>Connected</h3>
           <p>This browser blocks your listed sites during focus sessions. Signed in as {st.email}.</p>
           <p className="small quiet">It checks for changes every 30 seconds, and instantly when you use Sparrow in this browser.</p>
-          <div><button className="ghost" onClick={disconnect}>Disconnect this browser</button></div>
+          <div>
+            <button className="ghost" onClick={disconnect}>
+              Disconnect this browser
+            </button>
+          </div>
         </div>
       )}
-      {err && <p className="error" role="alert">{err}</p>}
+      {err && (
+        <p className="error" role="alert">
+          {err}
+        </p>
+      )}
     </div>
   );
 }

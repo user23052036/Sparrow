@@ -1,20 +1,84 @@
 :root {
-  --mist: #eef2ef; --surface: #f8faf8; --ink: #1e2a2f; --ink-soft: #4c5b61; --line: #c9d3cd;
-  --sparrow: #7a5a40; --sky: #3d6a86; --sky-ink: #fff; --ochre: #b08d4f;
+  --mist: #eef2ef;
+  --surface: #f8faf8;
+  --ink: #1e2a2f;
+  --ink-soft: #4c5b61;
+  --line: #c9d3cd;
+  --sparrow: #7a5a40;
+  --sky: #3d6a86;
+  --sky-ink: #fff;
+  --ochre: #b08d4f;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root { --mist: #141b1e; --surface: #1b2428; --ink: #e6ece8; --ink-soft: #a7b5b0; --line: #34424a;
-    --sparrow: #c9a27f; --sky: #7fb1cf; --sky-ink: #0f1a20; --ochre: #d4b276; color-scheme: dark; }
+  :root {
+    --mist: #141b1e;
+    --surface: #1b2428;
+    --ink: #e6ece8;
+    --ink-soft: #a7b5b0;
+    --line: #34424a;
+    --sparrow: #c9a27f;
+    --sky: #7fb1cf;
+    --sky-ink: #0f1a20;
+    --ochre: #d4b276;
+    color-scheme: dark;
+  }
 }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--mist); color: var(--ink); font: 15px/1.5 "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif; }
-h1, h2 { font-family: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; line-height: 1.15; margin: 0 0 .4rem; }
-p { margin: 0 0 .6rem; }
-.quiet { color: var(--ink-soft); }
-.small { font-size: 13px; }
-button { font: inherit; cursor: pointer; border-radius: 999px; padding: .5rem 1rem; border: 1px solid var(--line); background: var(--surface); color: var(--ink); min-height: 40px; }
-button.primary { background: var(--sky); border-color: var(--sky); color: var(--sky-ink); font-weight: 700; }
-button:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
-.row { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
-.note { border-left: 3px solid var(--ochre); padding-left: .6rem; }
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--mist);
+  color: var(--ink);
+  font:
+    15px/1.5 "Atkinson Hyperlegible",
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+}
+h1,
+h2 {
+  font-family: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.15;
+  margin: 0 0 0.4rem;
+}
+p {
+  margin: 0 0 0.6rem;
+}
+.quiet {
+  color: var(--ink-soft);
+}
+.small {
+  font-size: 13px;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  min-height: 40px;
+}
+button.primary {
+  background: var(--sky);
+  border-color: var(--sky);
+  color: var(--sky-ink);
+  font-weight: 700;
+}
+button:focus-visible {
+  outline: 3px solid var(--sky);
+  outline-offset: 2px;
+}
+.row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.note {
+  border-left: 3px solid var(--ochre);
+  padding-left: 0.6rem;
+}

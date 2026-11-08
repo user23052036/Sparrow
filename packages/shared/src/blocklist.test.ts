@@ -11,6 +11,5 @@ describe("normalizePackageList", () => {
     expect(normalizePackageList([" com.a.b ", "COM.A.B", "nope", "com.c.d"])).toEqual(["com.a.b", "com.c.d"]));
   it("never lets the dialer, messages, emergency or Sparrow be blocked", () =>
     expect(normalizePackageList(["com.sparrow.app", "com.google.android.dialer", "com.android.emergency", "com.x.y"])).toEqual(["com.x.y"]));
-  it("caps the list", () =>
-    expect(normalizePackageList(Array.from({ length: 400 }, (_, i) => `com.app.n${i}`))).toHaveLength(MAX_ANDROID_PACKAGES));
+  it("caps the list", () => expect(normalizePackageList(Array.from({ length: 400 }, (_, i) => `com.app.n${i}`))).toHaveLength(MAX_ANDROID_PACKAGES));
 });

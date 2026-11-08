@@ -30,9 +30,18 @@ async function deviceLabel() {
 async function ensureAlarm() {
   if (!(await chrome.alarms.get(TICK))) chrome.alarms.create(TICK, { periodInMinutes: 0.5 });
 }
-chrome.runtime.onInstalled.addListener(() => { void ensureAlarm(); void deviceId(); void sync(); });
-chrome.runtime.onStartup.addListener(() => { void ensureAlarm(); void sync(); });
-chrome.alarms.onAlarm.addListener((a) => { if (a.name === TICK || a.name === END) void sync(); });
+chrome.runtime.onInstalled.addListener(() => {
+  void ensureAlarm();
+  void deviceId();
+  void sync();
+});
+chrome.runtime.onStartup.addListener(() => {
+  void ensureAlarm();
+  void sync();
+});
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a.name === TICK || a.name === END) void sync();
+});
 void ensureAlarm();
 
 // ------------------------------------------------------------------ sync
@@ -60,7 +69,10 @@ async function doSync() {
       : { active: false, domains: normalizeDomainList(fs.domains) };
     await set({ focus, lastSyncAt: now, lastError: null });
     await api.rpc(config, getAuth, saveAuth, "heartbeat", {
-      p_device_id: await deviceId(), p_platform: "extension", p_label: await deviceLabel(), p_protection: true,
+      p_device_id: await deviceId(),
+      p_platform: "extension",
+      p_label: await deviceLabel(),
+      p_protection: true,
     });
   } catch (e) {
     if (e instanceof api.AuthError) {
@@ -113,7 +125,9 @@ async function closeOutOpenTabs(domains) {
       if (hostMatches(new URL(t.url).hostname, domains)) {
         await chrome.tabs.update(t.id, { url: chrome.runtime.getURL(BLOCKED_PAGE) });
       }
-    } catch { /* tab closed or not accessible */ }
+    } catch {
+      /* tab closed or not accessible */
+    }
   }
 }
 

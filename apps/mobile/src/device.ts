@@ -32,7 +32,10 @@ export async function registerDevice(protectionOn: boolean): Promise<void> {
   if (!ENGINE_READY) return;
   const id = await getDeviceId();
   await supabase.rpc("heartbeat", {
-    p_device_id: id, p_platform: "android", p_label: Device.modelName ?? "Android phone", p_protection: protectionOn,
+    p_device_id: id,
+    p_platform: "android",
+    p_label: Device.modelName ?? "Android phone",
+    p_protection: protectionOn,
   });
   try {
     const perm = await Notifications.requestPermissionsAsync();
