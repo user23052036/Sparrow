@@ -2,7 +2,7 @@
 
 A gentle daily accountability app for people who struggle with focus, motivation, internet and phone addiction, or low mood.
 
-**Status:** Working prototype: website + Chrome extension, plus an Android app shell (M5b-1). App blocking on the phone comes next (see `docs/PLAN.md`, milestone M5b-2).
+**Status:** Working prototype: website + Chrome extension, plus an Android app with an app-blocking engine (M5b-2 to M5b-4) that is written but not yet tried on a real phone (see `docs/DECISIONS.md`, D29).
 
 ## What works in this prototype
 
@@ -20,6 +20,10 @@ A gentle daily accountability app for people who struggle with focus, motivation
 - **Calendar import:** choose an `.ics` file (Google Calendar, Apple Calendar and Outlook can export one) and pick events to add as tasks. Read on your device only.
 - **Kind act:** after a day with something that didn't happen, log one small kind thing for someone (+5 points, once a day). No money, nothing shared.
 - **Progress page:** private badges, a mood trend in words, and how many days you supported your partner. Nothing is ranked or rated.
+- **Suggested number of tasks:** the morning suggests how many things to pick, from your last seven days and your mood. It only suggests.
+- **Make-up step stake:** instead of points, stake one five-minute step for tomorrow if something doesn't happen. Just one, however the day goes, and you can let it go.
+- **Voice-note proof:** record up to a minute about what you did. Private unless you share it with your partner, who can play it.
+- **Circles:** a small group of two to four people who see each other's counts (not task titles) and focus minutes, and can send one cheer a day. Separate from your partner.
 - **Your data:** download everything Sparrow holds about you, or delete the account (photos included), from Settings.
 - **Install and feedback:** the website installs as an app (PWA), has a feedback button, and a plain-language privacy page.
 - **Privacy:** every table has Row-Level Security; proofs are private by default.
@@ -42,7 +46,7 @@ You need Node.js 20+ and a free [Supabase](https://supabase.com) account.
 ### 1. Create the Supabase project
 
 1. Create a new project in Supabase.
-2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0016`).
+2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0020`).
 3. **Authentication → URL Configuration:** set Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to Redirect URLs.
 4. **Authentication → Sign In / Providers → User Signups:** turn **Confirm email** off, so new accounts work immediately without an email service. (Turn it back on once you connect your own SMTP provider for real users.)
 
@@ -79,7 +83,7 @@ cd apps/mobile && npx expo install --fix         # align package versions with y
 npx expo run:android                              # builds and installs the development build
 ```
 
-Today it signs in, shows your plan, starts and stops focus sessions, and lets you pick apps for your list. It does **not** block apps yet. If the Kotlin module fails to build, the app still runs and offers manual app-id entry. **This shell was written without a device, so expect small fixes on first run.**
+It signs in, shows your plan, starts and stops focus sessions, and lets you pick apps for your list. To block apps, open the **Protect** tab: read the disclosure, switch on "Sparrow focus blocking" in Accessibility, let Sparrow run in the background, and (on Xiaomi, Oppo, Vivo, Samsung and similar) allow autostart. From then on, a session started on any device reaches the phone within about 30 seconds, also when the app is closed, and the listed apps show a calm "This can wait." screen until it ends. Phone, messages, emergency, Settings and your home screen are never blocked. Firebase is not needed for blocking. **The blocking engine was written without a device or the Android SDK, so expect small fixes on the first build.**
 
 ## Tests
 
@@ -91,14 +95,15 @@ npm run test:e2e          # Playwright in Chromium against a fake Supabase (firs
 npm run typecheck
 npm run build
 npm run test:functions   # delete-account Edge Function logic (node --test)
-bash supabase/tests/run.sh   # migrations (0001 to 0016) + privacy/RLS checks on a local PostgreSQL 15+
+bash supabase/tests/run.sh   # migrations (0001 to 0020) + privacy/RLS checks on a local PostgreSQL 15+
+apps/mobile/modules/sparrow-blocker/android/run-jvm-tests.sh   # Android blocking rules on a plain JVM (needs kotlinc)
 ```
 
 ## Known limits
 
 - Blocking is friction, not a lock: the extension can be disabled, and another browser isn't covered. That's why going quiet mid-session is logged.
 - A session started on another device can take up to ~30 seconds to reach this browser.
-- Partner pings are in-app only (a badge and the Partner page); there is no email or push notification yet. No Android app yet (M5b).
+- Partner pings are in-app only (a badge and the Partner page); there is no email or push notification yet. Android app blocking is untested on real phones.
 - The partner flow needs two accounts, so try it with a friend (or a second email).
 - Photo "proof" raises the effort of faking; it doesn't prove anything. Re-used photos are flagged.
 
