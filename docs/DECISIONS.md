@@ -80,3 +80,17 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Reason:** The database treats every `android` row in `devices` as a device that is blocking. Registering a phone that cannot block yet would log false "blocking went quiet" events during sessions, and a partner who opted in to see tamper events would see them.
 **Also:** Android uses the same email + password sign-in as the web (D14), a raw FCM token (not an Expo push token), and lists apps through `queryIntentActivities` instead of the Play-restricted `QUERY_ALL_PACKAGES`.
 **Status:** Prototype. Untested on a real device (see README).
+
+## D18 — Beta metrics come from existing tables, and there is no tracking
+**Decision:** The beta is measured by `beta_metrics()` (migration `0008`), a SQL function over data the app already stores (plans, reviews, focus sessions, proofs, partnerships, feedback). It is callable only by the project owner. There are no analytics scripts, no event stream and no third-party services. The only new table is `feedback`, which the user writes on purpose.
+**Reason:** The audience may be struggling, and the plan promises privacy-respecting analytics. Everything the plan lists as a metric can be derived from product data, so extra tracking would add risk and no information.
+**Trade-offs:** No funnel or click data, and no per-person views. Retention is computed from plan dates, so it measures use of the planning loop, not page visits. With 20 to 50 users the rates are noisy; read trends, not decimals.
+**Also:** The scheduled heartbeat check (`check_all_heartbeats()`) is guarded: if `pg_cron` is not enabled, the migration prints a notice and everything else still works.
+**Not built, on purpose:** account deletion from inside the app. Storage objects (proof photos) cannot be removed with SQL, so a correct delete needs a server-side function with the service key. It is the first thing to add before a public launch.
+**Status:** Final for the beta.
+
+## D19 — Browser tests run against a fake backend; the SQL tests own the rules
+**Decision:** Playwright tests (`apps/web/e2e`) drive the real web app in a real browser and answer every Supabase request from an in-memory fake (`fake-supabase.ts`). Business rules (RLS, points, light-day caps) are verified against real PostgreSQL by `supabase/tests/rls_test.sql`; the fake reuses the shared scoring and light-day constants so the two cannot drift silently.
+**Reason:** A full local Supabase stack needs Docker and is slow and flaky in CI. The browser tests are meant to catch UI wiring, copy and flow regressions, not database behavior.
+**Trade-off:** The fake can accept something the real database would reject. When a rule changes, change the SQL test first.
+**Status:** Final.

@@ -20,13 +20,14 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const root = resolve(__dirname, "../../..");
-const SKIP = new Set(["node_modules", ".next", "tests", "icons", "public"]);
+// Test folders and tool config are not user-facing (e2e specs even assert that banned words are absent).
+const SKIP = new Set(["node_modules", ".next", "tests", "e2e", "icons", "public", "test-results", "playwright-report"]);
 function sources(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
     if (SKIP.has(n)) return [];
     const p = join(dir, n);
     if (statSync(p).isDirectory()) return sources(p);
-    return /\.(tsx?|jsx?|html|css)$/.test(n) && !/\.test\./.test(n) ? [p] : [];
+    return /\.(tsx?|jsx?|html|css)$/.test(n) && !/\.test\./.test(n) && !/^playwright\.config\./.test(n) ? [p] : [];
   });
 }
 describe("copy audit across the apps", () => {

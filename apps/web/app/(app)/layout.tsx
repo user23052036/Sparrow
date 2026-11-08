@@ -6,6 +6,8 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { copy } from "@sparrow/shared";
 import { isConfigured, supabase } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
+import { InstallBanner } from "@/components/InstallBanner";
+import { FeedbackButton } from "@/components/FeedbackButton";
 
 const NAV = [
   { href: "/today", label: copy.nav.today },
@@ -95,9 +97,14 @@ function Guard({ children }: { children: ReactNode }) {
           </nav>
         )}
       </header>
+      <InstallBanner />
       <main className="shell">{children}</main>
-      <footer className="shell small quiet" style={{ paddingTop: 0 }}>
-        <Link href="/help">{copy.nav.support}</Link>
+      <footer className="shell small quiet stack" style={{ paddingTop: 0 }}>
+        {profile.onboarded && <FeedbackButton />}
+        <div className="row">
+          <Link href="/help">{copy.nav.support}</Link>
+          <Link href="/privacy">{copy.nav.privacy}</Link>
+        </div>
       </footer>
     </>
   );

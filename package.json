@@ -14,7 +14,8 @@
     "test:extension": "node --test apps/extension/tests/*.test.js",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:e2e": "npm run test:e2e -w apps/web"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

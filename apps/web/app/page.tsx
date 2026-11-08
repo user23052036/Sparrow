@@ -36,6 +36,9 @@ export default function Home() {
         <Link className="button" href="/help">
           {copy.landing.support}
         </Link>
+        <Link className="button" href="/privacy">
+          {copy.nav.privacy}
+        </Link>
       </div>
     </main>
   );

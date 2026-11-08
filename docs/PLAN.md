@@ -158,6 +158,7 @@ Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 - **Done when:** low mood visibly changes the flow; no screen fails the checklist.
 
 ### M8 — Closed beta
+- **Built:** PWA install, feedback button, privacy page, owner-only `beta_metrics()`, scheduled heartbeat check, extension store packaging (`docs/STORE_LISTING.md`). **Left for a human:** deployment, SMTP, Web Store submission, recruiting (`docs/BETA.md`). Android distribution waits for M5b-2 to M5b-5.
 - PWA install prompt, Chrome Web Store submission, Android internal testing track (or direct APK), feedback button, privacy-respecting analytics.
 - **Metrics:** daily completion rate; 1/7/30-day retention; focus sessions per active user; early-exit and tamper rates; proof rate; buddy-pair retention; self-reported helpfulness and mood trend.
 - **Done when:** 20–50 users, including people outside the founder's circle.
