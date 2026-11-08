@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   copy,
   dayShape,
+  ifThenLine,
   isHeavyStretch,
   isLowMood,
   MAX_POINT_STAKE,
@@ -253,6 +254,7 @@ function ItemCard({
         <h3 style={{ margin: 0 }}>{task.title}</h3>
         <span className={`small ${item.status === "done" ? "status-done" : ""}`}>{label[item.status]}</span>
       </div>
+      {ifThenLine(task) && <p className="small quiet">{ifThenLine(task)}</p>}
       {steps.length > 0 && (
         <ul className="steps">
           {steps.map((s) => (

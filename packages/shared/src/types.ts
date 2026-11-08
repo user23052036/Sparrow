@@ -19,6 +19,9 @@ export interface Task {
   notes: string | null;
   proof_required: boolean;
   archived: boolean;
+  /** "If X, then I will Y" plan; both parts or neither. */
+  if_cue?: string | null;
+  then_action?: string | null;
   created_at: string;
 }
 

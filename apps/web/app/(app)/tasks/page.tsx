@@ -3,15 +3,38 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { copy, type Task, type TaskStep } from "@sparrow/shared";
+import { cleanIfThen, copy, ifThenLine, type Task, type TaskStep } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 
 function TaskEditor({ task, steps, reload }: { task: Task; steps: TaskStep[]; reload: () => void }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [cue, setCue] = useState(task.if_cue ?? "");
+  const [action, setAction] = useState(task.then_action ?? "");
+  const [planNote, setPlanNote] = useState<string | null>(null);
   const sb = supabase();
 
+  async function savePlan(e: React.FormEvent) {
+    e.preventDefault();
+    const clean = cleanIfThen(cue, action);
+    // One half filled: keep what they typed and say what's missing, instead of saving nothing silently.
+    if (!clean.if_cue && (cleanIfThen(cue, "x").if_cue || cleanIfThen("x", action).then_action)) {
+      setPlanNote(null);
+      setErr(copy.tasks.planNeedsBoth);
+      return;
+    }
+    const { error } = await sb.from("tasks").update(clean).eq("id", task.id);
+    if (error) {
+      setErr(errorText(error));
+      return;
+    }
+    setErr(null);
+    setCue(clean.if_cue ?? "");
+    setAction(clean.then_action ?? "");
+    setPlanNote(clean.if_cue ? copy.tasks.planSaved : null);
+    reload();
+  }
   async function run(p: PromiseLike<{ error: unknown }>) {
     const { error } = await p;
     if (error) setErr(errorText(error));
@@ -47,6 +70,7 @@ function TaskEditor({ task, steps, reload }: { task: Task; steps: TaskStep[]; re
             {steps.length === 0 ? copy.tasks.noSteps : copy.tasks.steps(steps.length)}
             {task.proof_required && copy.tasks.proofAsked}
           </div>
+          {ifThenLine(task) && <div className="small">{ifThenLine(task)}</div>}
         </div>
         <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? copy.tasks.close : copy.tasks.edit}
@@ -85,6 +109,44 @@ function TaskEditor({ task, steps, reload }: { task: Task; steps: TaskStep[]; re
               style={{ flex: 1, minWidth: 180 }}
             />
             <button>{copy.tasks.addStep}</button>
+          </form>
+          <form onSubmit={savePlan} className="stack" aria-label={copy.tasks.planTitle}>
+            <strong className="small">{copy.tasks.planTitle}</strong>
+            <p className="small quiet">{copy.tasks.planHint}</p>
+            <div>
+              <label htmlFor={`if-${task.id}`}>{copy.tasks.planIf}</label>
+              <input id={`if-${task.id}`} value={cue} maxLength={140} placeholder={copy.tasks.planIfPlaceholder} onChange={(e) => setCue(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor={`then-${task.id}`}>{copy.tasks.planThen}</label>
+              <input
+                id={`then-${task.id}`}
+                value={action}
+                maxLength={140}
+                placeholder={copy.tasks.planThenPlaceholder}
+                onChange={(e) => setAction(e.target.value)}
+              />
+            </div>
+            <div className="row">
+              <button>{copy.tasks.planSave}</button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setCue("");
+                  setAction("");
+                  setPlanNote(null);
+                  void run(sb.from("tasks").update({ if_cue: null, then_action: null }).eq("id", task.id));
+                }}
+              >
+                {copy.tasks.planClear}
+              </button>
+              {planNote && (
+                <span className="small status-done" role="status">
+                  {planNote}
+                </span>
+              )}
+            </div>
           </form>
           <label className="check">
             <input

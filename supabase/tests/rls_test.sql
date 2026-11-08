@@ -369,3 +369,15 @@ select pg_temp.check(not exists (select 1 from devices where user_id = '99999999
 select pg_temp.check(not exists (select 1 from buddy_links where requester_id = '99999999-0000-0000-0000-0000000000a1'), 'deleting an account ends the partnership row');
 select pg_temp.check(not (select locked from focus_sessions where user_id = '99999999-0000-0000-0000-0000000000a2'), 'the partner''s locked session is released');
 select pg_temp.check(exists (select 1 from profiles where id = '99999999-0000-0000-0000-0000000000a2'), 'the partner''s own data is untouched');
+
+-- ------------------------------------------------- if-then plans (0010)
+insert into auth.users values ('88888888-0000-0000-0000-000000000001', 'i@test');
+select pg_temp.expect_error($q$insert into tasks (user_id, title, if_cue) values ('88888888-0000-0000-0000-000000000001', 'half plan', 'I sit down')$q$,
+  'an if-then plan needs both parts');
+select pg_temp.expect_error($q$insert into tasks (user_id, title, if_cue, then_action) values ('88888888-0000-0000-0000-000000000001', 'blank', '   ', 'x')$q$,
+  'an if-then plan cannot be blank');
+insert into tasks (user_id, title, if_cue, then_action) values ('88888888-0000-0000-0000-000000000001', 'full plan', 'I sit down', 'open the doc');
+select pg_temp.check((select then_action from tasks where title = 'full plan') = 'open the doc', 'a full if-then plan is stored');
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.check((select count(*) from tasks where title = 'full plan') = 0, 'another user cannot see someone else''s if-then plan');
+reset role;
