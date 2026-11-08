@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { cleanIfThen, copy, ifThenLine, type Task, type TaskStep } from "@sparrow/shared";
+import { cleanIfThen, copy, eventNote, ifThenLine, MAX_ICS_BYTES, parseIcs, type CalendarEvent, type Task, type TaskStep } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 
 function TaskEditor({ task, steps, reload }: { task: Task; steps: TaskStep[]; reload: () => void }) {
@@ -172,6 +172,102 @@ function TaskEditor({ task, steps, reload }: { task: Task; steps: TaskStep[]; re
   );
 }
 
+function CalendarImport({ onAdded }: { onAdded: () => void }) {
+  const [events, setEvents] = useState<CalendarEvent[] | null>(null);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function choose(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setMsg(null);
+    setErr(null);
+    setEvents(null);
+    if (!file) return;
+    if (file.size > MAX_ICS_BYTES) return setErr(copy.tasks.importTooBig);
+    let found: CalendarEvent[];
+    try {
+      found = parseIcs(await file.text());
+    } catch {
+      return setErr(copy.tasks.importUnreadable);
+    }
+    if (found.length === 0) return setErr(copy.tasks.importNone);
+    setEvents(found);
+    setPicked(new Set(found.map((_, i) => i)));
+  }
+  async function add() {
+    if (!events) return;
+    const rows = events.filter((_, i) => picked.has(i)).map((ev) => ({ title: ev.title, notes: eventNote(ev) }));
+    if (rows.length === 0) return;
+    setBusy(true);
+    const { error } = await supabase().from("tasks").insert(rows);
+    setBusy(false);
+    if (error) return setErr(errorText(error));
+    setEvents(null);
+    setMsg(copy.tasks.importDone(rows.length));
+    onAdded();
+  }
+
+  return (
+    <div className="panel stack">
+      <h3>{copy.tasks.importTitle}</h3>
+      <p className="small quiet">{copy.tasks.importHint}</p>
+      <div>
+        <label htmlFor="ics-file">{copy.tasks.importChoose}</label>
+        <input id="ics-file" type="file" accept=".ics,text/calendar" onChange={choose} />
+      </div>
+      {events && (
+        <>
+          <p role="status">{copy.tasks.importCount(events.length)}</p>
+          <ul style={{ listStyle: "none" }}>
+            {events.map((ev, i) => (
+              <li key={i}>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={picked.has(i)}
+                    onChange={(c) =>
+                      setPicked((s) => {
+                        const n = new Set(s);
+                        if (c.target.checked) n.add(i);
+                        else n.delete(i);
+                        return n;
+                      })
+                    }
+                  />
+                  <span>
+                    {ev.title} <span className="small quiet">{eventNote(ev).replace("From your calendar: ", "")}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="row">
+            <button className="primary" disabled={busy || picked.size === 0} onClick={add}>
+              {copy.tasks.importAdd(picked.size)}
+            </button>
+            <button type="button" className="ghost" onClick={() => setEvents(null)}>
+              {copy.tasks.importCancel}
+            </button>
+          </div>
+        </>
+      )}
+      {msg && (
+        <p className="note" role="status">
+          {msg}
+        </p>
+      )}
+      {err && (
+        <p className="error" role="alert">
+          {err}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function TasksInner() {
   const first = useSearchParams().get("first") === "1";
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -234,6 +330,7 @@ function TasksInner() {
           ))}
         </ul>
       )}
+      <CalendarImport onAdded={load} />
       {(first || tasks.length > 0) && tasks.length > 0 && (
         <Link className="button primary" href="/today">
           {copy.tasks.planToday}

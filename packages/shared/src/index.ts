@@ -8,3 +8,4 @@ export * from "./safety";
 export * from "./blocklist";
 export * from "./imagesize";
 export * from "./ifthen";
+export * from "./ics";
