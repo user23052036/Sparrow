@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   copy,
+  CURRENCY_SYMBOL,
   dayShape,
   ifThenLine,
   isHeavyStretch,
@@ -10,6 +11,8 @@ import {
   KIND_ACT_POINTS,
   MAX_POINT_STAKE,
   nextDay,
+  type Charity,
+  type Pledge,
   trimToLight,
   type DailyPlan,
   type ItemStatus,
@@ -23,6 +26,7 @@ import { Branch } from "@/components/Branch";
 import { MoodPicker } from "@/components/MoodPicker";
 import { StepTimer } from "@/components/StepTimer";
 import { ProofCapture } from "@/components/ProofCapture";
+import { SupportNudge } from "@/components/SupportNudge";
 
 interface Data {
   plan: DailyPlan;
@@ -37,6 +41,8 @@ interface Data {
   partnerName: string | null;
   /** Plans (days) that already have a kind act. */
   kindActs: string[];
+  charities: Charity[];
+  pledges: Pledge[];
 }
 
 async function loadData(): Promise<Data> {
@@ -44,7 +50,7 @@ async function loadData(): Promise<Data> {
   const today = await sb.rpc("get_today");
   if (today.error) throw today.error;
   const plan = today.data as DailyPlan;
-  const [unrev, tasks, items, steps, proofs, bal, recent, vers, po, kind] = await Promise.all([
+  const [unrev, tasks, items, steps, proofs, bal, recent, vers, po, kind, chars, pledges] = await Promise.all([
     sb.rpc("unreviewed_days"),
     sb.from("tasks").select("*").eq("archived", false).order("created_at"),
     sb.from("plan_items").select("*"),
@@ -55,6 +61,8 @@ async function loadData(): Promise<Data> {
     sb.from("verifications").select("proof_id, verdict, comment, created_at").order("created_at"),
     sb.rpc("partner_overview"),
     sb.from("kind_acts").select("plan_id"),
+    sb.from("charities").select("id, name, blurb").order("name"),
+    sb.from("pledges").select("id, plan_id, charity_id, amount, mode, status, owed"),
   ]);
   for (const r of [unrev, tasks, items, steps, proofs, bal, recent]) if (r.error) throw r.error;
   const proofCounts: Record<string, number> = {};
@@ -82,6 +90,8 @@ async function loadData(): Promise<Data> {
     verdicts,
     partnerName: ov?.state === "active" ? (ov.partner?.name ?? null) : null,
     kindActs: ((kind.data ?? []) as { plan_id: string }[]).map((k) => k.plan_id),
+    charities: (chars.data ?? []) as Charity[],
+    pledges: (pledges.data ?? []) as Pledge[],
   };
 }
 
@@ -402,6 +412,69 @@ function Review({
   );
 }
 
+/* ------------------------------------------------------------ pledge (practice mode) */
+function PledgePanel({ charities, reload }: { charities: Charity[]; reload: () => void }) {
+  const [limit, setLimit] = useState<number | null>(null);
+  const [amount, setAmount] = useState("10");
+  const [charity, setCharity] = useState("");
+  const [ok, setOk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    void supabase()
+      .rpc("pledge_limit")
+      .then(({ data }) => setLimit(typeof data === "number" ? data : null));
+  }, []);
+  async function set(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase().rpc("set_pledge", { p_amount: Number(amount), p_charity_id: charity, p_understood: ok });
+    setBusy(false);
+    if (error) setErr(errorText(error));
+    else reload();
+  }
+  return (
+    <form onSubmit={set} className="panel stack" aria-label={copy.pledge.title}>
+      <h3 style={{ margin: 0 }}>{copy.pledge.title}</h3>
+      <p className="note" style={{ margin: 0 }}>
+        {copy.pledge.practiceNote}
+      </p>
+      <div>
+        <label htmlFor="pledge-amount">{copy.pledge.amountLabel}</label>
+        <input id="pledge-amount" type="number" min={1} max={limit ?? 100} value={amount} onChange={(e) => setAmount(e.target.value)} />
+        {limit !== null && <p className="small quiet">{copy.pledge.limit(CURRENCY_SYMBOL, limit)}</p>}
+      </div>
+      <div>
+        <label htmlFor="pledge-charity">{copy.pledge.charityLabel}</label>
+        <select id="pledge-charity" value={charity} onChange={(e) => setCharity(e.target.value)} required>
+          <option value="">{copy.pledge.pickCharity}</option>
+          {charities.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <label className="check">
+        <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} />
+        {copy.pledge.understood}
+      </label>
+      <div>
+        <button className="primary" disabled={busy || !ok || !charity}>
+          {copy.pledge.setBtn}
+        </button>
+      </div>
+      <p className="small quiet">{copy.pledge.why}</p>
+      {err && (
+        <p className="error" role="alert">
+          {err}
+        </p>
+      )}
+    </form>
+  );
+}
+
 /* ------------------------------------------------------------ kind act */
 function KindAct({ planId, done, reload }: { planId: string; done: boolean; reload: () => void }) {
   const [note, setNote] = useState("");
@@ -477,6 +550,7 @@ export default function Today() {
     void reload();
   }, [reload]);
 
+  const todayPledge = data?.pledges.find((p) => p.plan_id === data.plan.id);
   const todayItems = useMemo(() => (data ? data.items.filter((i) => i.daily_plan_id === data.plan.id) : []), [data]);
 
   if (err)
@@ -489,6 +563,14 @@ export default function Today() {
 
   const { plan } = data;
   const taskOf = (id: string) => data.tasks.find((t) => t.id === id);
+  const canPledge =
+    !todayPledge &&
+    !plan.reviewed_at &&
+    !profile.gentle_mode &&
+    profile.light_day !== plan.date &&
+    !isLowMood(plan.mood_morning) &&
+    todayItems.every((i) => i.status === "pending") &&
+    data.charities.length > 0;
   const greeting = profile.display_name ? `, ${profile.display_name}` : "";
 
   if (reviewing) {
@@ -515,6 +597,7 @@ export default function Today() {
         <h1 style={{ margin: 0 }}>{copy.today.title(greeting)}</h1>
         <span className="small quiet">{copy.today.points(data.balance)}</span>
       </div>
+      {data.partnerName && <SupportNudge />}
       {result && (
         <p className="note" role="status">
           {result}
@@ -560,6 +643,12 @@ export default function Today() {
         <>
           <Branch items={todayItems.map((i) => ({ id: i.id, title: taskOf(i.task_id)?.title ?? "", status: i.status }))} />
           {plan.stake_amount > 0 && <p className="small quiet">{copy.today.stakeSetAside(plan.stake_amount)}</p>}
+          {todayPledge && (
+            <p className="small quiet" role="status">
+              {copy.pledge.summary(CURRENCY_SYMBOL, todayPledge.amount, data.charities.find((c) => c.id === todayPledge.charity_id)?.name ?? "")}
+            </p>
+          )}
+          {canPledge && <PledgePanel charities={data.charities} reload={reload} />}
           <ul className="panel" style={{ listStyle: "none" }}>
             {todayItems.map((i) => {
               const t = taskOf(i.task_id);
@@ -590,6 +679,13 @@ export default function Today() {
           <Branch items={todayItems.map((i) => ({ id: i.id, title: taskOf(i.task_id)?.title ?? "", status: i.status }))} />
           <h2>{copy.today.closedTitle}</h2>
           <p>{copy.today.closedBody(plan.points_earned ?? 0)}</p>
+          {todayPledge && todayPledge.status === "cleared" && <p className="note">{copy.pledge.cleared(CURRENCY_SYMBOL, todayPledge.amount)}</p>}
+          {todayPledge && todayPledge.status === "owed" && (
+            <p className="note">
+              {copy.pledge.helped(CURRENCY_SYMBOL, todayPledge.owed, data.charities.find((c) => c.id === todayPledge.charity_id)?.name ?? "")}{" "}
+              {copy.oneSmallWin}
+            </p>
+          )}
           {todayItems.some((i) => i.status === "missed") && <KindAct planId={plan.id} done={data.kindActs.includes(plan.id)} reload={reload} />}
         </div>
       )}

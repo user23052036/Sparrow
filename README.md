@@ -42,7 +42,7 @@ You need Node.js 20+ and a free [Supabase](https://supabase.com) account.
 ### 1. Create the Supabase project
 
 1. Create a new project in Supabase.
-2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0012`).
+2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0016`).
 3. **Authentication → URL Configuration:** set Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to Redirect URLs.
 4. **Authentication → Sign In / Providers → User Signups:** turn **Confirm email** off, so new accounts work immediately without an email service. (Turn it back on once you connect your own SMTP provider for real users.)
 
@@ -91,7 +91,7 @@ npm run test:e2e          # Playwright in Chromium against a fake Supabase (firs
 npm run typecheck
 npm run build
 npm run test:functions   # delete-account Edge Function logic (node --test)
-bash supabase/tests/run.sh   # migrations (0001 to 0012) + privacy/RLS checks on a local PostgreSQL 15+
+bash supabase/tests/run.sh   # migrations (0001 to 0016) + privacy/RLS checks on a local PostgreSQL 15+
 ```
 
 ## Known limits

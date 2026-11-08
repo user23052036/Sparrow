@@ -471,3 +471,265 @@ set role anon;
 select pg_temp.expect_error($q$select export_my_data()$q$, 'anonymous visitors cannot export');
 select pg_temp.expect_error($q$select my_progress()$q$, 'anonymous visitors cannot read progress');
 reset role;
+
+-- ------------------------------------------------- charity pledges, practice mode (0013)
+insert into auth.users values ('55555555-0000-0000-0000-000000000001', 'p@test'), ('55555555-0000-0000-0000-000000000002', 'q@test');
+insert into profiles (id) values ('55555555-0000-0000-0000-000000000001') on conflict (id) do nothing;
+insert into profiles (id) values ('55555555-0000-0000-0000-000000000002') on conflict (id) do nothing;
+insert into charities (id, name, active) values
+  ('55555555-9999-0000-0000-000000000001', 'Test Charity One', true),
+  ('55555555-9999-0000-0000-000000000002', 'Retired Charity', false);
+select set_config('request.jwt.claim.sub', '55555555-0000-0000-0000-000000000001', false);
+insert into tasks (user_id, title) values ('55555555-0000-0000-0000-000000000001', 'P1'), ('55555555-0000-0000-0000-000000000001', 'P2');
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+select pg_temp.check((select count(*) from charities) = 1, 'people see only active charities');
+select pg_temp.check(pledge_limit() = 20, 'the first pledge limit is 20');
+select commit_day(array(select id from tasks order by title), 3, 0);
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', true)$q$, 'no pledge while Gentle Mode is on');
+update profiles set gentle_mode = false;
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', false)$q$, 'a pledge needs the person to confirm');
+select pg_temp.expect_error($q$select set_pledge(0, '55555555-9999-0000-0000-000000000001', true)$q$, 'a pledge must be at least 1');
+select pg_temp.expect_error($q$select set_pledge(21, '55555555-9999-0000-0000-000000000001', true)$q$, 'the first pledge cannot be above 20');
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000002', true)$q$, 'a retired charity cannot be chosen');
+select pg_temp.expect_error($q$select set_pledge(10, gen_random_uuid(), true)$q$, 'an unknown charity cannot be chosen');
+select pg_temp.check((set_pledge(20, '55555555-9999-0000-0000-000000000001', true)).mode = 'practice', 'a pledge is stored in practice mode');
+select pg_temp.expect_error($q$select set_pledge(5, '55555555-9999-0000-0000-000000000001', true)$q$, 'only one pledge per day');
+select pg_temp.expect_error($q$insert into pledges (user_id, plan_id, charity_id, amount) select auth.uid(), id, '55555555-9999-0000-0000-000000000001', 5 from daily_plans$q$, 'clients cannot write pledges directly');
+select set_item_status((select i.id from plan_items i join tasks t on t.id = i.task_id where t.title = 'P1'), 'done');
+-- P1 done, P2 missed: half done, so half of 20 stays "owed"
+select review_day((select id from daily_plans), '{}', 3);
+select pg_temp.check((select owed from pledges) = 10 and (select status from pledges) = 'owed', 'half a day done: 10 of 20 is owed (practice)');
+reset role;
+update daily_plans set date = current_date - 1 where user_id = '55555555-0000-0000-0000-000000000001';
+
+-- day 2: the limit rises gradually (twice the biggest recent pledge), a full day clears it
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+select pg_temp.check(pledge_limit() = 40, 'the limit doubles after a 20 pledge');
+select commit_day(array(select id from tasks order by title), 4, 0);
+select pg_temp.expect_error($q$select set_pledge(41, '55555555-9999-0000-0000-000000000001', true)$q$, 'cannot jump past the gradual limit');
+select set_pledge(40, '55555555-9999-0000-0000-000000000001', true);
+select review_day((select id from daily_plans where reviewed_at is null), (select jsonb_object_agg(id::text, 'done') from plan_items where status = 'pending'), 4);
+select pg_temp.check((select status from pledges where amount = 40) = 'cleared' and (select owed from pledges where amount = 40) = 0, 'a full day clears the pledge');
+reset role;
+update daily_plans set date = current_date - 2 where user_id = '55555555-0000-0000-0000-000000000001' and date = current_date;
+
+-- day 3: a heavy morning means no pledge
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks order by title), 2, 0);
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', true)$q$, 'no pledge after a heavy morning');
+reset role;
+update daily_plans set date = current_date - 3 where user_id = '55555555-0000-0000-0000-000000000001' and date = current_date;
+
+-- day 4: not once the day's tasks have started
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks order by title), 4, 0);
+select set_item_status((select id from plan_items where daily_plan_id = (select id from daily_plans where date = current_date) limit 1), 'done');
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', true)$q$, 'no pledge once a task has been started');
+reset role;
+update daily_plans set date = current_date - 4 where user_id = '55555555-0000-0000-0000-000000000001' and date = current_date;
+
+-- day 5: a lighter day means no pledge
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+update profiles set light_day = current_date;
+select commit_day(array(select id from tasks order by title), 4, 0);
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', true)$q$, 'no pledge on a lighter day');
+reset role;
+
+-- privacy and the practice-only guarantee
+select pg_temp.as_user('55555555-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from pledges) = 0, 'other people cannot read my pledges');
+select pg_temp.expect_error($q$select pledge_metrics(30)$q$, 'people cannot call pledge_metrics');
+reset role;
+select pg_temp.expect_error($q$insert into pledges (user_id, plan_id, charity_id, amount, mode) select user_id, id, '55555555-9999-0000-0000-000000000001', 5, 'live' from daily_plans where date = current_date and user_id = '55555555-0000-0000-0000-000000000001'$q$, 'a live-money pledge cannot exist yet');
+select pg_temp.check((pledge_metrics(30) ->> 'mode') = 'practice' and (pledge_metrics(30) ->> 'practice_total_pledged')::int = 60, 'pledge_metrics reports practice totals to the owner');
+select pg_temp.check((pledge_metrics(30) ->> 'practice_total_owed')::int = 10, 'pledge_metrics reports the practice amount owed');
+
+-- ------------------------------------------------- partner penalty and nudges (0014)
+insert into auth.users values
+  ('44444444-0000-0000-0000-000000000001', 'r@test'), ('44444444-0000-0000-0000-000000000002', 's@test'),
+  ('44444444-0000-0000-0000-000000000003', 't@test'), ('44444444-0000-0000-0000-000000000004', 'u@test');
+insert into profiles (id) values ('44444444-0000-0000-0000-000000000001'), ('44444444-0000-0000-0000-000000000002'),
+  ('44444444-0000-0000-0000-000000000003'), ('44444444-0000-0000-0000-000000000004') on conflict (id) do nothing;
+update profiles set gentle_mode = false where id in ('44444444-0000-0000-0000-000000000001', '44444444-0000-0000-0000-000000000002');
+insert into buddy_links (id, requester_id, partner_id, status, mutual) values
+  ('44444444-7777-0000-0000-000000000001', '44444444-0000-0000-0000-000000000001', '44444444-0000-0000-0000-000000000002', 'active', true);
+select set_config('request.jwt.claim.sub', '44444444-0000-0000-0000-000000000001', false);
+insert into tasks (user_id, title) values ('44444444-0000-0000-0000-000000000001', 'R1'), ('44444444-0000-0000-0000-000000000001', 'R2');
+
+-- nothing happens until BOTH opt in
+select pg_temp.as_user('44444444-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks where title like 'R%' order by title), 3, 0);
+select set_pledge(20, '55555555-9999-0000-0000-000000000001', true);
+select review_day((select id from daily_plans where user_id = auth.uid() and reviewed_at is null), '{}', 3);
+reset role;
+select pg_temp.check((select count(*) from partner_pledges) = 0, 'no partner penalty when nobody opted in');
+update daily_plans set date = current_date - 1 where user_id = '44444444-0000-0000-0000-000000000001';
+
+select pg_temp.as_user('44444444-0000-0000-0000-000000000001');
+select pg_temp.check((select (set_penalty_optin(true) ->> 'on')::boolean) = false, 'one person opting in is not enough');
+reset role;
+select pg_temp.as_user('44444444-0000-0000-0000-000000000002');
+select pg_temp.check((penalty_status() ->> 'theirs')::boolean, 'the partner can see that the other person opted in');
+select pg_temp.check((set_penalty_optin(true) ->> 'on')::boolean, 'both opted in: the partner penalty is on');
+reset role;
+select pg_temp.as_user('44444444-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks where title like 'R%' order by title), 3, 0);
+select set_pledge(20, '55555555-9999-0000-0000-000000000001', true);
+select review_day((select id from daily_plans where user_id = auth.uid() and reviewed_at is null),
+  (select jsonb_build_object(i.id::text, 'done') from plan_items i join tasks t on t.id = i.task_id where t.title = 'R1' and i.daily_plan_id = (select id from daily_plans where user_id = auth.uid() and reviewed_at is null)), 3);
+select pg_temp.check((select count(*) from partner_pledges) = 0, 'the person whose day it was cannot see the partner pledge');
+reset role;
+select pg_temp.check((select amount from partner_pledges) = 3 and (select payer_id from partner_pledges) = '44444444-0000-0000-0000-000000000002', 'half a 20 pledge: owes 10, the partner owes a quarter, rounded up (3)');
+select pg_temp.as_user('44444444-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from partner_pledges) = 1, 'the partner can read their own practice pledge');
+select pg_temp.check((penalty_status() ->> 'practice_total_30d')::int = 3, 'the partner sees their practice total');
+select pg_temp.expect_error($q$insert into partner_pledges (plan_id, payer_id, for_user_id, charity_id, amount) values (gen_random_uuid(), auth.uid(), auth.uid(), '55555555-9999-0000-0000-000000000001', 1)$q$, 'clients cannot write partner pledges');
+reset role;
+select pg_temp.expect_error($q$insert into partner_pledges (plan_id, payer_id, for_user_id, charity_id, amount, mode) values (gen_random_uuid(), '44444444-0000-0000-0000-000000000002', '44444444-0000-0000-0000-000000000001', '55555555-9999-0000-0000-000000000001', 1, 'live')$q$, 'a live partner pledge cannot exist yet');
+update daily_plans set date = current_date - 2 where user_id = '44444444-0000-0000-0000-000000000001' and date = current_date;
+
+-- a full day costs the partner nothing; a partner in Gentle Mode or opted out is skipped
+select pg_temp.as_user('44444444-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks where title like 'R%' order by title), 3, 0);
+select set_pledge(40, '55555555-9999-0000-0000-000000000001', true);
+select review_day((select id from daily_plans where user_id = auth.uid() and reviewed_at is null), (select jsonb_object_agg(id::text, 'done') from plan_items where status = 'pending'), 3);
+reset role;
+select pg_temp.check((select count(*) from partner_pledges) = 1, 'a full day creates no partner pledge');
+update daily_plans set date = current_date - 3 where user_id = '44444444-0000-0000-0000-000000000001' and date = current_date;
+update profiles set gentle_mode = true where id = '44444444-0000-0000-0000-000000000002';
+select pg_temp.as_user('44444444-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks where title like 'R%' order by title), 3, 0);
+select set_pledge(40, '55555555-9999-0000-0000-000000000001', true);
+select review_day((select id from daily_plans where user_id = auth.uid() and reviewed_at is null), '{}', 3);
+reset role;
+select pg_temp.check((select count(*) from partner_pledges) = 1, 'a partner in Gentle Mode is never charged');
+update daily_plans set date = current_date - 4 where user_id = '44444444-0000-0000-0000-000000000001' and date = current_date;
+update profiles set gentle_mode = false where id = '44444444-0000-0000-0000-000000000002';
+select pg_temp.as_user('44444444-0000-0000-0000-000000000002');
+select set_penalty_optin(false);
+reset role;
+select pg_temp.as_user('44444444-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks where title like 'R%' order by title), 3, 0);
+select set_pledge(40, '55555555-9999-0000-0000-000000000001', true);
+select review_day((select id from daily_plans where user_id = auth.uid() and reviewed_at is null), '{}', 3);
+reset role;
+select pg_temp.check((select count(*) from partner_pledges) = 1, 'opting out takes effect immediately');
+select pg_temp.as_user('44444444-0000-0000-0000-000000000003');
+select pg_temp.expect_error($q$select set_penalty_optin(true)$q$, 'no opt-in without a partner');
+select pg_temp.check((penalty_status() ->> 'state') = 'none', 'no partner means no penalty status');
+reset role;
+
+-- nudges: T has been having hard days; U is T's partner
+insert into buddy_links (requester_id, partner_id, status, mutual) values ('44444444-0000-0000-0000-000000000003', '44444444-0000-0000-0000-000000000004', 'active', true);
+insert into tasks (id, user_id, title) values ('44444444-2222-0000-0000-000000000003', '44444444-0000-0000-0000-000000000003', 'T task');
+insert into daily_plans (id, user_id, date, committed_at, reviewed_at) values
+  ('44444444-1111-0000-0000-000000000010', '44444444-0000-0000-0000-000000000003', (now() at time zone 'UTC')::date, now(), now()),
+  ('44444444-1111-0000-0000-000000000011', '44444444-0000-0000-0000-000000000003', (now() at time zone 'UTC')::date - 1, now(), now()),
+  ('44444444-1111-0000-0000-000000000012', '44444444-0000-0000-0000-000000000003', (now() at time zone 'UTC')::date - 2, now(), now());
+insert into plan_items (daily_plan_id, user_id, task_id, status)
+  select id, '44444444-0000-0000-0000-000000000003', '44444444-2222-0000-0000-000000000003', 'missed' from daily_plans where user_id = '44444444-0000-0000-0000-000000000003';
+select pg_temp.as_user('44444444-0000-0000-0000-000000000004');
+select pg_temp.check((partner_support_nudge() ->> 'level')::int = 2 and (partner_support_nudge() ->> 'days')::int = 3, 'three hard days in a row: the partner gets the stronger, still gentle, nudge');
+reset role;
+delete from daily_plans where id = '44444444-1111-0000-0000-000000000012';
+select pg_temp.as_user('44444444-0000-0000-0000-000000000004');
+select pg_temp.check((partner_support_nudge() ->> 'level')::int = 1, 'two hard days: a light nudge');
+reset role;
+update buddy_links set requester_shares = false where requester_id = '44444444-0000-0000-0000-000000000003';
+select pg_temp.as_user('44444444-0000-0000-0000-000000000004');
+select pg_temp.check((partner_support_nudge() ->> 'level')::int = 0, 'no nudge when the person does not share their activity');
+reset role;
+select pg_temp.as_user('44444444-0000-0000-0000-000000000003');
+select pg_temp.check((partner_support_nudge() ->> 'level')::int = 0, 'the person having hard days is never nudged about themselves');
+reset role;
+
+-- ------------------------------------------------- rating and leaderboard (0015)
+-- W: 8 reviewed days, 4 done and 4 missed (average 0.5), a partner X, and support on 3 different days
+insert into auth.users values ('22222222-0000-0000-0000-000000000001', 'w@test'), ('22222222-0000-0000-0000-000000000002', 'x@test');
+insert into profiles (id) values ('22222222-0000-0000-0000-000000000001'), ('22222222-0000-0000-0000-000000000002') on conflict (id) do nothing;
+insert into tasks (id, user_id, title) values ('22222222-2222-0000-0000-000000000001', '22222222-0000-0000-0000-000000000001', 'W task'), ('22222222-2222-0000-0000-000000000002', '22222222-0000-0000-0000-000000000002', 'X task');
+insert into daily_plans (id, user_id, date, committed_at, reviewed_at)
+  select ('22222222-1111-0000-0000-' || lpad(g::text, 12, '0'))::uuid, '22222222-0000-0000-0000-000000000001', (now() at time zone 'UTC')::date - g, now(), now() from generate_series(1, 8) g;
+insert into plan_items (daily_plan_id, user_id, task_id, status)
+  select id, '22222222-0000-0000-0000-000000000001', '22222222-2222-0000-0000-000000000001', case when (now() at time zone 'UTC')::date - date <= 4 then 'done' else 'missed' end
+    from daily_plans where user_id = '22222222-0000-0000-0000-000000000001';
+select pg_temp.as_user('22222222-0000-0000-0000-000000000001');
+select pg_temp.check((my_rating() ->> 'reliability')::numeric = 3.0, 'half the days done: reliability is 3.0 of 5');
+select pg_temp.check((my_rating() -> 'support') = 'null'::jsonb, 'no partner yet: no support rating');
+reset role;
+insert into buddy_links (requester_id, partner_id, status, mutual) values ('22222222-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'active', true);
+select set_config('request.jwt.claim.sub', '22222222-0000-0000-0000-000000000002', false);
+insert into daily_plans (id, user_id, date, committed_at) values ('22222222-1111-0000-0000-0000000000a1', '22222222-0000-0000-0000-000000000002', (now() at time zone 'UTC')::date, now());
+insert into plan_items (id, daily_plan_id, user_id, task_id) values ('22222222-5555-0000-0000-000000000001', '22222222-1111-0000-0000-0000000000a1', '22222222-0000-0000-0000-000000000002', '22222222-2222-0000-0000-000000000002');
+insert into proofs (id, plan_item_id, user_id, kind, text_body, visibility) values
+  ('22222222-3333-0000-0000-000000000001', '22222222-5555-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'text', 'a', 'buddy'),
+  ('22222222-3333-0000-0000-000000000002', '22222222-5555-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'text', 'b', 'buddy'),
+  ('22222222-3333-0000-0000-000000000003', '22222222-5555-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002', 'text', 'c', 'buddy');
+select set_config('request.jwt.claim.sub', '22222222-0000-0000-0000-000000000001', false);
+insert into verifications (proof_id, verifier_id, verdict, created_at) values
+  ('22222222-3333-0000-0000-000000000001', '22222222-0000-0000-0000-000000000001', 'approve', now()),
+  ('22222222-3333-0000-0000-000000000002', '22222222-0000-0000-0000-000000000001', 'approve', now() - interval '1 day'),
+  ('22222222-3333-0000-0000-000000000003', '22222222-0000-0000-0000-000000000001', 'approve', now() - interval '2 days');
+select pg_temp.as_user('22222222-0000-0000-0000-000000000001');
+select pg_temp.check((my_rating() ->> 'support')::numeric = 1.8, '3 days of support in 30: support rating 1.8');
+select pg_temp.check((my_rating() ->> 'shared')::boolean = false, 'ratings are not shared by default');
+reset role;
+select pg_temp.as_user('22222222-0000-0000-0000-000000000002');
+select pg_temp.check((partner_rating() ->> 'shared')::boolean = false and not (partner_rating() ? 'reliability'), 'the partner sees no rating unless it is shared');
+select pg_temp.check((my_rating() -> 'reliability') = 'null'::jsonb and (my_rating() ->> 'days_counted')::int = 0, 'too few days: no reliability yet');
+reset role;
+select pg_temp.as_user('22222222-0000-0000-0000-000000000001');
+update profiles set share_rating = true;
+reset role;
+select pg_temp.as_user('22222222-0000-0000-0000-000000000002');
+select pg_temp.check((partner_rating() ->> 'reliability')::numeric = 3.0 and (partner_rating() ->> 'name') is not null, 'once shared, the partner sees the rating');
+reset role;
+set role anon;
+select pg_temp.expect_error($q$select my_rating()$q$, 'anonymous visitors cannot read ratings');
+select pg_temp.expect_error($q$select monthly_leaderboard()$q$, 'anonymous visitors cannot read the leaderboard');
+reset role;
+
+-- leaderboard: 20 people with one reviewed day today; 12 done, 8 missed
+insert into auth.users select ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid, 'l' || i || '@test' from generate_series(1, 20) i;
+insert into profiles (id) select ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid from generate_series(1, 20) i on conflict (id) do nothing;
+insert into tasks (id, user_id, title) select ('33333333-2222-0000-0000-' || lpad(i::text, 12, '0'))::uuid, ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid, 'L task' from generate_series(1, 20) i;
+insert into daily_plans (id, user_id, date, committed_at, reviewed_at)
+  select ('33333333-1111-0000-0000-' || lpad(i::text, 12, '0'))::uuid, ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid, (now() at time zone 'UTC')::date, now(), now() from generate_series(1, 20) i;
+insert into plan_items (daily_plan_id, user_id, task_id, status)
+  select ('33333333-1111-0000-0000-' || lpad(i::text, 12, '0'))::uuid, ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid,
+         ('33333333-2222-0000-0000-' || lpad(i::text, 12, '0'))::uuid, case when i <= 12 then 'done' else 'missed' end from generate_series(1, 20) i;
+-- the 8 "missed" people did nothing that counts, so make 4 of them partly done to have a ranked tail
+update plan_items set status = 'partial' where user_id in (select ('33333333-0000-0000-0000-' || lpad(i::text, 12, '0'))::uuid from generate_series(13, 16) i);
+select pg_temp.as_user('33333333-0000-0000-0000-000000000001');
+select pg_temp.check((monthly_leaderboard() ->> 'state') = 'not_joined', 'the leaderboard is hidden until you join');
+select pg_temp.expect_error($q$select join_leaderboard('x')$q$, 'a handle must be 3 to 20 letters, numbers or underscores');
+select pg_temp.expect_error($q$select join_leaderboard('has space')$q$, 'a handle cannot contain spaces');
+reset role;
+-- nine people join: not enough to show anything
+update profiles set leaderboard_optin = true, leaderboard_handle = 'ghost_' || right(id::text, 2) where id::text like '33333333-0000-0000-0000-0000000000%' and right(id::text, 2)::int between 1 and 9;
+select pg_temp.as_user('33333333-0000-0000-0000-000000000001');
+select pg_temp.check((monthly_leaderboard() ->> 'state') = 'waiting' and (monthly_leaderboard() ->> 'have')::int = 9, 'with 9 people the leaderboard stays hidden');
+reset role;
+select pg_temp.as_user('33333333-0000-0000-0000-000000000010');
+select pg_temp.expect_error($q$select join_leaderboard('Ghost_01')$q$, 'a taken handle is refused, case-insensitively');
+select join_leaderboard('fresh_10');
+reset role;
+select pg_temp.as_user('33333333-0000-0000-0000-000000000001');
+select pg_temp.check((monthly_leaderboard() ->> 'state') = 'ready', 'with 10 people the board shows');
+select pg_temp.check((monthly_leaderboard() ->> 'band') in ('top10', 'top_quarter', 'top_half', 'keep_going'), 'I get a band, not an exact low rank');
+select pg_temp.check(jsonb_array_length(monthly_leaderboard() -> 'top') <= 10, 'at most the top 10 are listed');
+select pg_temp.check(not (monthly_leaderboard()::text ~ '33333333-0000'), 'no user ids appear on the board');
+select leave_leaderboard();
+select pg_temp.check((monthly_leaderboard() ->> 'state') = 'not_joined', 'leaving removes me from the board');
+select pg_temp.check((select leaderboard_handle from profiles where id = auth.uid()) is null, 'leaving frees my handle');
+reset role;
+
+-- ------------------------------------------------- rating switch and fuller export (0016)
+select pg_temp.as_user('22222222-0000-0000-0000-000000000001');
+select pg_temp.check((set_share_rating(false) ->> 'shared')::boolean = false, 'sharing can be switched off again');
+select pg_temp.check(export_my_data() ? 'partner_pledges_paid', 'export includes the practice partner pledges the person paid');
+select pg_temp.check(export_my_data() ? 'pledges', 'export includes pledges');
+reset role;
+set role anon;
+select pg_temp.expect_error($q$select set_share_rating(true)$q$, 'anonymous visitors cannot change ratings');
+reset role;
