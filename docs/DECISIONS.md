@@ -68,3 +68,9 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Reason:** The original brief's core idea is that someone else is on the hook with you. For internet addiction in particular, an impulse to quit a session is exactly when a second person helps most. Everything is enforced in Postgres (partner functions plus RLS), covered by the privacy tests.
 **Not built, on purpose:** the "partner pays a penalty" rule (D3), public star ratings and leaderboards (D4), and real-money stakes (D1). Partner pings are in-app only for now.
 **Status:** Prototype. Needs two real accounts to try end to end.
+
+## D16 — A lighter day is the user's choice, and the database enforces it
+**Decision:** A low morning mood (Heavy/Low) or three consecutive heavy days (each under 34% completion) *offers* a smaller day; it never forces one. If the user says yes, `profiles.light_day` is set to that date and `commit_day()` allows at most two tasks and no stake for it. Three heavy days are counted only when the reviewed days are consecutive calendar days, so a long break never reads as a bad streak. The offer after the third heavy day is shown right after the evening review ("Want to make tomorrow lighter?") and applies to tomorrow.
+**Reason:** Shrinking the day is help, not a penalty, so it must be opt-in; but once chosen it should hold even if the UI is bypassed, like the other rules in D13. The owner can clear it at any time (their own profile row), so it can't trap anyone.
+**Also:** The support page is linked from Settings, the evening review and the footer. Copy audit tests now scan all web and extension sources for shaming words.
+**Status:** Final for MVP.

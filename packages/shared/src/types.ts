@@ -8,6 +8,8 @@ export interface Profile {
   timezone: string;
   gentle_mode: boolean;
   onboarded: boolean;
+  /** A day the user asked to keep light (at most two tasks, no stake). */
+  light_day: string | null;
 }
 
 export interface Task {

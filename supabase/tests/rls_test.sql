@@ -275,3 +275,24 @@ select pg_temp.check(
 select pg_temp.check(points_balance() = 45, 'balance after full day is 45');
 reset role;
 
+
+-- ------------------------------------------------- M7: lighter days (0006)
+insert into auth.users values ('eeeeeeee-0000-0000-0000-000000000005', 'e@test');
+select pg_temp.as_user('eeeeeeee-0000-0000-0000-000000000005');
+insert into tasks (title) values ('One'), ('Two'), ('Three'), ('Four');
+select pg_temp.check((select light_day from profiles) is null, 'light_day is off by default');
+select pg_temp.check(count(*) = 1, 'E sees only own profile (light_day is private)') from profiles;
+update profiles set light_day = (get_today()).date;
+select pg_temp.expect_error($q$select commit_day(array(select id from tasks order by title limit 3), 1, 0)$q$,
+  'a light day allows at most two tasks');
+update profiles set gentle_mode = false;
+select pg_temp.check(
+  (commit_day(array(select id from tasks order by title limit 2), 1, 20)).stake_amount = 0,
+  'a light day forces the stake to 0 and accepts two tasks');
+reset role;
+-- another user cannot set E's light day
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+update profiles set light_day = null where id = 'eeeeeeee-0000-0000-0000-000000000005';
+reset role;
+select pg_temp.check((select light_day from profiles where id = 'eeeeeeee-0000-0000-0000-000000000005') is not null,
+  'another user cannot clear E''s light day');

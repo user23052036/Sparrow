@@ -15,6 +15,7 @@ A gentle daily accountability app for people who struggle with focus, motivation
 - **Tamper visibility:** if the extension goes quiet during a session, it's noted on the Focus page.
 - **Accountability partner:** invite one person with a link. Each of you sees what you choose to share (your day, focus moments, and proofs one at a time). They can approve a proof or ask a question.
 - **Partner key:** lock a focus session so only your partner can end it early. You ask, they decide. Ending the partnership releases any lock immediately.
+- **Lighter days:** a low mood check-in, or three hard days in a row, offers a small day (one or two things, no stake). The support page is one tap from Settings and the evening review.
 - **Privacy:** every table has Row-Level Security; proofs are private by default.
 
 ## Project layout
@@ -34,7 +35,7 @@ You need Node.js 20+ and a free [Supabase](https://supabase.com) account.
 ### 1. Create the Supabase project
 
 1. Create a new project in Supabase.
-2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0005`).
+2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0006`).
 3. **Authentication → URL Configuration:** set Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to Redirect URLs.
 4. **Authentication → Sign In / Providers → User Signups:** turn **Confirm email** off, so new accounts work immediately without an email service. (Turn it back on once you connect your own SMTP provider for real users.)
 
