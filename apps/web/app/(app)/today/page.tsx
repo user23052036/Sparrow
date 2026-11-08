@@ -7,6 +7,7 @@ import {
   ifThenLine,
   isHeavyStretch,
   isLowMood,
+  KIND_ACT_POINTS,
   MAX_POINT_STAKE,
   nextDay,
   trimToLight,
@@ -34,6 +35,8 @@ interface Data {
   heavyStretch: boolean;
   verdicts: Record<string, { verdict: string; comment: string | null }>;
   partnerName: string | null;
+  /** Plans (days) that already have a kind act. */
+  kindActs: string[];
 }
 
 async function loadData(): Promise<Data> {
@@ -41,7 +44,7 @@ async function loadData(): Promise<Data> {
   const today = await sb.rpc("get_today");
   if (today.error) throw today.error;
   const plan = today.data as DailyPlan;
-  const [unrev, tasks, items, steps, proofs, bal, recent, vers, po] = await Promise.all([
+  const [unrev, tasks, items, steps, proofs, bal, recent, vers, po, kind] = await Promise.all([
     sb.rpc("unreviewed_days"),
     sb.from("tasks").select("*").eq("archived", false).order("created_at"),
     sb.from("plan_items").select("*"),
@@ -51,6 +54,7 @@ async function loadData(): Promise<Data> {
     sb.rpc("recent_completion", { p_days: 3 }),
     sb.from("verifications").select("proof_id, verdict, comment, created_at").order("created_at"),
     sb.rpc("partner_overview"),
+    sb.from("kind_acts").select("plan_id"),
   ]);
   for (const r of [unrev, tasks, items, steps, proofs, bal, recent]) if (r.error) throw r.error;
   const proofCounts: Record<string, number> = {};
@@ -77,6 +81,7 @@ async function loadData(): Promise<Data> {
     heavyStretch: isHeavyStretch(rc),
     verdicts,
     partnerName: ov?.state === "active" ? (ov.partner?.name ?? null) : null,
+    kindActs: ((kind.data ?? []) as { plan_id: string }[]).map((k) => k.plan_id),
   };
 }
 
@@ -397,6 +402,46 @@ function Review({
   );
 }
 
+/* ------------------------------------------------------------ kind act */
+function KindAct({ planId, done, reload }: { planId: string; done: boolean; reload: () => void }) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (done)
+    return (
+      <p className="note" role="status">
+        {copy.today.kindThanks}
+      </p>
+    );
+  async function log() {
+    setBusy(true);
+    const { error } = await supabase().rpc("log_kind_act", { p_plan_id: planId, p_note: note.trim() || null });
+    setBusy(false);
+    if (error) setErr(errorText(error));
+    else reload();
+  }
+  return (
+    <div className="note stack">
+      <h3 style={{ margin: 0 }}>{copy.today.kindTitle}</h3>
+      <p style={{ margin: 0 }}>{copy.today.kindBody}</p>
+      <div>
+        <label htmlFor="kind-note">{copy.today.kindLabel}</label>
+        <input id="kind-note" value={note} maxLength={200} placeholder={copy.today.kindPlaceholder} onChange={(e) => setNote(e.target.value)} />
+      </div>
+      <div>
+        <button type="button" disabled={busy} onClick={log}>
+          {copy.today.kindBtn(KIND_ACT_POINTS)}
+        </button>
+      </div>
+      {err && (
+        <p className="error" role="alert">
+          {err}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------ page */
 export default function Today() {
   const { profile, session, refreshProfile } = useAuth();
@@ -545,6 +590,7 @@ export default function Today() {
           <Branch items={todayItems.map((i) => ({ id: i.id, title: taskOf(i.task_id)?.title ?? "", status: i.status }))} />
           <h2>{copy.today.closedTitle}</h2>
           <p>{copy.today.closedBody(plan.points_earned ?? 0)}</p>
+          {todayItems.some((i) => i.status === "missed") && <KindAct planId={plan.id} done={data.kindActs.includes(plan.id)} reload={reload} />}
         </div>
       )}
     </div>

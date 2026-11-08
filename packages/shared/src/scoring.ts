@@ -12,6 +12,9 @@ export const POINTS = {
 
 export const MAX_POINT_STAKE = 50;
 
+/** Points for one kind act on a day when something didn't happen. Mirrors public.log_kind_act() (0011). */
+export const KIND_ACT_POINTS = 5;
+
 export interface DayScore {
   itemPoints: number;
   fullDayBonus: number;

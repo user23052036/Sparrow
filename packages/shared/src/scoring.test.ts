@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scoreDay } from "./scoring";
+import { KIND_ACT_POINTS, POINTS, scoreDay } from "./scoring";
 
 describe("scoreDay", () => {
   it("gives a full-day bonus when everything is done", () => {
@@ -26,5 +26,12 @@ describe("scoreDay", () => {
   });
   it("empty day refunds the whole stake and gives no bonus", () => {
     expect(scoreDay([], 10)).toMatchObject({ stakeRefund: 10, fullDayBonus: 0, total: 10 });
+  });
+});
+
+describe("kind act points", () => {
+  it("match the database rule and stay below finishing a task, so missing on purpose never pays", () => {
+    expect(KIND_ACT_POINTS).toBe(5); // public.log_kind_act() in 0011
+    expect(KIND_ACT_POINTS).toBeLessThan(POINTS.done);
   });
 });

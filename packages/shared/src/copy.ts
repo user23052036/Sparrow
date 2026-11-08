@@ -187,6 +187,13 @@ export const copy = {
     closeThatDay: "Close that day",
     stakeSetAside: (n: number) => `${n} points set aside for today.`,
     reviewMyDay: "Review my day",
+    kindTitle: "Turn it into something kind",
+    kindBody:
+      "Some things didn't happen today, and that's information, not a verdict. If you like, do one small kind thing for someone, even a short message, and Sparrow will count it.",
+    kindLabel: "What did you do? (optional)",
+    kindPlaceholder: "Texted a friend to say thanks",
+    kindBtn: (n: number) => `I did something kind (+${n} points)`,
+    kindThanks: "Thank you for that. It counts.",
     closedTitle: "Today is closed",
     closedBody: (n: number) => `You earned ${n} points today. Rest well. Tomorrow starts fresh.`,
   },

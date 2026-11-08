@@ -381,3 +381,30 @@ select pg_temp.check((select then_action from tasks where title = 'full plan') =
 select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
 select pg_temp.check((select count(*) from tasks where title = 'full plan') = 0, 'another user cannot see someone else''s if-then plan');
 reset role;
+
+-- ------------------------------------------------- kind acts (0011)
+insert into auth.users values ('77777777-0000-0000-0000-000000000001', 'k@test'), ('77777777-0000-0000-0000-000000000002', 'l@test');
+insert into daily_plans (id, user_id, date, committed_at, reviewed_at) values
+  ('77777777-1111-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', current_date - 1, now(), now()),
+  ('77777777-1111-0000-0000-000000000002', '77777777-0000-0000-0000-000000000001', current_date - 2, now(), now()),
+  ('77777777-1111-0000-0000-000000000003', '77777777-0000-0000-0000-000000000001', current_date - 3, now(), null);
+insert into tasks (id, user_id, title) values ('77777777-2222-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', 'k task');
+insert into plan_items (daily_plan_id, user_id, task_id, status) values
+  ('77777777-1111-0000-0000-000000000001', '77777777-0000-0000-0000-000000000001', '77777777-2222-0000-0000-000000000001', 'missed'),
+  ('77777777-1111-0000-0000-000000000002', '77777777-0000-0000-0000-000000000001', '77777777-2222-0000-0000-000000000001', 'done'),
+  ('77777777-1111-0000-0000-000000000003', '77777777-0000-0000-0000-000000000001', '77777777-2222-0000-0000-000000000001', 'missed');
+select pg_temp.as_user('77777777-0000-0000-0000-000000000002');
+select pg_temp.expect_error($q$select log_kind_act('77777777-1111-0000-0000-000000000001', 'x')$q$, 'another user cannot log a kind act on my day');
+reset role;
+select pg_temp.as_user('77777777-0000-0000-0000-000000000001');
+select pg_temp.expect_error($q$select log_kind_act('77777777-1111-0000-0000-000000000002')$q$, 'no kind act when nothing was missed');
+select pg_temp.expect_error($q$select log_kind_act('77777777-1111-0000-0000-000000000003')$q$, 'no kind act before the day is reviewed');
+select pg_temp.check((log_kind_act('77777777-1111-0000-0000-000000000001', '  Called my aunt ') ->> 'points')::int = 5, 'a kind act on a missed day earns 5 points');
+select pg_temp.check((select note from kind_acts) = 'Called my aunt', 'the note is trimmed and stored');
+select pg_temp.check((log_kind_act('77777777-1111-0000-0000-000000000001') ->> 'points')::int = 0, 'a second kind act for the same day earns nothing');
+select pg_temp.check((select sum(delta) from points_ledger where reason = 'kind_act') = 5, 'points were added once');
+select pg_temp.expect_error($q$insert into kind_acts (user_id, plan_id) values ('77777777-0000-0000-0000-000000000001', '77777777-1111-0000-0000-000000000002')$q$, 'clients cannot write kind acts directly');
+reset role;
+select pg_temp.as_user('77777777-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from kind_acts) = 0, 'other users cannot read my kind acts');
+reset role;

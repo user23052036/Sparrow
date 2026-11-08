@@ -6,7 +6,7 @@
  * reuses the shared scoring and light-day constants so the two cannot silently drift.
  */
 import type { BrowserContext, Request, Route } from "@playwright/test";
-import { LIGHT_DAY_MAX_TASKS, scoreDay, type ItemStatus } from "@sparrow/shared";
+import { KIND_ACT_POINTS, LIGHT_DAY_MAX_TASKS, scoreDay, type ItemStatus } from "@sparrow/shared";
 
 export const SUPABASE_URL = "http://localhost:54321";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -35,6 +35,7 @@ export class FakeSupabase {
     blocklists: [],
     devices: [],
     feedback: [],
+    kind_acts: [],
   };
   uploads: { path: string; bytes: number }[] = [];
   deleteCalls: unknown[] = [];
@@ -341,6 +342,17 @@ export class FakeSupabase {
         if (!item) throw new RpcError("item not found or day already reviewed");
         item.status = args.p_status;
         return ok(item);
+      }
+      case "log_kind_act": {
+        const plan = this.db.daily_plans.find((p) => p.id === args.p_plan_id);
+        if (!plan) throw new RpcError("plan not found");
+        if (!plan.reviewed_at) throw new RpcError("look back at the day first");
+        if (!this.db.plan_items.some((i) => i.daily_plan_id === plan.id && i.status === "missed"))
+          throw new RpcError("a kind act is for a day when something didn't happen");
+        if (this.db.kind_acts.some((k) => k.plan_id === plan.id)) return ok({ points: 0, already: true });
+        this.db.kind_acts.push({ id: uid(), user_id: USER_ID, plan_id: plan.id, note: args.p_note ?? null });
+        this.points += KIND_ACT_POINTS;
+        return ok({ points: KIND_ACT_POINTS, already: false });
       }
       case "review_day": {
         const plan = this.db.daily_plans.find((p) => p.id === args.p_plan_id)!;
