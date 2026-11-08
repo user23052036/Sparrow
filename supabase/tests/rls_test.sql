@@ -471,3 +471,75 @@ set role anon;
 select pg_temp.expect_error($q$select export_my_data()$q$, 'anonymous visitors cannot export');
 select pg_temp.expect_error($q$select my_progress()$q$, 'anonymous visitors cannot read progress');
 reset role;
+
+-- ------------------------------------------------- charity pledges, practice mode (0013)
+insert into auth.users values ('55555555-0000-0000-0000-000000000001', 'p@test'), ('55555555-0000-0000-0000-000000000002', 'q@test');
+insert into profiles (id) values ('55555555-0000-0000-0000-000000000001') on conflict (id) do nothing;
+insert into profiles (id) values ('55555555-0000-0000-0000-000000000002') on conflict (id) do nothing;
+insert into charities (id, name, active) values
+  ('55555555-9999-0000-0000-000000000001', 'Test Charity One', true),
+  ('55555555-9999-0000-0000-000000000002', 'Retired Charity', false);
+select set_config('request.jwt.claim.sub', '55555555-0000-0000-0000-000000000001', false);
+insert into tasks (user_id, title) values ('55555555-0000-0000-0000-000000000001', 'P1'), ('55555555-0000-0000-0000-000000000001', 'P2');
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+select pg_temp.check((select count(*) from charities) = 1, 'people see only active charities');
+select pg_temp.check(pledge_limit() = 20, 'the first pledge limit is 20');
+select commit_day(array(select id from tasks order by title), 3, 0);
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', true)$q$, 'no pledge while Gentle Mode is on');
+update profiles set gentle_mode = false;
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', false)$q$, 'a pledge needs the person to confirm');
+select pg_temp.expect_error($q$select set_pledge(0, '55555555-9999-0000-0000-000000000001', true)$q$, 'a pledge must be at least 1');
+select pg_temp.expect_error($q$select set_pledge(21, '55555555-9999-0000-0000-000000000001', true)$q$, 'the first pledge cannot be above 20');
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000002', true)$q$, 'a retired charity cannot be chosen');
+select pg_temp.expect_error($q$select set_pledge(10, gen_random_uuid(), true)$q$, 'an unknown charity cannot be chosen');
+select pg_temp.check((set_pledge(20, '55555555-9999-0000-0000-000000000001', true)).mode = 'practice', 'a pledge is stored in practice mode');
+select pg_temp.expect_error($q$select set_pledge(5, '55555555-9999-0000-0000-000000000001', true)$q$, 'only one pledge per day');
+select pg_temp.expect_error($q$insert into pledges (user_id, plan_id, charity_id, amount) select auth.uid(), id, '55555555-9999-0000-0000-000000000001', 5 from daily_plans$q$, 'clients cannot write pledges directly');
+select set_item_status((select i.id from plan_items i join tasks t on t.id = i.task_id where t.title = 'P1'), 'done');
+-- P1 done, P2 missed: half done, so half of 20 stays "owed"
+select review_day((select id from daily_plans), '{}', 3);
+select pg_temp.check((select owed from pledges) = 10 and (select status from pledges) = 'owed', 'half a day done: 10 of 20 is owed (practice)');
+reset role;
+update daily_plans set date = current_date - 1 where user_id = '55555555-0000-0000-0000-000000000001';
+
+-- day 2: the limit rises gradually (twice the biggest recent pledge), a full day clears it
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+select pg_temp.check(pledge_limit() = 40, 'the limit doubles after a 20 pledge');
+select commit_day(array(select id from tasks order by title), 4, 0);
+select pg_temp.expect_error($q$select set_pledge(41, '55555555-9999-0000-0000-000000000001', true)$q$, 'cannot jump past the gradual limit');
+select set_pledge(40, '55555555-9999-0000-0000-000000000001', true);
+select review_day((select id from daily_plans where reviewed_at is null), (select jsonb_object_agg(id::text, 'done') from plan_items where status = 'pending'), 4);
+select pg_temp.check((select status from pledges where amount = 40) = 'cleared' and (select owed from pledges where amount = 40) = 0, 'a full day clears the pledge');
+reset role;
+update daily_plans set date = current_date - 2 where user_id = '55555555-0000-0000-0000-000000000001' and date = current_date;
+
+-- day 3: a heavy morning means no pledge
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks order by title), 2, 0);
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', true)$q$, 'no pledge after a heavy morning');
+reset role;
+update daily_plans set date = current_date - 3 where user_id = '55555555-0000-0000-0000-000000000001' and date = current_date;
+
+-- day 4: not once the day's tasks have started
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks order by title), 4, 0);
+select set_item_status((select id from plan_items where daily_plan_id = (select id from daily_plans where date = current_date) limit 1), 'done');
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', true)$q$, 'no pledge once a task has been started');
+reset role;
+update daily_plans set date = current_date - 4 where user_id = '55555555-0000-0000-0000-000000000001' and date = current_date;
+
+-- day 5: a lighter day means no pledge
+select pg_temp.as_user('55555555-0000-0000-0000-000000000001');
+update profiles set light_day = current_date;
+select commit_day(array(select id from tasks order by title), 4, 0);
+select pg_temp.expect_error($q$select set_pledge(10, '55555555-9999-0000-0000-000000000001', true)$q$, 'no pledge on a lighter day');
+reset role;
+
+-- privacy and the practice-only guarantee
+select pg_temp.as_user('55555555-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from pledges) = 0, 'other people cannot read my pledges');
+select pg_temp.expect_error($q$select pledge_metrics(30)$q$, 'people cannot call pledge_metrics');
+reset role;
+select pg_temp.expect_error($q$insert into pledges (user_id, plan_id, charity_id, amount, mode) select user_id, id, '55555555-9999-0000-0000-000000000001', 5, 'live' from daily_plans where date = current_date and user_id = '55555555-0000-0000-0000-000000000001'$q$, 'a live-money pledge cannot exist yet');
+select pg_temp.check((pledge_metrics(30) ->> 'mode') = 'practice' and (pledge_metrics(30) ->> 'practice_total_pledged')::int = 60, 'pledge_metrics reports practice totals to the owner');
+select pg_temp.check((pledge_metrics(30) ->> 'practice_total_owed')::int = 10, 'pledge_metrics reports the practice amount owed');

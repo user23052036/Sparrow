@@ -115,6 +115,22 @@ export const copy = {
     deleting: "Deleting…",
     deleteError: "We couldn't finish deleting your account. Nothing was lost. Please try again in a moment.",
   },
+  pledge: {
+    title: "Pledge to a charity (practice mode)",
+    practiceNote:
+      "Practice mode: no money is charged and nothing is paid. Sparrow is testing how pledges feel. Finish your day and the pledge is cleared. If some of it didn't happen, that share is what a live pledge would send to the charity.",
+    amountLabel: "Amount",
+    charityLabel: "Charity",
+    limit: (symbol: string, n: number) => `Up to ${symbol}${n} today. The limit rises gradually as you use pledges.`,
+    understood: "I understand this is practice mode, and I can skip pledges any time.",
+    setBtn: "Set my pledge",
+    summary: (symbol: string, n: number, charity: string) => `${symbol}${n} pledged for ${charity} (practice).`,
+    cleared: (symbol: string, n: number) => `Your ${symbol}${n} pledge is cleared. Nothing owed.`,
+    helped: (symbol: string, owed: number, charity: string) =>
+      `You chose to help ${charity} today. Thank you. In a live pledge ${symbol}${owed} would go to them. Nothing was charged.`,
+    pickCharity: "Choose a charity",
+    why: "Pledges only show when Gentle Mode is off, and never on a lighter day or after a heavy morning.",
+  },
   progress: {
     title: "Your progress",
     intro: "This page is only for you. Nothing here is ranked, rated or shown to anyone else.",

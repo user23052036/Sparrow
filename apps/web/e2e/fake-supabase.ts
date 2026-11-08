@@ -6,7 +6,7 @@
  * reuses the shared scoring and light-day constants so the two cannot silently drift.
  */
 import type { BrowserContext, Request, Route } from "@playwright/test";
-import { KIND_ACT_POINTS, LIGHT_DAY_MAX_TASKS, scoreDay, type ItemStatus } from "@sparrow/shared";
+import { KIND_ACT_POINTS, LIGHT_DAY_MAX_TASKS, pledgeLimit, scoreDay, settlePledge, type ItemStatus } from "@sparrow/shared";
 
 export const SUPABASE_URL = "http://localhost:54321";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -36,6 +36,8 @@ export class FakeSupabase {
     devices: [],
     feedback: [],
     kind_acts: [],
+    charities: [],
+    pledges: [],
   };
   uploads: { path: string; bytes: number }[] = [];
   deleteCalls: unknown[] = [];
@@ -92,6 +94,16 @@ export class FakeSupabase {
 
   profile() {
     return this.db.profiles[0];
+  }
+  private currentPledgeLimit() {
+    const amounts = this.db.pledges.map((p) => Number(p.amount));
+    return pledgeLimit(amounts.length ? Math.max(...amounts) : null);
+  }
+  /** A charity the app can offer (the real list is owner-managed in the database). */
+  addCharity(name: string) {
+    const c = { id: uid(), name, blurb: null, active: true };
+    this.db.charities.push(c);
+    return c;
   }
   planFor(date: string) {
     return this.db.daily_plans.find((p) => p.date === date);
@@ -345,6 +357,24 @@ export class FakeSupabase {
         item.status = args.p_status;
         return ok(item);
       }
+      case "pledge_limit":
+        return ok(this.currentPledgeLimit());
+      case "set_pledge": {
+        const plan = this.planFor(this.today);
+        const profile = this.db.profiles[0];
+        if (!args.p_understood) throw new RpcError("please confirm you understand how a pledge works");
+        if (!plan?.committed_at) throw new RpcError("plan your day first");
+        if (profile.gentle_mode) throw new RpcError("pledges are off while Gentle Mode is on");
+        if (this.db.pledges.some((p) => p.plan_id === plan.id)) throw new RpcError("you already set a pledge today");
+        const amount = Number(args.p_amount);
+        const lim = this.currentPledgeLimit();
+        if (!(amount >= 1)) throw new RpcError("choose an amount of at least 1");
+        if (amount > lim) throw new RpcError(`you can raise your pledge gradually: up to ${lim} today`);
+        if (!this.db.charities.some((c) => c.id === args.p_charity_id)) throw new RpcError("choose a charity from the list");
+        const row = { id: uid(), user_id: USER_ID, plan_id: plan.id, charity_id: args.p_charity_id, amount, mode: "practice", status: "set", owed: 0 };
+        this.db.pledges.push(row);
+        return ok(row);
+      }
       case "my_progress":
         return ok({ ...this.progress, balance: this.points });
       case "export_my_data":
@@ -371,6 +401,11 @@ export class FakeSupabase {
         );
         const countable = items.filter((i) => i.status !== "rescheduled");
         this.points += score.total;
+        const pledge = this.db.pledges.find((p) => p.plan_id === plan.id && p.status === "set");
+        if (pledge) {
+          const { owed } = settlePledge(Number(pledge.amount), score.completion);
+          Object.assign(pledge, { owed, status: owed === 0 ? "cleared" : "owed" });
+        }
         Object.assign(plan, { reviewed_at: new Date().toISOString(), points_earned: score.total, mood_evening: args.p_mood ?? null });
         return ok({
           total: score.total,
