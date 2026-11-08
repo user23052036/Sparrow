@@ -131,6 +131,21 @@ export const copy = {
     pickCharity: "Choose a charity",
     why: "Pledges only show when Gentle Mode is off, and never on a lighter day or after a heavy morning.",
   },
+  partnerPenalty: {
+    title: "Practice partner pledge (optional)",
+    explain: (name: string) =>
+      `You and ${name} can both agree to this: when one of you pledges to a charity and part of the day didn't happen, the other adds a small practice pledge (a quarter of it, at most ₹10) to the same charity. Practice mode: no money is charged. It never applies in Gentle Mode or on lighter days, either of you can switch it off any time, and neither of you sees the other's amounts.`,
+    agree: "I agree to this",
+    waiting: (name: string) => `Waiting for ${name} to agree too.`,
+    on: "You both agreed. It's on.",
+    off: "It's off.",
+    total: (symbol: string, n: number) => `Your practice partner pledges in the last 30 days: ${symbol}${n}.`,
+  },
+  nudge: {
+    level1: (name: string) => `${name} has had a couple of harder days. A short message can mean a lot.`,
+    level2: (name: string) => `${name} has had a rough few days. Maybe check in, with kindness and no pressure.`,
+    open: "Open Partner",
+  },
   progress: {
     title: "Your progress",
     intro: "This page is only for you. Nothing here is ranked, rated or shown to anyone else.",

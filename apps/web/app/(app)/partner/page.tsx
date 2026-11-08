@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { copy, eventLabel, inviteLink, parseInviteCode, type PartnerOverview, type PartnerProof } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 import { timeAgo } from "@/lib/format";
+import { PartnerPenalty } from "@/components/PartnerPenalty";
+import { SupportNudge } from "@/components/SupportNudge";
 
 type Active = Extract<PartnerOverview, { state: "active" }>;
 
@@ -95,6 +97,7 @@ function ActiveView({ ov, call, busy }: { ov: Active; call: (fn: string, args?: 
   return (
     <>
       <h1>{copy.partnerUi.withName(name)}</h1>
+      <SupportNudge link={false} />
 
       {attention && (
         <div className="panel stack" role="alert">
@@ -177,6 +180,8 @@ function ActiveView({ ov, call, busy }: { ov: Active; call: (fn: string, args?: 
           </ul>
         </details>
       )}
+
+      <PartnerPenalty name={name} />
 
       <div className="panel stack">
         <h3>{copy.partnerUi.shareTitle(name)}</h3>

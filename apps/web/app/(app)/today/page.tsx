@@ -26,6 +26,7 @@ import { Branch } from "@/components/Branch";
 import { MoodPicker } from "@/components/MoodPicker";
 import { StepTimer } from "@/components/StepTimer";
 import { ProofCapture } from "@/components/ProofCapture";
+import { SupportNudge } from "@/components/SupportNudge";
 
 interface Data {
   plan: DailyPlan;
@@ -596,6 +597,7 @@ export default function Today() {
         <h1 style={{ margin: 0 }}>{copy.today.title(greeting)}</h1>
         <span className="small quiet">{copy.today.points(data.balance)}</span>
       </div>
+      {data.partnerName && <SupportNudge />}
       {result && (
         <p className="note" role="status">
           {result}

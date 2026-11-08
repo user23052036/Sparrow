@@ -31,3 +31,14 @@ describe("settlePledge", () => {
     expect(settlePledge(10, -1)).toEqual({ kept: 0, owed: 10 });
   });
 });
+
+import { partnerShare } from "./pledge";
+describe("partnerShare", () => {
+  it("is a quarter of what is owed, rounded up, between 1 and 10", () => {
+    expect(partnerShare(10)).toBe(3);
+    expect(partnerShare(4)).toBe(1);
+    expect(partnerShare(1)).toBe(1);
+    expect(partnerShare(40)).toBe(10);
+    expect(partnerShare(100)).toBe(10);
+  });
+});

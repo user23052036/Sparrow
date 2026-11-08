@@ -33,3 +33,18 @@ export interface Pledge {
   status: "set" | "cleared" | "owed";
   owed: number;
 }
+
+/** Answer of public.penalty_status() (0014). */
+export type PenaltyStatus = { state: "none" } | { state: "active"; mine: boolean; theirs: boolean; on: boolean; practice_total_30d: number };
+
+/** Answer of public.partner_support_nudge() (0014): 0 = nothing, 1 = two hard days, 2 = three or more. */
+export interface SupportNudge {
+  level: 0 | 1 | 2;
+  days: number;
+  name?: string;
+}
+
+/** Partner's practice share of a pledge owed: a quarter, rounded up, between 1 and 10. Mirrors _settle_pledge(). */
+export function partnerShare(owed: number): number {
+  return Math.min(10, Math.max(1, Math.ceil(owed * 0.25)));
+}

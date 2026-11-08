@@ -41,6 +41,24 @@ export class FakeSupabase {
   };
   uploads: { path: string; bytes: number }[] = [];
   deleteCalls: unknown[] = [];
+  /** What partner_overview() answers (defaults to "no partner"). */
+  partnerOverview: Record<string, unknown> = { state: "none" };
+  /** A partner for tests that need one. */
+  givePartner(name = "Ravi") {
+    this.partnerOverview = {
+      state: "active",
+      link_id: uid(),
+      partner: { name, shares: true },
+      i_share: true,
+      pending_end_requests: [],
+      proofs: [],
+      activity: null,
+    };
+  }
+  /** Partner penalty state, as penalty_status() would report it. */
+  penalty = { mine: false, theirs: false, practice_total_30d: 0 };
+  /** What partner_support_nudge() answers. */
+  nudge: Record<string, unknown> = { level: 0, days: 0 };
   /** What my_progress() answers. The real calculation is tested in supabase/tests/rls_test.sql. */
   progress: Record<string, unknown> = { badges: [], best_run: 0, helping_days: 0, kind_acts: 0, mood: [], balance: 0 };
   /** Set to make the delete-account function answer 500, like a storage outage. */
@@ -323,7 +341,7 @@ export class FakeSupabase {
         return ok(days.map((p) => ({ date: p.date, completion: this.completion(p.id) })));
       }
       case "partner_overview":
-        return ok({ state: "none" });
+        return ok(this.partnerOverview);
       case "partner_badge":
         return ok(0);
       case "check_my_heartbeats":
@@ -375,6 +393,15 @@ export class FakeSupabase {
         this.db.pledges.push(row);
         return ok(row);
       }
+      case "penalty_status": {
+        const on = this.penalty.mine && this.penalty.theirs;
+        return ok({ state: "active", ...this.penalty, on });
+      }
+      case "set_penalty_optin":
+        this.penalty.mine = Boolean(args.p_on);
+        return ok({ state: "active", ...this.penalty, on: this.penalty.mine && this.penalty.theirs });
+      case "partner_support_nudge":
+        return ok(this.nudge);
       case "my_progress":
         return ok({ ...this.progress, balance: this.points });
       case "export_my_data":
