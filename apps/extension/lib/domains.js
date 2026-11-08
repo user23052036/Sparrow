@@ -1,6 +1,8 @@
 // JS copy of packages/shared/src/domains.ts (the extension has no build step).
 export function normalizeDomain(input) {
-  let s = String(input ?? "").trim().toLowerCase();
+  let s = String(input ?? "")
+    .trim()
+    .toLowerCase();
   if (!s) return null;
   s = s.replace(/^[a-z]+:\/\//, "");
   s = s.split(/[/?#]/)[0];
@@ -22,6 +24,8 @@ export function normalizeDomainList(list) {
 
 /** true if host is the domain or one of its subdomains */
 export function hostMatches(host, domains) {
-  const h = String(host ?? "").toLowerCase().replace(/^www\./, "");
+  const h = String(host ?? "")
+    .toLowerCase()
+    .replace(/^www\./, "");
   return domains.some((d) => h === d || h.endsWith("." + d));
 }

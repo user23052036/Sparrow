@@ -19,7 +19,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadProfile = useCallback(async (s: Session | null) => {
-    if (!s) { setProfile(null); return; }
+    if (!s) {
+      setProfile(null);
+      return;
+    }
     const { data } = await supabase().from("profiles").select("*").eq("id", s.user.id).maybeSingle();
     setProfile((data as Profile) ?? null);
   }, []);
@@ -37,7 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(s);
       void loadProfile(s);
     });
-    return () => { alive = false; sub.subscription.unsubscribe(); };
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
   }, [loadProfile]);
 
   const refreshProfile = useCallback(() => loadProfile(session), [loadProfile, session]);

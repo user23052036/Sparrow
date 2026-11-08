@@ -27,7 +27,10 @@ test("minutesLeft rounds up and is 0 when inactive", () => {
 test("buildRules makes a redirect and a frame-block rule per domain with unique ids", () => {
   const rules = buildRules(["a.com", "b.com"]);
   assert.equal(rules.length, 4);
-  assert.deepEqual(rules.map((r) => r.id), [1, 2, 3, 4]);
+  assert.deepEqual(
+    rules.map((r) => r.id),
+    [1, 2, 3, 4],
+  );
   assert.equal(rules[0].action.redirect.extensionPath, "/blocked.html");
   assert.deepEqual(rules[0].condition, { requestDomains: ["a.com"], resourceTypes: ["main_frame"] });
   assert.equal(rules[1].action.type, "block");

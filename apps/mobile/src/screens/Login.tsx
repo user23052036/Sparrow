@@ -13,7 +13,8 @@ export function Login() {
   const [err, setErr] = useState<string | null>(null);
 
   async function submit() {
-    setBusy(true); setErr(null);
+    setBusy(true);
+    setErr(null);
     const creds = { email: email.trim(), password };
     const { error } = mode === "in" ? await supabase.auth.signInWithPassword(creds) : await supabase.auth.signUp(creds);
     setBusy(false);
@@ -30,7 +31,12 @@ export function Login() {
         <TextInput style={s.input} value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
         <Text style={s.text}>Password</Text>
         <TextInput style={s.input} value={password} onChangeText={setPassword} secureTextEntry autoComplete="password" />
-        <Button primary disabled={busy || !email || password.length < (mode === "up" ? 8 : 1)} label={mode === "in" ? "Sign in" : "Create account"} onPress={submit} />
+        <Button
+          primary
+          disabled={busy || !email || password.length < (mode === "up" ? 8 : 1)}
+          label={mode === "in" ? "Sign in" : "Create account"}
+          onPress={submit}
+        />
         <Err>{err}</Err>
         <Button label={mode === "in" ? "I need an account" : "I already have an account"} onPress={() => setMode(mode === "in" ? "up" : "in")} />
         {mode === "up" && <Text style={s.quiet}>Use at least 8 characters. After signing up, finish your name and time zone on the website.</Text>}

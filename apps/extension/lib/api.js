@@ -79,8 +79,7 @@ export async function rpc(config, getAuth, saveAuth, fn, args = {}) {
     auth = await refresh(config, auth);
     await saveAuth(auth);
   }
-  const call = (token) =>
-    fetch(`${config.url}/rest/v1/rpc/${fn}`, { method: "POST", headers: headers(config, token), body: JSON.stringify(args) });
+  const call = (token) => fetch(`${config.url}/rest/v1/rpc/${fn}`, { method: "POST", headers: headers(config, token), body: JSON.stringify(args) });
   let res = await call(auth.access_token);
   if (res.status === 401) {
     auth = await refresh(config, auth);

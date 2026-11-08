@@ -14,9 +14,15 @@ export function StepTimer({ minutes, onDone, onCancel }: { minutes: number; onDo
   const left = end - now;
   return (
     <div className="row" aria-live="polite">
-      <span className="timer" style={{ fontSize: "var(--step-1)" }}>{left > 0 ? clock(left) : copy.timer.timesUp}</span>
-      <button type="button" className="primary" onClick={onDone}>{copy.timer.markDone}</button>
-      <button type="button" className="ghost" onClick={onCancel}>{copy.timer.stop}</button>
+      <span className="timer" style={{ fontSize: "var(--step-1)" }}>
+        {left > 0 ? clock(left) : copy.timer.timesUp}
+      </span>
+      <button type="button" className="primary" onClick={onDone}>
+        {copy.timer.markDone}
+      </button>
+      <button type="button" className="ghost" onClick={onCancel}>
+        {copy.timer.stop}
+      </button>
     </div>
   );
 }

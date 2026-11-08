@@ -36,7 +36,10 @@ describe("eventLabel", () => {
     expect(eventLabel("protection_disabled")).toBe(copy.eventDisabled);
   });
   it("never uses shaming words", () => {
-    const all = ["early_exit", "heartbeat_lost", "protection_disabled"].map((k) => eventLabel(k as never)).join(" ").toLowerCase();
+    const all = ["early_exit", "heartbeat_lost", "protection_disabled"]
+      .map((k) => eventLabel(k as never))
+      .join(" ")
+      .toLowerCase();
     for (const w of BANNED_WORDS) expect(all).not.toContain(w);
   });
 });

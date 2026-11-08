@@ -17,11 +17,20 @@ export function Apps({ userId }: { userId: string }) {
 
   useEffect(() => {
     setInstalled(getInstalledApps());
-    supabase.from("blocklists").select("android_packages").eq("user_id", userId).maybeSingle().then(({ data, error }) => {
-      if (error) { setErr(errorText(error)); return; }
-      const list = ((data as { android_packages: string[] } | null)?.android_packages ?? []);
-      setSaved(list); setPicked(list);
-    });
+    supabase
+      .from("blocklists")
+      .select("android_packages")
+      .eq("user_id", userId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          setErr(errorText(error));
+          return;
+        }
+        const list = (data as { android_packages: string[] } | null)?.android_packages ?? [];
+        setSaved(list);
+        setPicked(list);
+      });
   }, [userId]);
 
   const dirty = useMemo(() => JSON.stringify([...picked].sort()) !== JSON.stringify([...saved].sort()), [picked, saved]);
@@ -30,16 +39,27 @@ export function Apps({ userId }: { userId: string }) {
   const toggle = (p: string) => setPicked((x) => (x.includes(p) ? x.filter((y) => y !== p) : [...x, p]));
 
   async function save() {
-    setMsg(null); setErr(null);
+    setMsg(null);
+    setErr(null);
     const list = normalizePackageList(picked);
     const { error } = await supabase.from("blocklists").update({ android_packages: list, updated_at: new Date().toISOString() }).eq("user_id", userId);
-    if (error) { setErr(errorText(error)); return; }
-    setSaved(list); setPicked(list); setMsg("Saved.");
+    if (error) {
+      setErr(errorText(error));
+      return;
+    }
+    setSaved(list);
+    setPicked(list);
+    setMsg("Saved.");
   }
   function addManual() {
     const p = manual.trim();
-    if (!isValidPackageName(p)) { setErr("That doesn't look like an app id, like com.instagram.android."); return; }
-    setErr(null); setManual(""); setPicked((x) => (x.includes(p) ? x : [...x, p]));
+    if (!isValidPackageName(p)) {
+      setErr("That doesn't look like an app id, like com.instagram.android.");
+      return;
+    }
+    setErr(null);
+    setManual("");
+    setPicked((x) => (x.includes(p) ? x : [...x, p]));
   }
 
   return (
@@ -47,18 +67,30 @@ export function Apps({ userId }: { userId: string }) {
       <Text style={s.h1}>Apps to keep away</Text>
       <Text style={s.quiet}>You choose what Sparrow keeps away during focus time. Phone, messages and emergency apps are never blocked.</Text>
       <Err>{err}</Err>
-      {msg && <View style={s.note}><Text style={s.text}>{msg}</Text></View>}
+      {msg && (
+        <View style={s.note}>
+          <Text style={s.text}>{msg}</Text>
+        </View>
+      )}
       <View style={s.panel}>
         <Text style={s.h2}>Your list ({picked.length})</Text>
         {picked.length === 0 && <Text style={s.quiet}>Nothing yet.</Text>}
-        <View style={s.row}>{picked.map((p) => <Button key={p} on label={`${labelOf(p)} ✕`} onPress={() => toggle(p)} />)}</View>
+        <View style={s.row}>
+          {picked.map((p) => (
+            <Button key={p} on label={`${labelOf(p)} ✕`} onPress={() => toggle(p)} />
+          ))}
+        </View>
         <Button primary label="Save list" disabled={!dirty} onPress={save} />
       </View>
       {isNativeAvailable ? (
         <View style={s.panel}>
           <Text style={s.h2}>Installed apps</Text>
           <TextInput style={s.input} placeholder="Search" value={query} onChangeText={setQuery} />
-          <View style={s.row}>{shown.map((a) => <Button key={a.packageName} label={a.label} on={picked.includes(a.packageName)} onPress={() => toggle(a.packageName)} />)}</View>
+          <View style={s.row}>
+            {shown.map((a) => (
+              <Button key={a.packageName} label={a.label} on={picked.includes(a.packageName)} onPress={() => toggle(a.packageName)} />
+            ))}
+          </View>
         </View>
       ) : (
         <View style={s.panel}>

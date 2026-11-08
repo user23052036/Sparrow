@@ -3,10 +3,13 @@ import { BANNED_WORDS, copy } from "./copy";
 
 describe("gentle-language checklist", () => {
   const flat = (v: unknown): string[] =>
-    typeof v === "function" ? [String((v as (...a: unknown[]) => unknown)("x", 2, 3))]
-    : Array.isArray(v) ? v.flatMap(flat)
-    : v && typeof v === "object" ? Object.values(v).flatMap(flat)
-    : [String(v)];
+    typeof v === "function"
+      ? [String((v as (...a: unknown[]) => unknown)("x", 2, 3))]
+      : Array.isArray(v)
+        ? v.flatMap(flat)
+        : v && typeof v === "object"
+          ? Object.values(v).flatMap(flat)
+          : [String(v)];
   const all = flat(copy).join(" ").toLowerCase();
   it.each(BANNED_WORDS)("copy never uses %j", (w) => expect(all).not.toMatch(new RegExp(`\\b${w}\\b`)));
 });
@@ -37,8 +40,7 @@ describe("copy audit across the apps", () => {
     const hits = files.filter((f) => /[❌✗✘]/.test(readFileSync(f, "utf8")));
     expect(hits).toEqual([]);
   });
-  it("support page tells people to contact emergency services when in danger", () =>
-    expect(copy.helpIntro).toMatch(/emergency services/));
+  it("support page tells people to contact emergency services when in danger", () => expect(copy.helpIntro).toMatch(/emergency services/));
 });
 
 // Guard: user-facing sentences belong in copy.ts (PLAN.md §7). Flags JSX text that reads like a

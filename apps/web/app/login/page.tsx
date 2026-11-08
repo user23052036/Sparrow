@@ -19,12 +19,16 @@ export default function Login() {
   if (!isConfigured) return <NotConfigured />;
 
   function switchMode(m: Mode) {
-    setMode(m); setErr(null); setInfo(null);
+    setMode(m);
+    setErr(null);
+    setInfo(null);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true); setErr(null); setInfo(null);
+    setBusy(true);
+    setErr(null);
+    setInfo(null);
     const sb = supabase();
     try {
       if (mode === "link") {
@@ -57,7 +61,9 @@ export default function Login() {
 
   return (
     <main className="shell">
-      <Link href="/" className="brand" style={{ marginBottom: "1.5rem" }}>Sparrow</Link>
+      <Link href="/" className="brand" style={{ marginBottom: "1.5rem" }}>
+        Sparrow
+      </Link>
       <form onSubmit={submit} className="panel stack" style={{ maxWidth: 440 }}>
         <h2>{heading}</h2>
         <div>
@@ -67,21 +73,47 @@ export default function Login() {
         {mode !== "link" && (
           <div>
             <label htmlFor="password">{copy.auth.password}</label>
-            <input id="password" type="password" required minLength={mode === "signup" ? 8 : undefined}
+            <input
+              id="password"
+              type="password"
+              required
+              minLength={mode === "signup" ? 8 : undefined}
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              value={password} onChange={(e) => setPassword(e.target.value)} />
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
             {mode === "signup" && <p className="small quiet">{copy.auth.atLeast8}</p>}
           </div>
         )}
         <button className="primary" disabled={busy}>
           {mode === "signup" ? copy.auth.createBtn : mode === "link" ? copy.auth.emailLinkBtn : copy.auth.signIn}
         </button>
-        {err && <p className="error" role="alert">{err}</p>}
-        {info && <p className="note" role="status">{info}</p>}
+        {err && (
+          <p className="error" role="alert">
+            {err}
+          </p>
+        )}
+        {info && (
+          <p className="note" role="status">
+            {info}
+          </p>
+        )}
         <div className="row small">
-          {mode !== "signin" && <button type="button" className="ghost" onClick={() => switchMode("signin")}>{copy.auth.withPassword}</button>}
-          {mode !== "signup" && <button type="button" className="ghost" onClick={() => switchMode("signup")}>{copy.auth.createInstead}</button>}
-          {mode !== "link" && <button type="button" className="ghost" onClick={() => switchMode("link")}>{copy.auth.linkInstead}</button>}
+          {mode !== "signin" && (
+            <button type="button" className="ghost" onClick={() => switchMode("signin")}>
+              {copy.auth.withPassword}
+            </button>
+          )}
+          {mode !== "signup" && (
+            <button type="button" className="ghost" onClick={() => switchMode("signup")}>
+              {copy.auth.createInstead}
+            </button>
+          )}
+          {mode !== "link" && (
+            <button type="button" className="ghost" onClick={() => switchMode("link")}>
+              {copy.auth.linkInstead}
+            </button>
+          )}
         </div>
       </form>
     </main>

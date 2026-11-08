@@ -11,18 +11,14 @@ async function loadBitmap(file: Blob): Promise<ImageBitmap> {
  */
 export async function compressImage(file: Blob): Promise<Blob> {
   const bmp = await loadBitmap(file);
-  return await compressWithin(
-    ({ max, quality }) => {
-      const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(bmp.width * scale);
-      canvas.height = Math.round(bmp.height * scale);
-      canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-      return new Promise<Blob>((resolve, reject) =>
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(copy.proof.processError))), "image/jpeg", quality),
-      );
-    },
-  );
+  return await compressWithin(({ max, quality }) => {
+    const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    return new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error(copy.proof.processError))), "image/jpeg", quality));
+  });
 }
 
 /** 64-bit difference hash used to notice re-used photos. */

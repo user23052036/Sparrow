@@ -1,7 +1,9 @@
 const el = document.getElementById("content");
 const send = (type, extra = {}) => chrome.runtime.sendMessage({ type, ...extra });
 
-function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]); }
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
 
 function render(s) {
   if (!s.connected) {

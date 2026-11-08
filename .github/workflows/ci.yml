@@ -14,8 +14,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm test                 # shared logic (Vitest)
-      - run: npm run test:extension   # extension logic (node --test)
+      - run: npm test # shared logic (Vitest)
+      - run: npm run test:extension # extension logic (node --test)
       - run: npm run typecheck
       - run: npm run build
         env:

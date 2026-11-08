@@ -32,9 +32,7 @@ const dayNumber = (d: string) => Math.round(Date.parse(`${d}T00:00:00Z`) / DAY_M
  */
 export function isHeavyStretch(rows: DayCompletion[]): boolean {
   if (rows.length < HEAVY_STRETCH_DAYS) return false;
-  const latest = [...rows]
-    .sort((a, b) => dayNumber(b.date) - dayNumber(a.date))
-    .slice(0, HEAVY_STRETCH_DAYS);
+  const latest = [...rows].sort((a, b) => dayNumber(b.date) - dayNumber(a.date)).slice(0, HEAVY_STRETCH_DAYS);
   const consecutive = latest.every((r, i) => i === 0 || dayNumber(latest[i - 1].date) - dayNumber(r.date) === 1);
   return consecutive && latest.every((r) => Number(r.completion) < HEAVY_DAY_BELOW);
 }

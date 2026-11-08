@@ -16,14 +16,18 @@ export interface ExtStatus {
 export function extRequest<T = Record<string, unknown>>(type: string, payload: Record<string, unknown> = {}, timeoutMs = 8000): Promise<T> {
   return new Promise((resolve, reject) => {
     const id = crypto.randomUUID();
-    const timer = setTimeout(() => { window.removeEventListener("message", onMsg); reject(new Error("timeout")); }, timeoutMs);
+    const timer = setTimeout(() => {
+      window.removeEventListener("message", onMsg);
+      reject(new Error("timeout"));
+    }, timeoutMs);
     function onMsg(e: MessageEvent) {
       if (e.source !== window || e.origin !== window.location.origin) return;
       const d = e.data as { source?: string; replyTo?: string; ok?: boolean; error?: string } & T;
       if (d?.source !== "sparrow-ext" || d.replyTo !== id) return;
       clearTimeout(timer);
       window.removeEventListener("message", onMsg);
-      if (d.ok === false) reject(new Error(d.error || "The extension reported an error")); else resolve(d);
+      if (d.ok === false) reject(new Error(d.error || "The extension reported an error"));
+      else resolve(d);
     }
     window.addEventListener("message", onMsg);
     window.postMessage({ source: "sparrow-web", id, type, ...payload }, window.location.origin);

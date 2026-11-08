@@ -10,9 +10,7 @@ describe("normalizeDomain", () => {
     ["m.facebook.com:443", "m.facebook.com"],
   ])("%s -> %s", (input, out) => expect(normalizeDomain(input)).toBe(out));
 
-  it.each(["", "youtube", "not a domain", "-bad.com", "http://"])("rejects %j", (input) =>
-    expect(normalizeDomain(input)).toBeNull(),
-  );
+  it.each(["", "youtube", "not a domain", "-bad.com", "http://"])("rejects %j", (input) => expect(normalizeDomain(input)).toBeNull());
 
   it("dedupes and sorts lists", () => {
     expect(normalizeDomainList(["www.x.com", "x.com", "b.com", "nope"])).toEqual(["b.com", "x.com"]);
