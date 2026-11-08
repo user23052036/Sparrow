@@ -86,7 +86,7 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Reason:** The audience may be struggling, and the plan promises privacy-respecting analytics. Everything the plan lists as a metric can be derived from product data, so extra tracking would add risk and no information.
 **Trade-offs:** No funnel or click data, and no per-person views. Retention is computed from plan dates, so it measures use of the planning loop, not page visits. With 20 to 50 users the rates are noisy; read trends, not decimals.
 **Also:** The scheduled heartbeat check (`check_all_heartbeats()`) is guarded: if `pg_cron` is not enabled, the migration prints a notice and everything else still works.
-**Not built, on purpose:** account deletion from inside the app. Storage objects (proof photos) cannot be removed with SQL, so a correct delete needs a server-side function with the service key. It is the first thing to add before a public launch.
+**Not built here:** account deletion from inside the app. Storage objects (proof photos) cannot be removed with SQL, so a correct delete needs a server-side function with the service key. Built later in D20.
 **Status:** Final for the beta.
 
 ## D19 — Browser tests run against a fake backend; the SQL tests own the rules
@@ -94,3 +94,35 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Reason:** A full local Supabase stack needs Docker and is slow and flaky in CI. The browser tests are meant to catch UI wiring, copy and flow regressions, not database behavior.
 **Trade-off:** The fake can accept something the real database would reject. When a rule changes, change the SQL test first.
 **Status:** Final.
+
+## D20 — Account deletion is self-serve, photos first, through an Edge Function
+**Decision:** Settings has a "Delete my account" panel (type `delete` to confirm). It calls the `delete-account` Edge Function (`supabase/functions/delete-account`), which takes the user id from the verified access token (never the request body), removes every photo under `proofs/<user_id>/`, checks none are left, and only then deletes the user. Every table already cascades from `auth.users`, so the database rows go with it.
+**Reason:** D18 named this as the first thing to add before public users. Storage objects can't be removed with SQL, so the service key has to be used server-side.
+**Order matters:** photos first. If the second step fails the person can simply try again; the reverse order could leave photos that nobody owns and nobody can delete.
+**Found while building it:** deleting one partner also deletes the partnership row, which used to leave the other person's *locked* focus session with nobody able to release it (up to 120 minutes). Migration `0009` adds a trigger that releases such locks whenever a partnership row is deleted. The SQL suite fails without it.
+**Tested:** the function's logic (paging, sub-folders, similar-prefix folders, invalid ids, storage failure keeps the account) with `node --test`; cascade and lock release in `supabase/tests/rls_test.sql`; the Settings flow in Playwright against the fake. **Not tested:** the real Edge Function runtime against a real Supabase project (needs a deployed project; see docs/BETA.md).
+**Trade-off:** the confirmation is a typed word, not a password re-entry; a stolen unlocked session could delete the account. Acceptable for the beta.
+**Status:** Final for the beta; deploy step is manual.
+
+## D21 — Deferred on purpose: partner email/push, and narrowing the extension's `<all_urls>`
+**Partner notifications beyond in-app (D15):** they need a mail or push provider, secrets and a sending domain. Code written without those can't be verified, so it was not built. Add it together with the SMTP step in docs/BETA.md.
+**`<all_urls>` host permission:** redirecting a blocked site needs host access to that site. Moving it to optional permissions requested at runtime changes the install and first-run flow and has to be tried in a real Chrome. Left as the known Web Store review risk in docs/STORE_LISTING.md.
+**Status:** Open; revisit with beta feedback.
+
+## D22 — Kind act instead of a charity donation
+**Decision:** After a reviewed day with something that didn't happen, a person can log one small kind thing they did for someone (`log_kind_act()`, migration `0011`). It earns 5 points, once per day, only when the day had a miss. Nothing is shared and no money moves.
+**Reason:** The brief's "turn a miss into a prosocial action" is worth keeping, but money to charity is cut for now (D1). Points are kept below finishing a task (10), so missing on purpose never pays; the unit tests pin `KIND_ACT_POINTS` below `POINTS.done`.
+**Not built:** charity choice and donations (D1), volunteer vouchers, and an extra-micro-task stake. Those need either money, partners or a design pass.
+**Status:** Final for the beta.
+
+## D23 — Progress is computed, private and unranked; helping is counted in days, not points
+**Decision:** `my_progress()` (migration `0012`) returns badges, a mood trend and "days you supported your partner" for the signed-in person, computed on request from existing tables. Nothing is stored and nothing is shown to anyone else. Badges are digital only. A run of days counts any day with some credit (partly done counts), so one miss never resets it.
+**Reason:** The brief's motivation points and social ratings would give partners a reason to approve fake proofs (D3) and turn support into a popularity contest (D4). Counting days of support, privately, recognises help without paying for it.
+**Not built:** star ratings, public reputation, leaderboards (D4), physical badges, badge crafting.
+**Also:** `export_my_data()` returns only the caller's own rows (never a partner's shared proofs), without device push tokens, photo storage paths or invite codes. Photos themselves are not in the file.
+**Status:** Final for the beta.
+
+## D24 — If-then plans and calendar import are small and local
+**Decision:** A task can carry an "If X, then I will Y" plan (both parts or neither, enforced by a check constraint, migration `0010`). Calendar events come in through an `.ics` file chosen by the user and read in the browser by `packages/shared/src/ics.ts`; each chosen event becomes an ordinary task with the date in its notes. Repeating events are added once.
+**Reason:** Both are in the brief and need no outside service. Google Calendar sign-in would need OAuth credentials and a verified app, and a to-do app import needs per-app APIs.
+**Status:** Final for the beta; Google Calendar sync is open.

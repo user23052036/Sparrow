@@ -9,6 +9,8 @@ Goal from the plan: 20 to 50 users, including people outside the founder's circl
 - **Privacy page** at `/privacy`, linked from the footer, written to match what the database actually stores.
 - **Metrics without tracking.** There are no analytics scripts or event logs. `beta_metrics(p_days)` computes everything from tables the app already needs, and only the project owner (service role) can call it.
 - **Heartbeat checking runs on a schedule** (`check_all_heartbeats()` via pg_cron, every minute) so a device that goes quiet is noticed even when nobody has the app open.
+- **Account deletion** in Settings (D20): removes the account, every table row and every proof photo. Photos are removed before the account, so a failure never leaves orphaned images.
+- **Small helps:** if-then plans, calendar-file import, a kind act after a hard day, a private Progress page (badges, mood trend, days you supported your partner) and a data download. See D22 to D24.
 - **Chrome extension packaging:** see `docs/STORE_LISTING.md`.
 
 ## Reading the numbers
@@ -38,6 +40,7 @@ Read them as signals, not grades. With 20 to 50 people a single person moves a r
 
 ## Needs a human (cannot be done from the repo)
 
+0. Deploy the account-deletion function once: `supabase functions deploy delete-account` (keep JWT verification on). Without it the "Delete my account" button in Settings shows an error and nothing is deleted. Try it with a throwaway account first (see D20).
 1. Deploy the web app over HTTPS (installability requires it) and put the real address into the privacy page and store listing.
 2. Connect SMTP and turn "Confirm email" back on in Supabase (see D14). Until then, anyone can sign up with an address they do not own.
 3. Enable `pg_cron` in the Supabase project (Database, Extensions). Without it, migration `0008` only prints a notice and heartbeats are checked when a page asks.
@@ -47,4 +50,4 @@ Read them as signals, not grades. With 20 to 50 people a single person moves a r
 
 ## Not part of this beta
 
-Android blocking (M5b-2 to M5b-5) and Play internal testing, partner notifications by email or push (D15), and account deletion (D18).
+Android blocking (M5b-2 to M5b-5) and Play internal testing, partner notifications by email or push (D15).

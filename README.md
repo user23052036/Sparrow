@@ -16,6 +16,11 @@ A gentle daily accountability app for people who struggle with focus, motivation
 - **Accountability partner:** invite one person with a link. Each of you sees what you choose to share (your day, focus moments, and proofs one at a time). They can approve a proof or ask a question.
 - **Partner key:** lock a focus session so only your partner can end it early. You ask, they decide. Ending the partnership releases any lock immediately.
 - **Lighter days:** a low mood check-in, or three hard days in a row, offers a small day (one or two things, no stake). The support page is one tap from Settings and the evening review.
+- **If-then plans:** add "If X, then I will Y" to any task; it shows on the morning list.
+- **Calendar import:** choose an `.ics` file (Google Calendar, Apple Calendar and Outlook can export one) and pick events to add as tasks. Read on your device only.
+- **Kind act:** after a day with something that didn't happen, log one small kind thing for someone (+5 points, once a day). No money, nothing shared.
+- **Progress page:** private badges, a mood trend in words, and how many days you supported your partner. Nothing is ranked or rated.
+- **Your data:** download everything Sparrow holds about you, or delete the account (photos included), from Settings.
 - **Install and feedback:** the website installs as an app (PWA), has a feedback button, and a plain-language privacy page.
 - **Privacy:** every table has Row-Level Security; proofs are private by default.
 
@@ -37,7 +42,7 @@ You need Node.js 20+ and a free [Supabase](https://supabase.com) account.
 ### 1. Create the Supabase project
 
 1. Create a new project in Supabase.
-2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0007`).
+2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0012`).
 3. **Authentication → URL Configuration:** set Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to Redirect URLs.
 4. **Authentication → Sign In / Providers → User Signups:** turn **Confirm email** off, so new accounts work immediately without an email service. (Turn it back on once you connect your own SMTP provider for real users.)
 
@@ -85,7 +90,8 @@ npm run lint && npm run format:check
 npm run test:e2e          # Playwright in Chromium against a fake Supabase (first run: npx playwright install chromium)
 npm run typecheck
 npm run build
-bash supabase/tests/run.sh   # migrations (0001 to 0008) + privacy/RLS checks on a local PostgreSQL 15+
+npm run test:functions   # delete-account Edge Function logic (node --test)
+bash supabase/tests/run.sh   # migrations (0001 to 0012) + privacy/RLS checks on a local PostgreSQL 15+
 ```
 
 ## Known limits

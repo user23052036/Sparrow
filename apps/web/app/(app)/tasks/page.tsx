@@ -3,15 +3,38 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { copy, type Task, type TaskStep } from "@sparrow/shared";
+import { cleanIfThen, copy, eventNote, ifThenLine, MAX_ICS_BYTES, parseIcs, type CalendarEvent, type Task, type TaskStep } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 
 function TaskEditor({ task, steps, reload }: { task: Task; steps: TaskStep[]; reload: () => void }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [cue, setCue] = useState(task.if_cue ?? "");
+  const [action, setAction] = useState(task.then_action ?? "");
+  const [planNote, setPlanNote] = useState<string | null>(null);
   const sb = supabase();
 
+  async function savePlan(e: React.FormEvent) {
+    e.preventDefault();
+    const clean = cleanIfThen(cue, action);
+    // One half filled: keep what they typed and say what's missing, instead of saving nothing silently.
+    if (!clean.if_cue && (cleanIfThen(cue, "x").if_cue || cleanIfThen("x", action).then_action)) {
+      setPlanNote(null);
+      setErr(copy.tasks.planNeedsBoth);
+      return;
+    }
+    const { error } = await sb.from("tasks").update(clean).eq("id", task.id);
+    if (error) {
+      setErr(errorText(error));
+      return;
+    }
+    setErr(null);
+    setCue(clean.if_cue ?? "");
+    setAction(clean.then_action ?? "");
+    setPlanNote(clean.if_cue ? copy.tasks.planSaved : null);
+    reload();
+  }
   async function run(p: PromiseLike<{ error: unknown }>) {
     const { error } = await p;
     if (error) setErr(errorText(error));
@@ -47,6 +70,7 @@ function TaskEditor({ task, steps, reload }: { task: Task; steps: TaskStep[]; re
             {steps.length === 0 ? copy.tasks.noSteps : copy.tasks.steps(steps.length)}
             {task.proof_required && copy.tasks.proofAsked}
           </div>
+          {ifThenLine(task) && <div className="small">{ifThenLine(task)}</div>}
         </div>
         <button type="button" aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? copy.tasks.close : copy.tasks.edit}
@@ -86,6 +110,44 @@ function TaskEditor({ task, steps, reload }: { task: Task; steps: TaskStep[]; re
             />
             <button>{copy.tasks.addStep}</button>
           </form>
+          <form onSubmit={savePlan} className="stack" aria-label={copy.tasks.planTitle}>
+            <strong className="small">{copy.tasks.planTitle}</strong>
+            <p className="small quiet">{copy.tasks.planHint}</p>
+            <div>
+              <label htmlFor={`if-${task.id}`}>{copy.tasks.planIf}</label>
+              <input id={`if-${task.id}`} value={cue} maxLength={140} placeholder={copy.tasks.planIfPlaceholder} onChange={(e) => setCue(e.target.value)} />
+            </div>
+            <div>
+              <label htmlFor={`then-${task.id}`}>{copy.tasks.planThen}</label>
+              <input
+                id={`then-${task.id}`}
+                value={action}
+                maxLength={140}
+                placeholder={copy.tasks.planThenPlaceholder}
+                onChange={(e) => setAction(e.target.value)}
+              />
+            </div>
+            <div className="row">
+              <button>{copy.tasks.planSave}</button>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setCue("");
+                  setAction("");
+                  setPlanNote(null);
+                  void run(sb.from("tasks").update({ if_cue: null, then_action: null }).eq("id", task.id));
+                }}
+              >
+                {copy.tasks.planClear}
+              </button>
+              {planNote && (
+                <span className="small status-done" role="status">
+                  {planNote}
+                </span>
+              )}
+            </div>
+          </form>
           <label className="check">
             <input
               type="checkbox"
@@ -107,6 +169,102 @@ function TaskEditor({ task, steps, reload }: { task: Task; steps: TaskStep[]; re
         </div>
       )}
     </li>
+  );
+}
+
+function CalendarImport({ onAdded }: { onAdded: () => void }) {
+  const [events, setEvents] = useState<CalendarEvent[] | null>(null);
+  const [picked, setPicked] = useState<Set<number>>(new Set());
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function choose(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    setMsg(null);
+    setErr(null);
+    setEvents(null);
+    if (!file) return;
+    if (file.size > MAX_ICS_BYTES) return setErr(copy.tasks.importTooBig);
+    let found: CalendarEvent[];
+    try {
+      found = parseIcs(await file.text());
+    } catch {
+      return setErr(copy.tasks.importUnreadable);
+    }
+    if (found.length === 0) return setErr(copy.tasks.importNone);
+    setEvents(found);
+    setPicked(new Set(found.map((_, i) => i)));
+  }
+  async function add() {
+    if (!events) return;
+    const rows = events.filter((_, i) => picked.has(i)).map((ev) => ({ title: ev.title, notes: eventNote(ev) }));
+    if (rows.length === 0) return;
+    setBusy(true);
+    const { error } = await supabase().from("tasks").insert(rows);
+    setBusy(false);
+    if (error) return setErr(errorText(error));
+    setEvents(null);
+    setMsg(copy.tasks.importDone(rows.length));
+    onAdded();
+  }
+
+  return (
+    <div className="panel stack">
+      <h3>{copy.tasks.importTitle}</h3>
+      <p className="small quiet">{copy.tasks.importHint}</p>
+      <div>
+        <label htmlFor="ics-file">{copy.tasks.importChoose}</label>
+        <input id="ics-file" type="file" accept=".ics,text/calendar" onChange={choose} />
+      </div>
+      {events && (
+        <>
+          <p role="status">{copy.tasks.importCount(events.length)}</p>
+          <ul style={{ listStyle: "none" }}>
+            {events.map((ev, i) => (
+              <li key={i}>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={picked.has(i)}
+                    onChange={(c) =>
+                      setPicked((s) => {
+                        const n = new Set(s);
+                        if (c.target.checked) n.add(i);
+                        else n.delete(i);
+                        return n;
+                      })
+                    }
+                  />
+                  <span>
+                    {ev.title} <span className="small quiet">{eventNote(ev).replace("From your calendar: ", "")}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          <div className="row">
+            <button className="primary" disabled={busy || picked.size === 0} onClick={add}>
+              {copy.tasks.importAdd(picked.size)}
+            </button>
+            <button type="button" className="ghost" onClick={() => setEvents(null)}>
+              {copy.tasks.importCancel}
+            </button>
+          </div>
+        </>
+      )}
+      {msg && (
+        <p className="note" role="status">
+          {msg}
+        </p>
+      )}
+      {err && (
+        <p className="error" role="alert">
+          {err}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -172,6 +330,7 @@ function TasksInner() {
           ))}
         </ul>
       )}
+      <CalendarImport onAdded={load} />
       {(first || tasks.length > 0) && tasks.length > 0 && (
         <Link className="button primary" href="/today">
           {copy.tasks.planToday}

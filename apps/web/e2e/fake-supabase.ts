@@ -6,7 +6,7 @@
  * reuses the shared scoring and light-day constants so the two cannot silently drift.
  */
 import type { BrowserContext, Request, Route } from "@playwright/test";
-import { LIGHT_DAY_MAX_TASKS, scoreDay, type ItemStatus } from "@sparrow/shared";
+import { KIND_ACT_POINTS, LIGHT_DAY_MAX_TASKS, scoreDay, type ItemStatus } from "@sparrow/shared";
 
 export const SUPABASE_URL = "http://localhost:54321";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -35,8 +35,14 @@ export class FakeSupabase {
     blocklists: [],
     devices: [],
     feedback: [],
+    kind_acts: [],
   };
   uploads: { path: string; bytes: number }[] = [];
+  deleteCalls: unknown[] = [];
+  /** What my_progress() answers. The real calculation is tested in supabase/tests/rls_test.sql. */
+  progress: Record<string, unknown> = { badges: [], best_run: 0, helping_days: 0, kind_acts: 0, mood: [], balance: 0 };
+  /** Set to make the delete-account function answer 500, like a storage outage. */
+  failDelete = false;
   requests: string[] = [];
 
   /** A user who already exists (so tests can sign in through the real login form). */
@@ -124,11 +130,25 @@ export class FakeSupabase {
       if (url.pathname.startsWith("/rest/v1/rpc/")) return await this.rpc(route, url.pathname.split("/").pop()!);
       if (url.pathname.startsWith("/rest/v1/")) return await this.table(route, url);
       if (url.pathname.startsWith("/storage/v1/object/")) return await this.storage(route, url);
+      if (url.pathname === "/functions/v1/delete-account") return this.deleteAccount(route);
       return this.send(route, 404, { message: "not found" });
     } catch (e) {
       if (e instanceof RpcError) return this.send(route, 400, { code: "P0001", message: e.message, details: null, hint: null });
       throw e;
     }
+  }
+
+  // ------------------------------------------------------------------ Edge Function: delete-account
+  private deleteAccount(route: Route) {
+    if (!this.signedIn) return this.send(route, 401, { error: "Please sign in again, then try once more." });
+    const body = (route.request().postDataJSON() ?? {}) as Row;
+    this.deleteCalls.push(body);
+    if (body.confirm !== true) return this.send(route, 400, { error: "needs confirmation" });
+    if (this.failDelete) return this.send(route, 500, { error: "storage down" });
+    for (const k of Object.keys(this.db)) this.db[k] = [];
+    this.uploads = [];
+    this.signedIn = false;
+    return this.send(route, 200, { deleted: true });
   }
 
   // ------------------------------------------------------------------ auth
@@ -324,6 +344,21 @@ export class FakeSupabase {
         if (!item) throw new RpcError("item not found or day already reviewed");
         item.status = args.p_status;
         return ok(item);
+      }
+      case "my_progress":
+        return ok({ ...this.progress, balance: this.points });
+      case "export_my_data":
+        return ok({ exported_at: new Date().toISOString(), profile: this.db.profiles[0] ?? null, tasks: this.db.tasks, daily_plans: this.db.daily_plans });
+      case "log_kind_act": {
+        const plan = this.db.daily_plans.find((p) => p.id === args.p_plan_id);
+        if (!plan) throw new RpcError("plan not found");
+        if (!plan.reviewed_at) throw new RpcError("look back at the day first");
+        if (!this.db.plan_items.some((i) => i.daily_plan_id === plan.id && i.status === "missed"))
+          throw new RpcError("a kind act is for a day when something didn't happen");
+        if (this.db.kind_acts.some((k) => k.plan_id === plan.id)) return ok({ points: 0, already: true });
+        this.db.kind_acts.push({ id: uid(), user_id: USER_ID, plan_id: plan.id, note: args.p_note ?? null });
+        this.points += KIND_ACT_POINTS;
+        return ok({ points: KIND_ACT_POINTS, already: false });
       }
       case "review_day": {
         const plan = this.db.daily_plans.find((p) => p.id === args.p_plan_id)!;
