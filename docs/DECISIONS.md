@@ -86,7 +86,7 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Reason:** The audience may be struggling, and the plan promises privacy-respecting analytics. Everything the plan lists as a metric can be derived from product data, so extra tracking would add risk and no information.
 **Trade-offs:** No funnel or click data, and no per-person views. Retention is computed from plan dates, so it measures use of the planning loop, not page visits. With 20 to 50 users the rates are noisy; read trends, not decimals.
 **Also:** The scheduled heartbeat check (`check_all_heartbeats()`) is guarded: if `pg_cron` is not enabled, the migration prints a notice and everything else still works.
-**Not built, on purpose:** account deletion from inside the app. Storage objects (proof photos) cannot be removed with SQL, so a correct delete needs a server-side function with the service key. It is the first thing to add before a public launch.
+**Not built here:** account deletion from inside the app. Storage objects (proof photos) cannot be removed with SQL, so a correct delete needs a server-side function with the service key. Built later in D20.
 **Status:** Final for the beta.
 
 ## D19 — Browser tests run against a fake backend; the SQL tests own the rules
@@ -94,3 +94,17 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Reason:** A full local Supabase stack needs Docker and is slow and flaky in CI. The browser tests are meant to catch UI wiring, copy and flow regressions, not database behavior.
 **Trade-off:** The fake can accept something the real database would reject. When a rule changes, change the SQL test first.
 **Status:** Final.
+
+## D20 — Account deletion is self-serve, photos first, through an Edge Function
+**Decision:** Settings has a "Delete my account" panel (type `delete` to confirm). It calls the `delete-account` Edge Function (`supabase/functions/delete-account`), which takes the user id from the verified access token (never the request body), removes every photo under `proofs/<user_id>/`, checks none are left, and only then deletes the user. Every table already cascades from `auth.users`, so the database rows go with it.
+**Reason:** D18 named this as the first thing to add before public users. Storage objects can't be removed with SQL, so the service key has to be used server-side.
+**Order matters:** photos first. If the second step fails the person can simply try again; the reverse order could leave photos that nobody owns and nobody can delete.
+**Found while building it:** deleting one partner also deletes the partnership row, which used to leave the other person's *locked* focus session with nobody able to release it (up to 120 minutes). Migration `0009` adds a trigger that releases such locks whenever a partnership row is deleted. The SQL suite fails without it.
+**Tested:** the function's logic (paging, sub-folders, similar-prefix folders, invalid ids, storage failure keeps the account) with `node --test`; cascade and lock release in `supabase/tests/rls_test.sql`; the Settings flow in Playwright against the fake. **Not tested:** the real Edge Function runtime against a real Supabase project (needs a deployed project; see docs/BETA.md).
+**Trade-off:** the confirmation is a typed word, not a password re-entry; a stolen unlocked session could delete the account. Acceptable for the beta.
+**Status:** Final for the beta; deploy step is manual.
+
+## D21 — Deferred on purpose: partner email/push, and narrowing the extension's `<all_urls>`
+**Partner notifications beyond in-app (D15):** they need a mail or push provider, secrets and a sending domain. Code written without those can't be verified, so it was not built. Add it together with the SMTP step in docs/BETA.md.
+**`<all_urls>` host permission:** redirecting a blocked site needs host access to that site. Moving it to optional permissions requested at runtime changes the install and first-run flow and has to be tried in a real Chrome. Left as the known Web Store review risk in docs/STORE_LISTING.md.
+**Status:** Open; revisit with beta feedback.

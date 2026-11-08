@@ -63,6 +63,7 @@ export const copy = {
     support: "Need support right now?",
   },
   auth: {
+    accountDeleted: "Your account and everything in it has been deleted. Take care of yourself.",
     signIn: "Sign in",
     createAccount: "Create your account",
     linkTitle: "Get a sign-in link",
@@ -97,6 +98,16 @@ export const copy = {
     extensionBtn: "Connect the extension",
     supportTitle: "Support",
     supportBody: "If things feel like too much, there are people who can help.",
+    deleteTitle: "Delete my account",
+    deleteBody:
+      "This removes your tasks, plans, photos, notes, points, focus history and settings for good, and signs you out everywhere. If you have a partner, the partnership ends and any lock on their session is released. We can't bring it back afterwards.",
+    deleteStart: "I want to delete my account",
+    deleteCancel: "Keep my account",
+    deleteConfirmLabel: (word: string) => `Type ${word} to confirm`,
+    deleteWord: "delete",
+    deleteGo: "Delete everything",
+    deleting: "Deleting…",
+    deleteError: "We couldn't finish deleting your account. Nothing was lost. Please try again in a moment.",
   },
   tasks: {
     title: "Tasks",
@@ -315,7 +326,7 @@ export const copy = {
     fontsTitle: "Fonts",
     fonts: "Pages load two fonts from Google Fonts, so Google can see that your browser asked for them.",
     ownTitle: "Your data",
-    own: "You can edit or archive your tasks any time and turn activity sharing off in Partner. To have your account and data deleted, send a message with the Share feedback button or contact the person who invited you.",
+    own: "You can edit or archive your tasks any time and turn activity sharing off in Partner. You can delete your whole account, including photos, in Settings. It takes effect immediately and cannot be undone.",
     back: "Back",
   },
   timer: { timesUp: "Time's up", markDone: "Mark step done", stop: "Stop timer" },

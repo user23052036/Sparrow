@@ -18,6 +18,7 @@ jobs:
       - run: npm run format:check
       - run: npm test # shared logic (Vitest)
       - run: npm run test:extension # extension logic (node --test)
+      - run: npm run test:functions # Edge Function logic (node --test)
       - run: npm run typecheck
       - run: npm run build
         env:

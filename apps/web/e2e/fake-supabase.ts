@@ -37,6 +37,9 @@ export class FakeSupabase {
     feedback: [],
   };
   uploads: { path: string; bytes: number }[] = [];
+  deleteCalls: unknown[] = [];
+  /** Set to make the delete-account function answer 500, like a storage outage. */
+  failDelete = false;
   requests: string[] = [];
 
   /** A user who already exists (so tests can sign in through the real login form). */
@@ -124,11 +127,25 @@ export class FakeSupabase {
       if (url.pathname.startsWith("/rest/v1/rpc/")) return await this.rpc(route, url.pathname.split("/").pop()!);
       if (url.pathname.startsWith("/rest/v1/")) return await this.table(route, url);
       if (url.pathname.startsWith("/storage/v1/object/")) return await this.storage(route, url);
+      if (url.pathname === "/functions/v1/delete-account") return this.deleteAccount(route);
       return this.send(route, 404, { message: "not found" });
     } catch (e) {
       if (e instanceof RpcError) return this.send(route, 400, { code: "P0001", message: e.message, details: null, hint: null });
       throw e;
     }
+  }
+
+  // ------------------------------------------------------------------ Edge Function: delete-account
+  private deleteAccount(route: Route) {
+    if (!this.signedIn) return this.send(route, 401, { error: "Please sign in again, then try once more." });
+    const body = (route.request().postDataJSON() ?? {}) as Row;
+    this.deleteCalls.push(body);
+    if (body.confirm !== true) return this.send(route, 400, { error: "needs confirmation" });
+    if (this.failDelete) return this.send(route, 500, { error: "storage down" });
+    for (const k of Object.keys(this.db)) this.db[k] = [];
+    this.uploads = [];
+    this.signedIn = false;
+    return this.send(route, 200, { deleted: true });
   }
 
   // ------------------------------------------------------------------ auth

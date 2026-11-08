@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { copy } from "@sparrow/shared";
@@ -16,6 +16,16 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem("sparrow:deleted")) {
+        sessionStorage.removeItem("sparrow:deleted");
+        setInfo(copy.auth.accountDeleted);
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
   if (!isConfigured) return <NotConfigured />;
 
   function switchMode(m: Mode) {

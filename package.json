@@ -15,7 +15,8 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:e2e": "npm run test:e2e -w apps/web"
+    "test:e2e": "npm run test:e2e -w apps/web",
+    "test:functions": "node --test supabase/functions/delete-account/logic.test.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

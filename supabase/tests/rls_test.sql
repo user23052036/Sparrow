@@ -346,3 +346,26 @@ select pg_temp.check((select count(*) from tamper_events where user_id = 'ffffff
 select check_all_heartbeats();
 select pg_temp.check((select count(*) from tamper_events where user_id = 'ffffffff-0000-0000-0000-000000000006' and kind = 'heartbeat_lost') = 1,
   'running the job again does not duplicate it');
+
+-- ------------------------------------------------- D20: account deletion (0009)
+insert into auth.users values
+  ('99999999-0000-0000-0000-0000000000a1', 'g@test'),
+  ('99999999-0000-0000-0000-0000000000a2', 'h@test');
+insert into profiles (id, display_name) values ('99999999-0000-0000-0000-0000000000a1', 'Gus') on conflict (id) do nothing;
+insert into profiles (id, display_name) values ('99999999-0000-0000-0000-0000000000a2', 'Hana') on conflict (id) do nothing;
+insert into tasks (user_id, title) values ('99999999-0000-0000-0000-0000000000a1', 'Gus task');
+insert into feedback (user_id, message) values ('99999999-0000-0000-0000-0000000000a1', 'bye');
+insert into devices (id, user_id, platform) values ('dddddddd-0000-0000-0000-0000000000a1', '99999999-0000-0000-0000-0000000000a1', 'extension');
+insert into buddy_links (requester_id, partner_id, status, mutual)
+  values ('99999999-0000-0000-0000-0000000000a1', '99999999-0000-0000-0000-0000000000a2', 'active', true);
+insert into focus_sessions (user_id, planned_minutes, ends_at, locked)
+  values ('99999999-0000-0000-0000-0000000000a2', 60, now() + interval '50 minutes', true);
+select pg_temp.check((select locked from focus_sessions where user_id = '99999999-0000-0000-0000-0000000000a2'), 'H has a locked session while partnered');
+delete from auth.users where id = '99999999-0000-0000-0000-0000000000a1';
+select pg_temp.check(not exists (select 1 from profiles where id = '99999999-0000-0000-0000-0000000000a1'), 'deleting an account removes the profile');
+select pg_temp.check(not exists (select 1 from tasks where user_id = '99999999-0000-0000-0000-0000000000a1'), 'deleting an account removes tasks');
+select pg_temp.check(not exists (select 1 from feedback where user_id = '99999999-0000-0000-0000-0000000000a1'), 'deleting an account removes feedback');
+select pg_temp.check(not exists (select 1 from devices where user_id = '99999999-0000-0000-0000-0000000000a1'), 'deleting an account removes devices');
+select pg_temp.check(not exists (select 1 from buddy_links where requester_id = '99999999-0000-0000-0000-0000000000a1'), 'deleting an account ends the partnership row');
+select pg_temp.check(not (select locked from focus_sessions where user_id = '99999999-0000-0000-0000-0000000000a2'), 'the partner''s locked session is released');
+select pg_temp.check(exists (select 1 from profiles where id = '99999999-0000-0000-0000-0000000000a2'), 'the partner''s own data is untouched');

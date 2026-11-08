@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { copy } from "@sparrow/shared";
 import { ProfileForm } from "../ProfileForm";
+import { DeleteAccount } from "@/components/DeleteAccount";
 
 export default function Settings() {
   return (
@@ -21,6 +22,7 @@ export default function Settings() {
           {copy.helpTitle}
         </Link>
       </div>
+      <DeleteAccount />
     </>
   );
 }
