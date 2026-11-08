@@ -1,5 +1,5 @@
 export type ItemStatus = "pending" | "done" | "partial" | "missed" | "rescheduled";
-export type StakeType = "none" | "points";
+export type StakeType = "none" | "points" | "micro_task";
 export type Mood = 1 | 2 | 3 | 4 | 5;
 
 export interface Profile {
@@ -85,7 +85,7 @@ export interface PartnerEvent {
 
 export interface PartnerProof {
   id: string;
-  kind: "photo" | "text";
+  kind: "photo" | "text" | "voice";
   text: string | null;
   path: string | null;
   flagged: boolean;
@@ -121,4 +121,33 @@ export type PartnerOverview =
       pending_end_requests: PartnerEndRequest[];
       proofs: PartnerProof[];
       activity: PartnerActivity | null;
+    };
+
+/** A five-minute make-up step owed after a missed task on a micro-task day (0017). */
+export interface MakeupStep {
+  id: string;
+  from_plan_id: string;
+  due_on: string;
+  title: string;
+  status: "owed" | "done" | "let_go";
+}
+
+export interface CircleMember {
+  key: string;
+  name: string;
+  me: boolean;
+  shares: boolean;
+  cheered: boolean;
+  today: { planned: number; done: number; partial: number; closed: boolean | null } | null;
+  focus_minutes: number | null;
+}
+
+export type CircleOverview =
+  | { state: "none" }
+  | {
+      state: "active";
+      circle: { name: string; invite_code: string; size: number; max: number };
+      i_share: boolean;
+      cheers_today: string[];
+      members: CircleMember[];
     };

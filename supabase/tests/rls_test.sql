@@ -733,3 +733,206 @@ reset role;
 set role anon;
 select pg_temp.expect_error($q$select set_share_rating(true)$q$, 'anonymous visitors cannot change ratings');
 reset role;
+
+-- ------------------------------------------------- micro-task stake (0017)
+insert into auth.users values ('a1a1a1a1-0000-0000-0000-000000000001', 'm1@test'), ('a1a1a1a1-0000-0000-0000-000000000002', 'm2@test');
+select set_config('request.jwt.claim.sub', 'a1a1a1a1-0000-0000-0000-000000000001', false);
+insert into tasks (user_id, title) values ('a1a1a1a1-0000-0000-0000-000000000001', 'M1 write'), ('a1a1a1a1-0000-0000-0000-000000000001', 'M2 walk');
+select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000001');
+select pg_temp.check((commit_day(array(select id from tasks order by title), 3, 0, true)).stake_type = 'none', 'Gentle Mode turns a micro-task stake off');
+reset role;
+delete from plan_items where user_id = 'a1a1a1a1-0000-0000-0000-000000000001';
+update daily_plans set committed_at = null where user_id = 'a1a1a1a1-0000-0000-0000-000000000001';
+update profiles set gentle_mode = false where id = 'a1a1a1a1-0000-0000-0000-000000000001';
+select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000001');
+select pg_temp.check((commit_day(array(select id from tasks order by title), 3, 0, true)).stake_type = 'micro_task', 'a micro-task stake is stored');
+select pg_temp.check((select stake_amount from daily_plans where date = current_date) = 0, 'a micro-task stake costs no points');
+select pg_temp.expect_error($q$insert into makeup_steps (user_id, from_plan_id, due_on, title) select auth.uid(), id, current_date, 'x' from daily_plans$q$, 'clients cannot write make-up steps');
+select set_item_status((select i.id from plan_items i join tasks t on t.id = i.task_id where t.title = 'M1 write'), 'done');
+select review_day((select id from daily_plans where date = current_date), '{}', 3);
+select pg_temp.check((select count(*) from makeup_steps) = 1, 'a missed task on a micro-task day adds exactly one make-up step');
+select pg_temp.check((select title from makeup_steps) = '5 minutes on: M2 walk' and (select due_on from makeup_steps) = current_date + 1, 'the make-up step names the missed task and is due tomorrow');
+select pg_temp.expect_error($q$select settle_makeup_step((select id from makeup_steps), 'done')$q$, 'a make-up step cannot be done before its day');
+select pg_temp.expect_error($q$select settle_makeup_step((select id from makeup_steps), 'paid')$q$, 'only done or let go');
+reset role;
+select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from makeup_steps) = 0, 'other people cannot see my make-up steps');
+select pg_temp.expect_error($q$select settle_makeup_step((select id from makeup_steps limit 1), 'let_go')$q$, 'other people cannot settle my make-up step');
+reset role;
+update makeup_steps set due_on = current_date where user_id = 'a1a1a1a1-0000-0000-0000-000000000001';
+select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000001');
+select pg_temp.check((settle_makeup_step((select id from makeup_steps), 'done')).status = 'done', 'a due make-up step can be marked done');
+select pg_temp.check((settle_makeup_step((select id from makeup_steps), 'let_go')).status = 'done', 'a settled step stays settled');
+select pg_temp.check(export_my_data() ? 'makeup_steps', 'export includes make-up steps');
+reset role;
+-- a full day adds nothing; points and micro stakes cannot be combined; a lighter day turns it off
+update daily_plans set date = current_date - 1 where user_id = 'a1a1a1a1-0000-0000-0000-000000000001';
+select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000001');
+select pg_temp.expect_error($q$select commit_day(array(select id from tasks order by title), 3, 5, true)$q$, 'points and a make-up step cannot both be staked');
+select commit_day(array(select id from tasks order by title), 3, 0, true);
+select review_day((select id from daily_plans where date = current_date), (select jsonb_object_agg(id::text, 'done') from plan_items where status = 'pending'), 3);
+select pg_temp.check((select count(*) from makeup_steps) = 1, 'a full day adds no make-up step');
+reset role;
+update daily_plans set date = current_date - 2 where user_id = 'a1a1a1a1-0000-0000-0000-000000000001' and date = current_date;
+select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000001');
+update profiles set light_day = current_date;
+select pg_temp.check((commit_day(array(select id from tasks order by title limit 1), 3, 0, true)).stake_type = 'none', 'a lighter day turns a micro-task stake off');
+reset role;
+
+-- ------------------------------------------------- voice proofs (0018)
+select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000001');
+insert into proofs (plan_item_id, kind, storage_path, duration_s)
+  values ((select id from plan_items limit 1), 'voice', 'a1a1a1a1-0000-0000-0000-000000000001/a.webm', 12);
+select pg_temp.check((select count(*) from proofs where kind = 'voice') = 1, 'a voice proof can be saved');
+select pg_temp.check((select visibility from proofs where kind = 'voice') = 'private', 'voice proofs are private by default');
+select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path, duration_s) values ((select id from plan_items limit 1), 'voice', 'a1a1a1a1-0000-0000-0000-000000000001/b.webm', 61)$q$, 'recordings are at most 60 seconds');
+select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path) values ((select id from plan_items limit 1), 'voice', 'a1a1a1a1-0000-0000-0000-000000000001/c.webm')$q$, 'a recording needs a duration');
+select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path, duration_s) values ((select id from plan_items limit 1), 'voice', 'a1a1a1a1-0000-0000-0000-000000000002/d.webm', 5)$q$, 'a recording must be in my own folder');
+update proofs set duration_s = 1 where kind = 'voice';
+select pg_temp.check((select duration_s from proofs where kind = 'voice') = 12, 'the duration cannot be changed afterwards');
+reset role;
+select pg_temp.check((select 'audio/webm' = any (allowed_mime_types) from storage.buckets where id = 'proofs'), 'the proofs bucket accepts audio');
+select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from proofs where kind = 'voice') = 0, 'other people cannot see my voice proofs');
+reset role;
+
+-- ------------------------------------------------- circles (0019)
+insert into auth.users values
+  ('c1c1c1c1-0000-0000-0000-000000000001', 'c1@test'), ('c1c1c1c1-0000-0000-0000-000000000002', 'c2@test'),
+  ('c1c1c1c1-0000-0000-0000-000000000003', 'c3@test'), ('c1c1c1c1-0000-0000-0000-000000000004', 'c4@test'),
+  ('c1c1c1c1-0000-0000-0000-000000000005', 'c5@test');
+update profiles set display_name = 'Circle ' || right(id::text, 1) where id::text like 'c1c1c1c1-%';
+select set_config('request.jwt.claim.sub', 'c1c1c1c1-0000-0000-0000-000000000002', false);
+insert into tasks (user_id, title) values ('c1c1c1c1-0000-0000-0000-000000000002', 'Secret title one'), ('c1c1c1c1-0000-0000-0000-000000000002', 'Secret title two');
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000001');
+select pg_temp.check((circle_overview() ->> 'state') = 'none', 'no circle at first');
+select pg_temp.expect_error($q$select create_circle('   ')$q$, 'a circle needs a name');
+select create_circle('Morning birds');
+select pg_temp.expect_error($q$select create_circle('Another')$q$, 'one circle per person');
+select pg_temp.expect_error($q$insert into circle_members (circle_id, user_id) select id, 'c1c1c1c1-0000-0000-0000-000000000005' from circles$q$, 'clients cannot add members directly');
+reset role;
+select set_config('test.circle_code', (select invite_code from circles where name = 'Morning birds'), false);
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from circles) = 0, 'outsiders cannot read circles');
+select pg_temp.check((preview_circle_invite(current_setting('test.circle_code')) ->> 'valid')::boolean, 'the invite previews as valid');
+select join_circle(current_setting('test.circle_code'));
+select commit_day(array(select id from tasks order by title), 3, 0);
+select set_item_status((select id from plan_items order by id limit 1), 'done');
+select start_focus_session(25);
+reset role;
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000003');
+select join_circle(current_setting('test.circle_code'));
+reset role;
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000004');
+select join_circle(current_setting('test.circle_code'));
+reset role;
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000005');
+select pg_temp.check(not (preview_circle_invite(current_setting('test.circle_code')) ->> 'valid')::boolean, 'a full circle previews as full');
+select pg_temp.expect_error($q$select join_circle(current_setting('test.circle_code'))$q$, 'a circle holds at most four people');
+reset role;
+
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000001');
+select pg_temp.check((circle_overview() -> 'circle' ->> 'size')::int = 4, 'the circle has four members');
+select pg_temp.check((select (m -> 'today' ->> 'done')::int = 1 and (m -> 'today' ->> 'planned')::int = 2 and (m ->> 'focus_minutes')::int = 25
+                        from jsonb_array_elements(circle_overview() -> 'members') m where m ->> 'name' = 'Circle 2'), 'members see counts and focus minutes of those who share');
+select pg_temp.check(not (circle_overview()::text ~ 'Secret title'), 'task titles are never shown to the circle');
+select pg_temp.check(not (circle_overview()::text ~ 'c1c1c1c1-0000'), 'no user ids are handed to the circle');
+select pg_temp.check((select count(*) from circle_members) = 1, 'I can read only my own membership row');
+select pg_temp.check((select count(*) from proofs) = 0 and (select count(*) from tamper_events) = 0, 'a circle gives no access to proofs or focus events');
+select pg_temp.check((send_cheer((select (m ->> 'key')::uuid from jsonb_array_elements(circle_overview() -> 'members') m where m ->> 'name' = 'Circle 2')) ->> 'sent')::boolean, 'a cheer can be sent');
+select pg_temp.check(not (send_cheer((select (m ->> 'key')::uuid from jsonb_array_elements(circle_overview() -> 'members') m where m ->> 'name' = 'Circle 2')) ->> 'sent')::boolean, 'one cheer per person per day');
+select pg_temp.expect_error($q$select send_cheer((select (m ->> 'key')::uuid from jsonb_array_elements(circle_overview() -> 'members') m where (m ->> 'me')::boolean))$q$, 'no cheering yourself');
+select pg_temp.expect_error($q$select send_cheer(gen_random_uuid())$q$, 'cannot cheer someone outside the circle');
+reset role;
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000002');
+select pg_temp.check(circle_overview() -> 'cheers_today' ? 'Circle 1', 'the cheered person sees who cheered them');
+select set_circle_sharing(false);
+reset role;
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000001');
+select pg_temp.check((select m -> 'today' = 'null'::jsonb and m -> 'focus_minutes' = 'null'::jsonb
+                        from jsonb_array_elements(circle_overview() -> 'members') m where m ->> 'name' = 'Circle 2'), 'switching sharing off hides the counts');
+reset role;
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000004');
+select pg_temp.check((leave_circle() ->> 'state') = 'none', 'anyone can leave');
+select pg_temp.check((preview_circle_invite(current_setting('test.circle_code')) ->> 'valid') = 'false', 'leaving makes the old link stop working');
+reset role;
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000001');
+select pg_temp.check((circle_overview() -> 'circle' ->> 'size')::int = 3, 'the circle has three left');
+select pg_temp.check(export_my_data() ? 'circle' and export_my_data() ? 'cheers_sent', 'export includes circle membership and cheers sent');
+reset role;
+-- deleting an account removes the membership; the last person leaving removes the circle
+delete from auth.users where id = 'c1c1c1c1-0000-0000-0000-000000000003';
+select pg_temp.check((select count(*) from circle_members where circle_id = (select id from circles where name = 'Morning birds')) = 2, 'a deleted account leaves the circle');
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000001');
+select leave_circle();
+reset role;
+select pg_temp.as_user('c1c1c1c1-0000-0000-0000-000000000002');
+select leave_circle();
+reset role;
+select pg_temp.check((select count(*) from circles where name = 'Morning birds') = 0, 'an empty circle is removed');
+set role anon;
+select pg_temp.expect_error($q$select circle_overview()$q$, 'anonymous visitors cannot read circles');
+reset role;
+
+-- ------------------------------------------------- Android engine: device secret and sync (0020)
+insert into auth.users values ('d1d1d1d1-0000-0000-0000-000000000001', 'phone@test'), ('d1d1d1d1-0000-0000-0000-000000000002', 'other@test');
+select pg_temp.as_user('d1d1d1d1-0000-0000-0000-000000000001');
+insert into tasks (title) values ('Phone task');
+select heartbeat('d1d1d1d1-aaaa-0000-0000-000000000001', 'android', 'Pixel', true);
+select heartbeat('d1d1d1d1-aaaa-0000-0000-000000000002', 'extension', 'Chrome', true);
+select pg_temp.expect_error($q$select issue_device_secret('d1d1d1d1-aaaa-0000-0000-000000000002')$q$, 'only a phone gets a device secret');
+select set_config('test.secret', issue_device_secret('d1d1d1d1-aaaa-0000-0000-000000000001'), false);
+select pg_temp.check(length(current_setting('test.secret')) = 64, 'the device secret is long and random');
+select pg_temp.check((select secret_hash from devices where platform = 'android') <> current_setting('test.secret'), 'only a hash of the secret is stored');
+update blocklists set android_packages = '{com.instagram.android,com.zhiliaoapp.musically}';
+reset role;
+select pg_temp.as_user('d1d1d1d1-0000-0000-0000-000000000002');
+select pg_temp.expect_error($q$select issue_device_secret('d1d1d1d1-aaaa-0000-0000-000000000001')$q$, 'nobody else can issue a secret for my phone');
+reset role;
+
+-- the phone syncs with no user session at all
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error($q$select device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', 'wrong', true, false)$q$, 'a wrong secret is refused');
+select pg_temp.expect_error($q$select device_sync('d1d1d1d1-aaaa-0000-0000-000000000002', current_setting('test.secret'), true, false)$q$, 'a secret works only for its own device');
+select pg_temp.check(not (device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false) ->> 'active')::boolean, 'no session: nothing to block');
+select pg_temp.expect_error($q$select get_focus_state()$q$, 'the anon key alone still cannot read focus state');
+reset role;
+
+select pg_temp.as_user('d1d1d1d1-0000-0000-0000-000000000001');
+select commit_day(array(select id from tasks), 3, 0);
+select start_focus_session(25, null, (select id from plan_items limit 1));
+select pg_temp.expect_error($q$update blocklists set android_packages = '{com.instagram.android}'$q$, 'apps cannot be removed during a session');
+reset role;
+set role anon;
+select pg_temp.check((device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false) -> 'packages') ? 'com.instagram.android', 'a session started elsewhere reaches the phone with its app list');
+select pg_temp.check((device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false) ->> 'task') = 'Phone task', 'the phone learns the task to show on the blocked screen');
+reset role;
+-- an asleep phone that goes quiet is not "going quiet"; an awake one is
+update focus_sessions set started_at = now() - interval '10 minutes' where user_id = 'd1d1d1d1-0000-0000-0000-000000000001';
+set role anon;
+select device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, true);
+reset role;
+update devices set last_heartbeat_at = now() - interval '10 minutes' where user_id = 'd1d1d1d1-0000-0000-0000-000000000001';
+select public._record_heartbeat_events('d1d1d1d1-0000-0000-0000-000000000001');
+select pg_temp.check((select count(*) from tamper_events where device_id = 'd1d1d1d1-aaaa-0000-0000-000000000001') = 0, 'an asleep phone in a pocket is not logged');
+select pg_temp.check((select count(*) from tamper_events where device_id = 'd1d1d1d1-aaaa-0000-0000-000000000002') = 1, 'a quiet extension during the same session still is');
+update devices set asleep = false where id = 'd1d1d1d1-aaaa-0000-0000-000000000001';
+select public._record_heartbeat_events('d1d1d1d1-0000-0000-0000-000000000001');
+select pg_temp.check((select kind from tamper_events where device_id = 'd1d1d1d1-aaaa-0000-0000-000000000001') = 'heartbeat_lost', 'an awake phone that goes quiet is logged');
+-- switching protection off is recorded even while asleep
+set role anon;
+select device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), false, true);
+reset role;
+select pg_temp.check((select count(*) from tamper_events where device_id = 'd1d1d1d1-aaaa-0000-0000-000000000001' and kind = 'protection_disabled') = 1, 'turning blocking off on the phone is recorded');
+-- a foreground heartbeat wakes the device again; a new secret replaces the old one
+select pg_temp.as_user('d1d1d1d1-0000-0000-0000-000000000001');
+select heartbeat('d1d1d1d1-aaaa-0000-0000-000000000001', 'android', null, true);
+select pg_temp.check(not (select asleep from devices where platform = 'android'), 'the app in the foreground wakes the device');
+select pg_temp.check(not (export_my_data()::text ~ 'secret_hash'), 'the export leaves out the device secret hash');
+select set_config('test.secret2', issue_device_secret('d1d1d1d1-aaaa-0000-0000-000000000001'), false);
+reset role;
+set role anon;
+select pg_temp.expect_error($q$select device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false)$q$, 'a rotated secret stops the old one');
+select pg_temp.check((device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret2'), true, false) ->> 'active')::boolean, 'the new secret works');
+reset role;

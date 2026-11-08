@@ -14,6 +14,7 @@ const NAV = [
   { href: "/tasks", label: copy.nav.tasks },
   { href: "/focus", label: copy.nav.focus },
   { href: "/partner", label: copy.nav.partner },
+  { href: "/circle", label: copy.nav.circle },
   { href: "/progress", label: copy.nav.progress },
   { href: "/settings", label: copy.nav.settings },
 ];
@@ -29,7 +30,8 @@ function Guard({ children }: { children: ReactNode }) {
     if (!session) {
       // Remember a partner invite so it still opens after signing in or up.
       try {
-        if (window.location.pathname.startsWith("/partner/join")) sessionStorage.setItem("sparrow:next", window.location.pathname + window.location.search);
+        if (/^\/(partner|circle)\/join/.test(window.location.pathname))
+          sessionStorage.setItem("sparrow:next", window.location.pathname + window.location.search);
       } catch {
         /* storage unavailable */
       }
@@ -45,7 +47,7 @@ function Guard({ children }: { children: ReactNode }) {
         const next = sessionStorage.getItem("sparrow:next");
         if (next) {
           sessionStorage.removeItem("sparrow:next");
-          if (next.startsWith("/partner/join") && next !== path) router.replace(next);
+          if (/^\/(partner|circle)\/join/.test(next) && next !== path) router.replace(next);
         }
       } catch {
         /* storage unavailable */
