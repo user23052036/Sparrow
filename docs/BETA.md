@@ -10,6 +10,7 @@ Goal from the plan: 20 to 50 users, including people outside the founder's circl
 - **Metrics without tracking.** There are no analytics scripts or event logs. `beta_metrics(p_days)` computes everything from tables the app already needs, and only the project owner (service role) can call it.
 - **Heartbeat checking runs on a schedule** (`check_all_heartbeats()` via pg_cron, every minute) so a device that goes quiet is noticed even when nobody has the app open.
 - **Account deletion** in Settings (D20): removes the account, every table row and every proof photo. Photos are removed before the account, so a failure never leaves orphaned images.
+- **Small helps:** if-then plans, calendar-file import, a kind act after a hard day, a private Progress page (badges, mood trend, days you supported your partner) and a data download. See D22 to D24.
 - **Chrome extension packaging:** see `docs/STORE_LISTING.md`.
 
 ## Reading the numbers

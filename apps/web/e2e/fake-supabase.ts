@@ -39,6 +39,8 @@ export class FakeSupabase {
   };
   uploads: { path: string; bytes: number }[] = [];
   deleteCalls: unknown[] = [];
+  /** What my_progress() answers. The real calculation is tested in supabase/tests/rls_test.sql. */
+  progress: Record<string, unknown> = { badges: [], best_run: 0, helping_days: 0, kind_acts: 0, mood: [], balance: 0 };
   /** Set to make the delete-account function answer 500, like a storage outage. */
   failDelete = false;
   requests: string[] = [];
@@ -343,6 +345,10 @@ export class FakeSupabase {
         item.status = args.p_status;
         return ok(item);
       }
+      case "my_progress":
+        return ok({ ...this.progress, balance: this.points });
+      case "export_my_data":
+        return ok({ exported_at: new Date().toISOString(), profile: this.db.profiles[0] ?? null, tasks: this.db.tasks, daily_plans: this.db.daily_plans });
       case "log_kind_act": {
         const plan = this.db.daily_plans.find((p) => p.id === args.p_plan_id);
         if (!plan) throw new RpcError("plan not found");

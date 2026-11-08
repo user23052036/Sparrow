@@ -408,3 +408,66 @@ reset role;
 select pg_temp.as_user('77777777-0000-0000-0000-000000000002');
 select pg_temp.check((select count(*) from kind_acts) = 0, 'other users cannot read my kind acts');
 reset role;
+
+-- ------------------------------------------------- progress and export (0012)
+insert into auth.users values ('66666666-0000-0000-0000-000000000001', 'm@test'), ('66666666-0000-0000-0000-000000000002', 'n@test');
+insert into profiles (id, display_name, timezone) values ('66666666-0000-0000-0000-000000000001', 'Mia', 'UTC') on conflict (id) do nothing;
+insert into tasks (id, user_id, title) values
+  ('66666666-2222-0000-0000-000000000001', '66666666-0000-0000-0000-000000000001', 'm task'),
+  ('66666666-2222-0000-0000-000000000002', '66666666-0000-0000-0000-000000000002', 'n task');
+-- Mia: three consecutive credited days (the middle one partly done, one with a miss), then a gap, then one more
+insert into daily_plans (id, user_id, date, committed_at, reviewed_at, mood_morning, mood_evening) values
+  ('66666666-1111-0000-0000-000000000001', '66666666-0000-0000-0000-000000000001', current_date - 10, now(), now(), 4, 5),
+  ('66666666-1111-0000-0000-000000000002', '66666666-0000-0000-0000-000000000001', current_date - 9,  now(), now(), 3, 3),
+  ('66666666-1111-0000-0000-000000000003', '66666666-0000-0000-0000-000000000001', current_date - 8,  now(), now(), 2, null),
+  ('66666666-1111-0000-0000-000000000004', '66666666-0000-0000-0000-000000000001', current_date - 5,  now(), now(), null, null),
+  ('66666666-1111-0000-0000-000000000005', '66666666-0000-0000-0000-000000000002', current_date - 1,  now(), now(), null, null);
+insert into plan_items (daily_plan_id, user_id, task_id, status) values
+  ('66666666-1111-0000-0000-000000000001', '66666666-0000-0000-0000-000000000001', '66666666-2222-0000-0000-000000000001', 'done'),
+  ('66666666-1111-0000-0000-000000000002', '66666666-0000-0000-0000-000000000001', '66666666-2222-0000-0000-000000000001', 'partial'),
+  ('66666666-1111-0000-0000-000000000003', '66666666-0000-0000-0000-000000000001', '66666666-2222-0000-0000-000000000001', 'done'),
+  ('66666666-1111-0000-0000-000000000004', '66666666-0000-0000-0000-000000000001', '66666666-2222-0000-0000-000000000001', 'missed'),
+  ('66666666-1111-0000-0000-000000000005', '66666666-0000-0000-0000-000000000002', '66666666-2222-0000-0000-000000000002', 'done');
+select pg_temp.as_user('66666666-0000-0000-0000-000000000001');
+select pg_temp.check((my_progress() ->> 'best_run')::int = 3, 'best run counts partly done days and stops at a gap');
+select pg_temp.check(my_progress() -> 'badges' @> '["first_plan","first_full_day","run_3"]'::jsonb, 'first plan, first full day and a 3-day run are earned');
+select pg_temp.check(not (my_progress() -> 'badges' @> '["run_7"]'::jsonb), 'no 7-day badge yet');
+select pg_temp.check(not (my_progress() -> 'badges' @> '["first_proof"]'::jsonb), 'no proof badge without a proof');
+select pg_temp.check(jsonb_array_length(my_progress() -> 'mood') = 3, 'mood trend lists only days with a mood');
+select pg_temp.check(jsonb_array_length(my_progress(2) -> 'mood') = 2, 'mood trend honours the day limit');
+select pg_temp.check((my_progress() ->> 'helping_days')::int = 0, 'no helping days yet');
+reset role;
+-- Mia helps Nia on two separate days: a verdict and a decided end request
+-- a trigger stamps the proof owner from the session user, so act as Nia while inserting her proof
+select set_config('request.jwt.claim.sub', '66666666-0000-0000-0000-000000000002', false);
+insert into proofs (id, plan_item_id, user_id, kind, text_body, visibility)
+  select '66666666-3333-0000-0000-000000000001', i.id, '66666666-0000-0000-0000-000000000002', 'text', 'done it', 'buddy'
+    from plan_items i where i.user_id = '66666666-0000-0000-0000-000000000002';
+select set_config('request.jwt.claim.sub', '66666666-0000-0000-0000-000000000001', false);
+insert into verifications (proof_id, verifier_id, verdict, created_at) values ('66666666-3333-0000-0000-000000000001', '66666666-0000-0000-0000-000000000001', 'approve', now());
+insert into focus_sessions (id, user_id, planned_minutes, ends_at, locked) values ('66666666-4444-0000-0000-000000000001', '66666666-0000-0000-0000-000000000002', 30, now() + interval '20 minutes', true);
+insert into end_requests (session_id, user_id, reason, status, decided_by, decided_at)
+  values ('66666666-4444-0000-0000-000000000001', '66666666-0000-0000-0000-000000000002', 'need a break', 'approved', '66666666-0000-0000-0000-000000000001', now() - interval '1 day');
+select pg_temp.as_user('66666666-0000-0000-0000-000000000001');
+select pg_temp.check((my_progress() ->> 'helping_days')::int = 2, 'helping days count distinct days of verdicts and decisions');
+select pg_temp.check(my_progress() -> 'badges' @> '["helped_partner"]'::jsonb, 'helping a partner earns the badge');
+reset role;
+select pg_temp.as_user('66666666-0000-0000-0000-000000000002');
+select pg_temp.check((my_progress() ->> 'helping_days')::int = 0, 'being helped does not count as helping');
+select pg_temp.check(jsonb_array_length(my_progress() -> 'mood') = 0, 'another user sees none of Mia''s mood entries');
+reset role;
+-- export: only the caller's rows, no tokens or storage paths, and not a partner's shared proofs
+insert into devices (id, user_id, platform, push_token) values ('dddddddd-0000-0000-0000-0000000000b1', '66666666-0000-0000-0000-000000000001', 'android', 'SECRET-TOKEN');
+insert into buddy_links (requester_id, partner_id, status, mutual) values ('66666666-0000-0000-0000-000000000002', '66666666-0000-0000-0000-000000000001', 'active', true);
+select pg_temp.as_user('66666666-0000-0000-0000-000000000001');
+select pg_temp.check(jsonb_array_length(export_my_data() -> 'tasks') = 1, 'export holds only my tasks');
+select pg_temp.check(jsonb_array_length(export_my_data() -> 'proofs') = 0, 'export leaves out a partner''s shared proofs even though I can read them');
+select pg_temp.check(position('SECRET-TOKEN' in export_my_data()::text) = 0, 'export never contains device push tokens');
+select pg_temp.check(position('invite_code' in export_my_data()::text) = 0, 'export leaves out the invite code');
+select pg_temp.check(export_my_data() #>> '{profile,display_name}' = 'Mia', 'export includes my profile');
+reset role;
+select set_config('request.jwt.claim.sub', '', false);
+set role anon;
+select pg_temp.expect_error($q$select export_my_data()$q$, 'anonymous visitors cannot export');
+select pg_temp.expect_error($q$select my_progress()$q$, 'anonymous visitors cannot read progress');
+reset role;

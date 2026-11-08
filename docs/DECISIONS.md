@@ -108,3 +108,21 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Partner notifications beyond in-app (D15):** they need a mail or push provider, secrets and a sending domain. Code written without those can't be verified, so it was not built. Add it together with the SMTP step in docs/BETA.md.
 **`<all_urls>` host permission:** redirecting a blocked site needs host access to that site. Moving it to optional permissions requested at runtime changes the install and first-run flow and has to be tried in a real Chrome. Left as the known Web Store review risk in docs/STORE_LISTING.md.
 **Status:** Open; revisit with beta feedback.
+
+## D22 — Kind act instead of a charity donation
+**Decision:** After a reviewed day with something that didn't happen, a person can log one small kind thing they did for someone (`log_kind_act()`, migration `0011`). It earns 5 points, once per day, only when the day had a miss. Nothing is shared and no money moves.
+**Reason:** The brief's "turn a miss into a prosocial action" is worth keeping, but money to charity is cut for now (D1). Points are kept below finishing a task (10), so missing on purpose never pays; the unit tests pin `KIND_ACT_POINTS` below `POINTS.done`.
+**Not built:** charity choice and donations (D1), volunteer vouchers, and an extra-micro-task stake. Those need either money, partners or a design pass.
+**Status:** Final for the beta.
+
+## D23 — Progress is computed, private and unranked; helping is counted in days, not points
+**Decision:** `my_progress()` (migration `0012`) returns badges, a mood trend and "days you supported your partner" for the signed-in person, computed on request from existing tables. Nothing is stored and nothing is shown to anyone else. Badges are digital only. A run of days counts any day with some credit (partly done counts), so one miss never resets it.
+**Reason:** The brief's motivation points and social ratings would give partners a reason to approve fake proofs (D3) and turn support into a popularity contest (D4). Counting days of support, privately, recognises help without paying for it.
+**Not built:** star ratings, public reputation, leaderboards (D4), physical badges, badge crafting.
+**Also:** `export_my_data()` returns only the caller's own rows (never a partner's shared proofs), without device push tokens, photo storage paths or invite codes. Photos themselves are not in the file.
+**Status:** Final for the beta.
+
+## D24 — If-then plans and calendar import are small and local
+**Decision:** A task can carry an "If X, then I will Y" plan (both parts or neither, enforced by a check constraint, migration `0010`). Calendar events come in through an `.ics` file chosen by the user and read in the browser by `packages/shared/src/ics.ts`; each chosen event becomes an ordinary task with the date in its notes. Repeating events are added once.
+**Reason:** Both are in the brief and need no outside service. Google Calendar sign-in would need OAuth credentials and a verified app, and a to-do app import needs per-app APIs.
+**Status:** Final for the beta; Google Calendar sync is open.

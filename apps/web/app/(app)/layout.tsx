@@ -14,6 +14,7 @@ const NAV = [
   { href: "/tasks", label: copy.nav.tasks },
   { href: "/focus", label: copy.nav.focus },
   { href: "/partner", label: copy.nav.partner },
+  { href: "/progress", label: copy.nav.progress },
   { href: "/settings", label: copy.nav.settings },
 ];
 
