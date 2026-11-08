@@ -118,7 +118,7 @@ Each milestone ends with a short report: what was built, how to run it, what was
 ### M5b — Android app + app blocking
 Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 
-**M5b-1: App shell**
+**M5b-1: App shell** (built, untested on a device; see DECISIONS D17)
 - Expo app with sign-in, today's plan, focus session start/stop, blocklist editor (pick installed apps → `android_packages`).
 - Registers device in `devices` with FCM push token.
 

@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Sparrow",
+    "slug": "sparrow",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["android"],
+    "android": {
+      "package": "com.sparrow.app",
+      "googleServicesFile": "./google-services.json"
+    },
+    "plugins": ["expo-notifications"]
+  }
+}

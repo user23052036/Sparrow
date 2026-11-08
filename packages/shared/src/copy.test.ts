@@ -25,7 +25,7 @@ function sources(dir: string): string[] {
   });
 }
 describe("copy audit across the apps", () => {
-  const files = [...sources(join(root, "apps/web")), ...sources(join(root, "apps/extension"))];
+  const files = [...sources(join(root, "apps/web")), ...sources(join(root, "apps/extension")), ...sources(join(root, "apps/mobile/src"))];
   it("finds the sources", () => expect(files.length).toBeGreaterThan(10));
   it.each(BANNED_WORDS)("no source file uses %j", (w) => {
     const hits = files.filter((f) => new RegExp(`\\b${w}\\b`, "i").test(readFileSync(f, "utf8")));

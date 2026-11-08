@@ -296,3 +296,20 @@ update profiles set light_day = null where id = 'eeeeeeee-0000-0000-0000-0000000
 reset role;
 select pg_temp.check((select light_day from profiles where id = 'eeeeeeee-0000-0000-0000-000000000005') is not null,
   'another user cannot clear E''s light day');
+
+-- ------------------------------------------- M5b-1: device push tokens (0007)
+select pg_temp.as_user('eeeeeeee-0000-0000-0000-000000000005');
+select heartbeat('dddddddd-0000-0000-0000-0000000000e1', 'android', 'Pixel', true);
+select set_push_token('dddddddd-0000-0000-0000-0000000000e1', 'fcm-token-abc');
+select pg_temp.check((select push_token from devices where id = 'dddddddd-0000-0000-0000-0000000000e1') = 'fcm-token-abc',
+  'owner can store an FCM token for their own device');
+reset role;
+select pg_temp.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select pg_temp.expect_error($q$select set_push_token('dddddddd-0000-0000-0000-0000000000e1', 'hijack')$q$,
+  'another user cannot overwrite a device token');
+select pg_temp.check((select count(*) from devices where id = 'dddddddd-0000-0000-0000-0000000000e1') = 0,
+  'another user cannot see the device or its token');
+reset role;
+set role anon;
+select pg_temp.expect_error($q$select set_push_token('dddddddd-0000-0000-0000-0000000000e1', 'x')$q$, 'anonymous visitors cannot set tokens');
+reset role;
