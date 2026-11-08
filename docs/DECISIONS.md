@@ -68,3 +68,15 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Reason:** The original brief's core idea is that someone else is on the hook with you. For internet addiction in particular, an impulse to quit a session is exactly when a second person helps most. Everything is enforced in Postgres (partner functions plus RLS), covered by the privacy tests.
 **Not built, on purpose:** the "partner pays a penalty" rule (D3), public star ratings and leaderboards (D4), and real-money stakes (D1). Partner pings are in-app only for now.
 **Status:** Prototype. Needs two real accounts to try end to end.
+
+## D16 — A lighter day is the user's choice, and the database enforces it
+**Decision:** A low morning mood (Heavy/Low) or three consecutive heavy days (each under 34% completion) *offers* a smaller day; it never forces one. If the user says yes, `profiles.light_day` is set to that date and `commit_day()` allows at most two tasks and no stake for it. Three heavy days are counted only when the reviewed days are consecutive calendar days, so a long break never reads as a bad streak. The offer after the third heavy day is shown right after the evening review ("Want to make tomorrow lighter?") and applies to tomorrow.
+**Reason:** Shrinking the day is help, not a penalty, so it must be opt-in; but once chosen it should hold even if the UI is bypassed, like the other rules in D13. The owner can clear it at any time (their own profile row), so it can't trap anyone.
+**Also:** The support page is linked from Settings, the evening review and the footer. Copy audit tests now scan all web and extension sources for shaming words.
+**Status:** Final for MVP.
+
+## D17 — The Android shell does not register as a blocking device yet
+**Decision:** The M5b-1 app shell (sign-in, today's plan, focus start/stop, app blocklist) does not call `heartbeat` or store its FCM token until the native blocker exists. The code is written and sits behind `ENGINE_READY` in `apps/mobile/src/device.ts`; flip it when M5b-2 and the background heartbeat (M5b-4) ship. Migration `0007` already adds `devices.push_token` and `set_push_token()`.
+**Reason:** The database treats every `android` row in `devices` as a device that is blocking. Registering a phone that cannot block yet would log false "blocking went quiet" events during sessions, and a partner who opted in to see tamper events would see them.
+**Also:** Android uses the same email + password sign-in as the web (D14), a raw FCM token (not an Expo push token), and lists apps through `queryIntentActivities` instead of the Play-restricted `QUERY_ALL_PACKAGES`.
+**Status:** Prototype. Untested on a real device (see README).

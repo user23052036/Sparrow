@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { copy, MAX_POINT_STAKE, type DailyPlan, type ItemStatus, type PlanItem, type Task, type TaskStep } from "@sparrow/shared";
+import { copy, dayShape, isHeavyStretch, isLowMood, MAX_POINT_STAKE, nextDay, trimToLight, type DailyPlan, type ItemStatus, type PlanItem, type Task, type TaskStep } from "@sparrow/shared";
 import { useAuth } from "@/lib/auth";
 import { supabase, errorText } from "@/lib/supabase";
 import { Branch } from "@/components/Branch";
@@ -51,7 +51,7 @@ async function loadData(): Promise<Data> {
     if (item) verdicts[item] = { verdict: v.verdict, comment: v.comment };
   }
   const ov = po.data as { state?: string; partner?: { name: string } } | null;
-  const rc = (recent.data ?? []) as { completion: number }[];
+  const rc = (recent.data ?? []) as { date: string; completion: number }[];
   return {
     plan,
     unreviewed: (unrev.data ?? []) as DailyPlan[],
@@ -60,28 +60,38 @@ async function loadData(): Promise<Data> {
     steps: (steps.data ?? []) as TaskStep[],
     proofCounts,
     balance: (bal.data as number) ?? 0,
-    heavyStretch: rc.length === 3 && rc.every((r) => Number(r.completion) < 0.34),
+    heavyStretch: isHeavyStretch(rc),
     verdicts,
     partnerName: ov?.state === "active" ? ov.partner?.name ?? null : null,
   };
 }
 
 /* ------------------------------------------------------------ morning */
-function Morning({ data, gentle, reload }: { data: Data; gentle: boolean; reload: () => void }) {
+function Morning({ data, gentle, lightDay, reload }: { data: Data; gentle: boolean; lightDay: boolean; reload: () => void }) {
+  const { session, refreshProfile } = useAuth();
+  const [declined, setDeclined] = useState(false);
   const [mood, setMood] = useState<number | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [stake, setStake] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const low = mood !== null && mood <= 2;
+  const low = isLowMood(mood);
+  const shape = dayShape({ mood, gentle, lightDay, heavyStretch: data.heavyStretch });
   const maxStake = Math.min(MAX_POINT_STAKE, data.balance);
 
   function toggle(id: string) {
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= 5 ? p : [...p, id]));
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= shape.maxTasks ? p : [...p, id]));
+  }
+  async function setLight(on: boolean) {
+    setErr(null);
+    const { error } = await supabase().from("profiles").update({ light_day: on ? data.plan.date : null }).eq("id", session!.user.id);
+    if (error) { setErr(errorText(error)); return; }
+    if (on) setPicked((p) => trimToLight(p));
+    await refreshProfile();
   }
   async function commit() {
     setBusy(true); setErr(null);
-    const { error } = await supabase().rpc("commit_day", { p_task_ids: picked, p_mood: mood, p_stake: gentle ? 0 : stake });
+    const { error } = await supabase().rpc("commit_day", { p_task_ids: picked, p_mood: mood, p_stake: shape.showStake ? stake : 0 });
     setBusy(false);
     if (error) setErr(errorText(error)); else reload();
   }
@@ -101,8 +111,21 @@ function Morning({ data, gentle, reload }: { data: Data; gentle: boolean; reload
       <div className="panel stack">
         <h2>Good morning</h2>
         <MoodPicker label={copy.moodPrompt} value={mood} onChange={setMood} />
-        {low && <p className="note">{copy.lowMoodOffer}</p>}
-        {data.heavyStretch && !low && <p className="note">{copy.heavyStretch}</p>}
+        {lightDay && (
+          <div className="note stack" role="status">
+            <p style={{ margin: 0 }}>{copy.lightDayNowOn}</p>
+            <div className="row"><button type="button" className="ghost" onClick={() => setLight(false)}>{copy.lightDayOff}</button></div>
+          </div>
+        )}
+        {shape.offerLightDay && !declined && (
+          <div className="note stack" role="status">
+            <p style={{ margin: 0 }}>{low ? copy.lowMoodOffer : copy.heavyStretchToday}</p>
+            <div className="row">
+              <button type="button" className="primary" onClick={() => setLight(true)}>{copy.lightDayYes}</button>
+              <button type="button" className="ghost" onClick={() => setDeclined(true)}>{copy.lightDayNo}</button>
+            </div>
+          </div>
+        )}
       </div>
       <div className="panel stack">
         <h3>{copy.morningPrompt}</h3>
@@ -110,14 +133,14 @@ function Morning({ data, gentle, reload }: { data: Data; gentle: boolean; reload
           {data.tasks.map((t) => (
             <label key={t.id} className="check">
               <input type="checkbox" checked={picked.includes(t.id)} onChange={() => toggle(t.id)}
-                disabled={!picked.includes(t.id) && picked.length >= 5} />
+                disabled={!picked.includes(t.id) && picked.length >= shape.maxTasks} />
               {t.title}
             </label>
           ))}
         </div>
-        <p className="small quiet">{picked.length} of up to 5 picked{low && picked.length > 2 ? ". Two might be plenty today." : ""}</p>
+        <p className="small quiet">{picked.length} of up to {shape.maxTasks} picked{low && !lightDay && picked.length > 2 ? ". Two might be plenty today." : ""}</p>
       </div>
-      {!gentle && (
+      {shape.showStake && (
         <div className="panel stack">
           <h3>Stake (optional)</h3>
           {maxStake <= 0 ? (
@@ -209,7 +232,7 @@ function ItemCard({ item, task, steps, date, proofs, userId, reload, verdict, pa
 
 /* ------------------------------------------------------------ evening */
 function Review({ plan, items, tasks, isToday, onDone }: {
-  plan: DailyPlan; items: PlanItem[]; tasks: Task[]; isToday: boolean; onDone: (msg: string) => void;
+  plan: DailyPlan; items: PlanItem[]; tasks: Task[]; isToday: boolean; onDone: (msg: string, offerTomorrow: boolean) => void;
 }) {
   const [statuses, setStatuses] = useState<Record<string, ItemStatus>>(
     () => Object.fromEntries(items.map((i) => [i.id, i.status === "pending" ? "missed" : i.status])),
@@ -230,7 +253,13 @@ function Review({ plan, items, tasks, isToday, onDone }: {
     const line = r.full_day_bonus > 0 ? copy.fullDay
       : r.done < r.countable ? `${copy.partialWin(r.done, r.countable)} ${isToday ? copy.oneSmallWin : ""}`
       : copy.partialWin(r.done, r.countable);
-    onDone(`${line} (+${r.total} points)`);
+    // After today's review, check whether this was the third heavy day in a row.
+    let offer = false;
+    if (isToday) {
+      const recent = await supabase().rpc("recent_completion", { p_days: 3 });
+      offer = !recent.error && isHeavyStretch((recent.data ?? []) as { date: string; completion: number }[]);
+    }
+    onDone(`${line} (+${r.total} points)`, offer);
   }
 
   return (
@@ -251,17 +280,27 @@ function Review({ plan, items, tasks, isToday, onDone }: {
       <MoodPicker label="How are you leaving the day?" value={mood} onChange={setMood} />
       <button className="primary" disabled={busy} onClick={submit}>Finish the day</button>
       {err && <p className="error" role="alert">{err}</p>}
+      <p className="small quiet"><Link href="/help">{copy.supportLink}</Link></p>
     </div>
   );
 }
 
 /* ------------------------------------------------------------ page */
 export default function Today() {
-  const { profile, session } = useAuth();
+  const { profile, session, refreshProfile } = useAuth();
   const [data, setData] = useState<Data | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<DailyPlan | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const [tomorrowOffer, setTomorrowOffer] = useState<string | null>(null); // date of the day just closed
+  const [tomorrowSet, setTomorrowSet] = useState(false);
+
+  async function lightenTomorrow(date: string) {
+    const { error } = await supabase().from("profiles").update({ light_day: nextDay(date) }).eq("id", session!.user.id);
+    if (error) { setErr(errorText(error)); return; }
+    setTomorrowSet(true);
+    await refreshProfile();
+  }
 
   const reload = useCallback(async () => {
     try { setData(await loadData()); setErr(null); } catch (e) { setErr(errorText(e)); }
@@ -281,7 +320,11 @@ export default function Today() {
     return (
       <Review plan={reviewing} items={data.items.filter((i) => i.daily_plan_id === reviewing.id)} tasks={data.tasks}
         isToday={reviewing.id === plan.id}
-        onDone={(m) => { setResult(m); setReviewing(null); void reload(); }} />
+        onDone={(m, offer) => {
+          setResult(m); setReviewing(null); setTomorrowSet(false);
+          setTomorrowOffer(offer ? reviewing.date : null);
+          void reload();
+        }} />
     );
   }
 
@@ -292,6 +335,22 @@ export default function Today() {
         <span className="small quiet">{data.balance} points</span>
       </div>
       {result && <p className="note" role="status">{result}</p>}
+      {tomorrowOffer && (
+        <div className="note stack" role="status">
+          {tomorrowSet ? (
+            <><p style={{ margin: 0 }}>{copy.lightDayTomorrow}</p><p className="small quiet" style={{ margin: 0 }}>{copy.lightDayTomorrowNote}</p></>
+          ) : (
+            <>
+              <p style={{ margin: 0 }}>{copy.heavyStretch}</p>
+              <div className="row">
+                <button type="button" className="primary" onClick={() => lightenTomorrow(tomorrowOffer)}>{copy.lightDayYes}</button>
+                <button type="button" className="ghost" onClick={() => setTomorrowOffer(null)}>{copy.lightDayNo}</button>
+              </div>
+            </>
+          )}
+          <p className="small quiet" style={{ margin: 0 }}><Link href="/help">{copy.supportLink}</Link></p>
+        </div>
+      )}
       {data.unreviewed.map((u) => (
         <div key={u.id} className="panel spread">
           <span>You haven't looked back at {new Date(u.date + "T12:00").toLocaleDateString(undefined, { weekday: "long" })} yet.</span>
@@ -299,7 +358,7 @@ export default function Today() {
         </div>
       ))}
 
-      {!plan.committed_at && <Morning data={data} gentle={profile.gentle_mode} reload={reload} />}
+      {!plan.committed_at && <Morning data={data} gentle={profile.gentle_mode} lightDay={profile.light_day === plan.date} reload={reload} />}
 
       {plan.committed_at && !plan.reviewed_at && (
         <>

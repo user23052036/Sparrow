@@ -1,0 +1,13 @@
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module-gradle-plugin'
+
+group = 'expo.modules.sparrowblocker'
+version = '0.1.0'
+
+android {
+  namespace "expo.modules.sparrowblocker"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}

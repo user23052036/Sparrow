@@ -118,7 +118,7 @@ Each milestone ends with a short report: what was built, how to run it, what was
 ### M5b — Android app + app blocking
 Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 
-**M5b-1: App shell**
+**M5b-1: App shell** (built, untested on a device; see DECISIONS D17)
 - Expo app with sign-in, today's plan, focus session start/stop, blocklist editor (pick installed apps → `android_packages`).
 - Registers device in `devices` with FCM push token.
 
@@ -150,7 +150,7 @@ Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 - **No penalties of any kind on the buddy** (see DECISIONS.md).
 - **Done when:** two test accounts complete the full invite → share → verify loop; RLS tests prove non-shared proofs stay invisible.
 
-### M7 — Safety, mood & copy pass
+### M7 — Safety, mood & copy pass (built; see DECISIONS D16)
 - Low morning mood → offer to shrink the day to 1–2 steps.
 - 3 consecutive heavy-miss days → "Want to make tomorrow lighter?" (never punitive).
 - Help & crisis-resources page reachable from settings and the evening review.
