@@ -11,3 +11,4 @@ export * from "./ifthen";
 export * from "./ics";
 export * from "./progress";
 export * from "./pledge";
+export * from "./rating";

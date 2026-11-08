@@ -6,6 +6,7 @@ import { supabase, errorText } from "@/lib/supabase";
 import { timeAgo } from "@/lib/format";
 import { PartnerPenalty } from "@/components/PartnerPenalty";
 import { SupportNudge } from "@/components/SupportNudge";
+import { PartnerRating } from "@/components/PartnerRating";
 
 type Active = Extract<PartnerOverview, { state: "active" }>;
 
@@ -180,6 +181,8 @@ function ActiveView({ ov, call, busy }: { ov: Active; call: (fn: string, args?: 
           </ul>
         </details>
       )}
+
+      <PartnerRating />
 
       <PartnerPenalty name={name} />
 

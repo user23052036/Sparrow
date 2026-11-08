@@ -717,9 +717,19 @@ reset role;
 select pg_temp.as_user('33333333-0000-0000-0000-000000000001');
 select pg_temp.check((monthly_leaderboard() ->> 'state') = 'ready', 'with 10 people the board shows');
 select pg_temp.check((monthly_leaderboard() ->> 'band') in ('top10', 'top_quarter', 'top_half', 'keep_going'), 'I get a band, not an exact low rank');
-select pg_temp.check(jsonb_array_length(monthly_leaderboard() -> 'rows') <= 10, 'at most the top 10 are listed');
+select pg_temp.check(jsonb_array_length(monthly_leaderboard() -> 'top') <= 10, 'at most the top 10 are listed');
 select pg_temp.check(not (monthly_leaderboard()::text ~ '33333333-0000'), 'no user ids appear on the board');
 select leave_leaderboard();
 select pg_temp.check((monthly_leaderboard() ->> 'state') = 'not_joined', 'leaving removes me from the board');
 select pg_temp.check((select leaderboard_handle from profiles where id = auth.uid()) is null, 'leaving frees my handle');
+reset role;
+
+-- ------------------------------------------------- rating switch and fuller export (0016)
+select pg_temp.as_user('22222222-0000-0000-0000-000000000001');
+select pg_temp.check((set_share_rating(false) ->> 'shared')::boolean = false, 'sharing can be switched off again');
+select pg_temp.check(export_my_data() ? 'partner_pledges_paid', 'export includes the practice partner pledges the person paid');
+select pg_temp.check(export_my_data() ? 'pledges', 'export includes pledges');
+reset role;
+set role anon;
+select pg_temp.expect_error($q$select set_share_rating(true)$q$, 'anonymous visitors cannot change ratings');
 reset role;

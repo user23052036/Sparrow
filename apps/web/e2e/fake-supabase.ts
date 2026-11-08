@@ -55,6 +55,11 @@ export class FakeSupabase {
       activity: null,
     };
   }
+  /** Rating state: what my_rating() answers, and what the partner shares. */
+  rating = { reliability: 3 as number | null, support: 2 as number | null, days_counted: 8, days_needed: 7, shared: false };
+  partnerRating: Record<string, unknown> = { shared: false };
+  /** Leaderboard state as monthly_leaderboard() would answer it. */
+  leaderboard: Record<string, unknown> = { state: "not_joined" };
   /** Partner penalty state, as penalty_status() would report it. */
   penalty = { mine: false, theirs: false, practice_total_30d: 0 };
   /** What partner_support_nudge() answers. */
@@ -400,6 +405,23 @@ export class FakeSupabase {
       case "set_penalty_optin":
         this.penalty.mine = Boolean(args.p_on);
         return ok({ state: "active", ...this.penalty, on: this.penalty.mine && this.penalty.theirs });
+      case "my_rating":
+        return ok(this.rating);
+      case "set_share_rating":
+        this.rating.shared = Boolean(args.p_on);
+        return ok(this.rating);
+      case "partner_rating":
+        return ok(this.partnerRating);
+      case "monthly_leaderboard":
+        return ok(this.leaderboard);
+      case "join_leaderboard": {
+        if (!/^[A-Za-z0-9_]{3,20}$/.test(String(args.p_handle))) throw new RpcError("handles are 3 to 20 letters, numbers or underscores");
+        this.leaderboard = { state: "waiting", needed: 10, have: 3, handle: args.p_handle };
+        return ok(this.leaderboard);
+      }
+      case "leave_leaderboard":
+        this.leaderboard = { state: "not_joined" };
+        return ok({ state: "not_joined" });
       case "partner_support_nudge":
         return ok(this.nudge);
       case "my_progress":

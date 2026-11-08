@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { BADGE_KEYS, copy, moodWord, splitBadges, type Progress } from "@sparrow/shared";
 import { errorText, supabase } from "@/lib/supabase";
+import { RatingCard } from "@/components/RatingCard";
+import { LeaderboardCard } from "@/components/LeaderboardCard";
 
 export default function ProgressPage() {
   const [p, setP] = useState<Progress | null>(null);
@@ -87,6 +89,9 @@ export default function ProgressPage() {
         <p>{copy.progress.helpingDays(p.helping_days)}</p>
         {p.kind_acts > 0 && <p>{copy.progress.kindActs(p.kind_acts)}</p>}
       </div>
+
+      <RatingCard />
+      <LeaderboardCard />
     </div>
   );
 }
