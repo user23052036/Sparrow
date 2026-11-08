@@ -1,22 +1,24 @@
 import { useEffect, useState } from "react";
-import { Pressable, SafeAreaView, Text, View } from "react-native";
+import { AppState, Pressable, SafeAreaView, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import type { Session } from "@supabase/supabase-js";
 import { copy, type Profile } from "@sparrow/shared";
 import { isConfigured, supabase } from "./supabase";
-import { registerDevice } from "./device";
+import { forgetEngine, setUpEngine } from "./device";
 import { Login } from "./screens/Login";
 import { Today } from "./screens/Today";
 import { Focus } from "./screens/Focus";
 import { Apps } from "./screens/Apps";
+import { Protect } from "./screens/Protect";
 import { Button } from "./ui";
 import { s } from "./theme";
 
-type Tab = "today" | "focus" | "apps" | "account";
+type Tab = "today" | "focus" | "apps" | "protect" | "account";
 const TABS: { id: Tab; label: string }[] = [
   { id: "today", label: "Today" },
   { id: "focus", label: "Focus" },
   { id: "apps", label: "Apps" },
+  { id: "protect", label: copy.protect.tab },
   { id: "account", label: "Account" },
 ];
 
@@ -46,7 +48,10 @@ export default function App() {
       .eq("id", session.user.id)
       .maybeSingle()
       .then(({ data }) => setProfile((data as Profile) ?? null));
-    void registerDevice(false);
+    // Once blocking is switched on, keep the engine's credential and state fresh whenever the app opens.
+    void setUpEngine();
+    const sub = AppState.addEventListener("change", (st) => st === "active" && void setUpEngine());
+    return () => sub.remove();
   }, [session]);
 
   if (!isConfigured) {
@@ -72,12 +77,19 @@ export default function App() {
         {tab === "today" && <Today name={profile?.display_name ?? null} />}
         {tab === "focus" && <Focus />}
         {tab === "apps" && <Apps userId={session.user.id} />}
+        {tab === "protect" && <Protect />}
         {tab === "account" && (
           <View style={[s.body, { flex: 1 }]}>
             <Text style={s.h1}>Account</Text>
             <View style={s.panel}>
               <Text style={s.text}>{session.user.email}</Text>
-              <Button label="Sign out" onPress={() => supabase.auth.signOut()} />
+              <Button
+                label="Sign out"
+                onPress={async () => {
+                  await forgetEngine();
+                  await supabase.auth.signOut();
+                }}
+              />
             </View>
             <View style={s.panel}>
               <Text style={s.h2}>{copy.helpTitle}</Text>

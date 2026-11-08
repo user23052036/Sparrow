@@ -11,7 +11,10 @@ import {
   KIND_ACT_POINTS,
   MAX_POINT_STAKE,
   nextDay,
+  recentDaysFrom,
+  suggestTaskCount,
   type Charity,
+  type MakeupStep,
   type Pledge,
   trimToLight,
   type DailyPlan,
@@ -43,6 +46,9 @@ interface Data {
   kindActs: string[];
   charities: Charity[];
   pledges: Pledge[];
+  /** Reviewed days, newest first, for the suggested number of tasks. */
+  recentPlans: { id: string; date: string; reviewed_at: string | null }[];
+  makeups: MakeupStep[];
 }
 
 async function loadData(): Promise<Data> {
@@ -50,7 +56,7 @@ async function loadData(): Promise<Data> {
   const today = await sb.rpc("get_today");
   if (today.error) throw today.error;
   const plan = today.data as DailyPlan;
-  const [unrev, tasks, items, steps, proofs, bal, recent, vers, po, kind, chars, pledges] = await Promise.all([
+  const [unrev, tasks, items, steps, proofs, bal, recent, vers, po, kind, chars, pledges, past, makeups] = await Promise.all([
     sb.rpc("unreviewed_days"),
     sb.from("tasks").select("*").eq("archived", false).order("created_at"),
     sb.from("plan_items").select("*"),
@@ -63,6 +69,8 @@ async function loadData(): Promise<Data> {
     sb.from("kind_acts").select("plan_id"),
     sb.from("charities").select("id, name, blurb").order("name"),
     sb.from("pledges").select("id, plan_id, charity_id, amount, mode, status, owed"),
+    sb.from("daily_plans").select("id, date, reviewed_at").not("reviewed_at", "is", null).order("date", { ascending: false }).limit(7),
+    sb.from("makeup_steps").select("id, from_plan_id, due_on, title, status").order("due_on"),
   ]);
   for (const r of [unrev, tasks, items, steps, proofs, bal, recent]) if (r.error) throw r.error;
   const proofCounts: Record<string, number> = {};
@@ -92,6 +100,8 @@ async function loadData(): Promise<Data> {
     kindActs: ((kind.data ?? []) as { plan_id: string }[]).map((k) => k.plan_id),
     charities: (chars.data ?? []) as Charity[],
     pledges: (pledges.data ?? []) as Pledge[],
+    recentPlans: ((past.data ?? []) as Data["recentPlans"]).filter((p) => p.reviewed_at),
+    makeups: (makeups.data ?? []) as MakeupStep[],
   };
 }
 
@@ -102,11 +112,13 @@ function Morning({ data, gentle, lightDay, reload }: { data: Data; gentle: boole
   const [mood, setMood] = useState<number | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [stake, setStake] = useState(0);
+  const [stakeKind, setStakeKind] = useState<"none" | "points" | "micro">("none");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const low = isLowMood(mood);
   const shape = dayShape({ mood, gentle, lightDay, heavyStretch: data.heavyStretch });
   const maxStake = Math.min(MAX_POINT_STAKE, data.balance);
+  const suggestion = suggestTaskCount(recentDaysFrom(data.recentPlans, data.items), { mood, lightDay });
 
   function toggle(id: string) {
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length >= shape.maxTasks ? p : [...p, id]));
@@ -127,7 +139,12 @@ function Morning({ data, gentle, lightDay, reload }: { data: Data; gentle: boole
   async function commit() {
     setBusy(true);
     setErr(null);
-    const { error } = await supabase().rpc("commit_day", { p_task_ids: picked, p_mood: mood, p_stake: shape.showStake ? stake : 0 });
+    const { error } = await supabase().rpc("commit_day", {
+      p_task_ids: picked,
+      p_mood: mood,
+      p_stake: shape.showStake && stakeKind === "points" ? stake : 0,
+      p_micro: shape.showStake && stakeKind === "micro",
+    });
     setBusy(false);
     if (error) setErr(errorText(error));
     else reload();
@@ -176,6 +193,9 @@ function Morning({ data, gentle, lightDay, reload }: { data: Data; gentle: boole
       </div>
       <div className="panel stack">
         <h3>{copy.morningPrompt}</h3>
+        <p className="small" role="status" aria-label={copy.today.suggestion(suggestion.count)}>
+          <strong>{copy.today.suggestion(suggestion.count)}</strong> <span className="quiet">{copy.today.suggestionWhy[suggestion.reason]}</span>
+        </p>
         <div>
           {data.tasks.map((t) => (
             <label key={t.id} className="check">
@@ -197,15 +217,33 @@ function Morning({ data, gentle, lightDay, reload }: { data: Data; gentle: boole
       {shape.showStake && (
         <div className="panel stack">
           <h3>{copy.today.stakeTitle}</h3>
-          {maxStake <= 0 ? (
-            <p className="quiet">{copy.today.stakeNoPoints}</p>
-          ) : (
-            <>
-              <label htmlFor="stake">{copy.today.stakeLabel(stake)}</label>
-              <input id="stake" type="range" min={0} max={maxStake} step={5} value={stake} onChange={(e) => setStake(Number(e.target.value))} />
-              {stake > 0 && <p className="small quiet">{copy.stakeExplainer(stake)}</p>}
-            </>
-          )}
+          <fieldset style={{ border: "none", padding: 0, margin: 0 }}>
+            <legend className="small">{copy.today.stakeKindLabel}</legend>
+            <div className="row">
+              {(
+                [
+                  ["none", copy.today.stakeNone],
+                  ["points", copy.today.stakePoints],
+                  ["micro", copy.today.stakeMicro],
+                ] as const
+              ).map(([k, l]) => (
+                <button key={k} type="button" aria-pressed={stakeKind === k} onClick={() => setStakeKind(k)}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          {stakeKind === "points" &&
+            (maxStake <= 0 ? (
+              <p className="quiet">{copy.today.stakeNoPoints}</p>
+            ) : (
+              <>
+                <label htmlFor="stake">{copy.today.stakeLabel(stake)}</label>
+                <input id="stake" type="range" min={0} max={maxStake} step={5} value={stake} onChange={(e) => setStake(Number(e.target.value))} />
+                {stake > 0 && <p className="small quiet">{copy.stakeExplainer(stake)}</p>}
+              </>
+            ))}
+          {stakeKind === "micro" && <p className="small quiet">{copy.today.microExplainer}</p>}
         </div>
       )}
       <button className="primary" disabled={busy || picked.length === 0} onClick={commit}>
@@ -475,6 +513,51 @@ function PledgePanel({ charities, reload }: { charities: Charity[]; reload: () =
   );
 }
 
+/* ------------------------------------------------------------ make-up step (micro-task stake) */
+function MakeupPanel({ step, reload, onDone }: { step: MakeupStep; reload: () => void; onDone: (msg: string | null) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  async function settle(outcome: "done" | "let_go") {
+    setBusy(true);
+    setErr(null);
+    const { error } = await supabase().rpc("settle_makeup_step", { p_id: step.id, p_outcome: outcome });
+    setBusy(false);
+    if (error) {
+      setErr(errorText(error));
+      return;
+    }
+    onDone(outcome === "done" ? copy.today.makeupThanks : null);
+    reload();
+  }
+  return (
+    <section className="note stack" aria-label={copy.today.makeupTitle}>
+      <h3 style={{ margin: 0 }}>{copy.today.makeupTitle}</h3>
+      <p style={{ margin: 0 }}>
+        <strong>{step.title}</strong>
+      </p>
+      <p className="small" style={{ margin: 0 }}>
+        {copy.today.makeupBody}
+      </p>
+      <div className="row">
+        <button type="button" className="primary" disabled={busy} onClick={() => settle("done")}>
+          {copy.today.makeupDone}
+        </button>
+        <button type="button" className="ghost" disabled={busy} onClick={() => settle("let_go")}>
+          {copy.today.makeupLetGo}
+        </button>
+      </div>
+      <p className="small quiet" style={{ margin: 0 }}>
+        {copy.today.makeupLetGoNote}
+      </p>
+      {err && (
+        <p className="error" role="alert">
+          {err}
+        </p>
+      )}
+    </section>
+  );
+}
+
 /* ------------------------------------------------------------ kind act */
 function KindAct({ planId, done, reload }: { planId: string; done: boolean; reload: () => void }) {
   const [note, setNote] = useState("");
@@ -630,6 +713,11 @@ export default function Today() {
           </p>
         </div>
       )}
+      {data.makeups
+        .filter((m) => m.status === "owed" && m.due_on <= plan.date)
+        .map((m) => (
+          <MakeupPanel key={m.id} step={m} reload={reload} onDone={setResult} />
+        ))}
       {data.unreviewed.map((u) => (
         <div key={u.id} className="panel spread">
           <span>{copy.today.unreviewed(new Date(u.date + "T12:00").toLocaleDateString(undefined, { weekday: "long" }))}</span>
@@ -643,6 +731,7 @@ export default function Today() {
         <>
           <Branch items={todayItems.map((i) => ({ id: i.id, title: taskOf(i.task_id)?.title ?? "", status: i.status }))} />
           {plan.stake_amount > 0 && <p className="small quiet">{copy.today.stakeSetAside(plan.stake_amount)}</p>}
+          {plan.stake_type === "micro_task" && <p className="small quiet">{copy.today.microSet}</p>}
           {todayPledge && (
             <p className="small quiet" role="status">
               {copy.pledge.summary(CURRENCY_SYMBOL, todayPledge.amount, data.charities.find((c) => c.id === todayPledge.charity_id)?.name ?? "")}
@@ -684,6 +773,11 @@ export default function Today() {
             <p className="note">
               {copy.pledge.helped(CURRENCY_SYMBOL, todayPledge.owed, data.charities.find((c) => c.id === todayPledge.charity_id)?.name ?? "")}{" "}
               {copy.oneSmallWin}
+            </p>
+          )}
+          {plan.stake_type === "micro_task" && todayItems.some((i) => i.status === "missed") && (
+            <p className="small quiet" role="status">
+              {copy.today.makeupTomorrow}
             </p>
           )}
           {todayItems.some((i) => i.status === "missed") && <KindAct planId={plan.id} done={data.kindActs.includes(plan.id)} reload={reload} />}

@@ -19,7 +19,7 @@ function ProofCard({ proof, reload }: { proof: PartnerProof; reload: () => void 
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (proof.kind !== "photo" || !proof.path) return;
+    if (proof.kind === "text" || !proof.path) return;
     supabase()
       .storage.from("proofs")
       .createSignedUrl(proof.path, 600)
@@ -48,6 +48,12 @@ function ProofCard({ proof, reload }: { proof: PartnerProof; reload: () => void 
       </div>
       {proof.kind === "text" ? (
         <p>{proof.text}</p>
+      ) : proof.kind === "voice" ? (
+        url ? (
+          <audio controls preload="none" src={url} aria-label={`Voice note for ${proof.task}`} style={{ width: "100%" }} />
+        ) : (
+          <p className="quiet">{copy.proof.loadingVoice}</p>
+        )
       ) : url ? (
         <img src={url} alt={`Proof for ${proof.task}`} style={{ maxWidth: "100%", borderRadius: 8 }} />
       ) : (

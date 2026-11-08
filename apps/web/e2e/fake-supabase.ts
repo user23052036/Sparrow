@@ -6,7 +6,7 @@
  * reuses the shared scoring and light-day constants so the two cannot silently drift.
  */
 import type { BrowserContext, Request, Route } from "@playwright/test";
-import { KIND_ACT_POINTS, LIGHT_DAY_MAX_TASKS, pledgeLimit, scoreDay, settlePledge, type ItemStatus } from "@sparrow/shared";
+import { KIND_ACT_POINTS, LIGHT_DAY_MAX_TASKS, nextDay, pledgeLimit, scoreDay, settlePledge, type ItemStatus } from "@sparrow/shared";
 
 export const SUPABASE_URL = "http://localhost:54321";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -38,8 +38,10 @@ export class FakeSupabase {
     kind_acts: [],
     charities: [],
     pledges: [],
+    makeup_steps: [],
+    circles: [],
   };
-  uploads: { path: string; bytes: number }[] = [];
+  uploads: { path: string; bytes: number; type: string }[] = [];
   deleteCalls: unknown[] = [];
   /** What partner_overview() answers (defaults to "no partner"). */
   partnerOverview: Record<string, unknown> = { state: "none" };
@@ -66,6 +68,32 @@ export class FakeSupabase {
   nudge: Record<string, unknown> = { level: 0, days: 0 };
   /** What my_progress() answers. The real calculation is tested in supabase/tests/rls_test.sql. */
   progress: Record<string, unknown> = { badges: [], best_run: 0, helping_days: 0, kind_acts: 0, mood: [], balance: 0 };
+  /** Circle state as circle_overview() would answer it. The real rules are in rls_test.sql. */
+  circle: Record<string, unknown> = { state: "none" };
+  /** What preview_circle_invite() answers for any code. */
+  circlePreview: Record<string, unknown> = { valid: true, name: "Morning birds", members: 2 };
+  cheers: string[] = [];
+  /** A circle with the signed-in person and the given others (each sharing a small day). */
+  giveCircle(name: string, others: string[]) {
+    this.circle = {
+      state: "active",
+      circle: { name, invite_code: "0123456789abcdef", size: others.length + 1, max: 4 },
+      i_share: true,
+      cheers_today: [],
+      members: [
+        { key: "me-key", name: "Sam", me: true, shares: true, cheered: false, today: null, focus_minutes: 0 },
+        ...others.map((n, i) => ({
+          key: `key-${i}`,
+          name: n,
+          me: false,
+          shares: true,
+          cheered: false,
+          today: { planned: 3, done: 1, partial: 1, closed: false },
+          focus_minutes: 25,
+        })),
+      ],
+    };
+  }
   /** Set to make the delete-account function answer 500, like a storage outage. */
   failDelete = false;
   requests: string[] = [];
@@ -362,14 +390,16 @@ export class FakeSupabase {
         if (light && ids.length > LIGHT_DAY_MAX_TASKS) throw new RpcError("you asked for a lighter day: pick one or two tasks");
         if (ids.length < 1 || ids.length > 5) throw new RpcError("pick between one and five tasks");
         let stake = Number(args.p_stake ?? 0);
-        if (profile.gentle_mode || light) stake = 0;
+        let micro = Boolean(args.p_micro);
+        if (profile.gentle_mode || light) [stake, micro] = [0, false];
+        if (stake > 0 && micro) throw new RpcError("choose one kind of stake: points or a make-up step");
         for (const id of ids)
           this.db.plan_items.push({ id: uid(), daily_plan_id: plan.id, user_id: USER_ID, task_id: id, status: "pending", completed_at: null });
         Object.assign(plan, {
           committed_at: new Date().toISOString(),
           mood_morning: args.p_mood ?? null,
           stake_amount: stake,
-          stake_type: stake > 0 ? "points" : "none",
+          stake_type: stake > 0 ? "points" : micro ? "micro_task" : "none",
         });
         this.points -= stake;
         return ok(plan);
@@ -428,6 +458,44 @@ export class FakeSupabase {
         return ok({ ...this.progress, balance: this.points });
       case "export_my_data":
         return ok({ exported_at: new Date().toISOString(), profile: this.db.profiles[0] ?? null, tasks: this.db.tasks, daily_plans: this.db.daily_plans });
+      case "settle_makeup_step": {
+        const m = this.db.makeup_steps.find((r) => r.id === args.p_id);
+        if (!m) throw new RpcError("make-up step not found");
+        if (!["done", "let_go"].includes(String(args.p_outcome))) throw new RpcError("choose done or let go");
+        if (m.status === "owed") {
+          if (args.p_outcome === "done" && String(m.due_on) > this.today) throw new RpcError("this step is for tomorrow");
+          m.status = args.p_outcome;
+        }
+        return ok(m);
+      }
+      case "circle_overview":
+        return ok(this.circle);
+      case "create_circle": {
+        if (this.circle.state === "active") throw new RpcError("you are already in a circle");
+        this.giveCircle(String(args.p_name), []);
+        return ok({});
+      }
+      case "preview_circle_invite":
+        return ok(this.circlePreview);
+      case "join_circle": {
+        if (this.circle.state === "active") throw new RpcError("you are already in a circle");
+        this.giveCircle(String(this.circlePreview.name), ["Ravi", "Meera"]);
+        return ok({});
+      }
+      case "leave_circle":
+        this.circle = { state: "none" };
+        return ok({ state: "none" });
+      case "set_circle_sharing":
+        this.circle.i_share = Boolean(args.p_on);
+        return ok(this.circle.i_share);
+      case "send_cheer": {
+        const m = (this.circle.members as Row[]).find((x) => x.key === args.p_member_key);
+        if (!m || m.me) throw new RpcError("that person isn't in your circle");
+        const sent = !m.cheered;
+        m.cheered = true;
+        if (sent) this.cheers.push(String(m.name));
+        return ok({ sent });
+      }
       case "log_kind_act": {
         const plan = this.db.daily_plans.find((p) => p.id === args.p_plan_id);
         if (!plan) throw new RpcError("plan not found");
@@ -456,6 +524,18 @@ export class FakeSupabase {
           Object.assign(pledge, { owed, status: owed === 0 ? "cleared" : "owed" });
         }
         Object.assign(plan, { reviewed_at: new Date().toISOString(), points_earned: score.total, mood_evening: args.p_mood ?? null });
+        const firstMissed = items.find((i) => i.status === "missed");
+        if (plan.stake_type === "micro_task" && firstMissed) {
+          const title = this.db.tasks.find((t) => t.id === firstMissed.task_id)?.title;
+          this.db.makeup_steps.push({
+            id: uid(),
+            user_id: USER_ID,
+            from_plan_id: plan.id,
+            due_on: nextDay(String(plan.date)),
+            title: `5 minutes on: ${title}`,
+            status: "owed",
+          });
+        }
         return ok({
           total: score.total,
           done: countable.filter((i) => i.status === "done").length,
@@ -470,8 +550,14 @@ export class FakeSupabase {
   // ------------------------------------------------------------------ storage
   private async storage(route: Route, url: URL) {
     const req = route.request();
+    const objectPath = url.pathname.replace("/storage/v1/object/", "");
+    if (req.method() === "POST" && objectPath.startsWith("sign/")) return this.send(route, 200, { signedURL: `/object/${objectPath}?token=fake` });
     if (req.method() === "POST" || req.method() === "PUT") {
-      this.uploads.push({ path: url.pathname.replace("/storage/v1/object/", ""), bytes: req.postDataBuffer()?.length ?? 0 });
+      const raw = req.postDataBuffer() ?? Buffer.alloc(0);
+      const header = req.headers()["content-type"] ?? "";
+      // supabase-js sends a Blob as multipart form data; the file's own type is in the part header
+      const partType = header.startsWith("multipart/") ? /content-type:\s*([^\r\n;]+)/i.exec(raw.subarray(0, 400).toString("latin1"))?.[1] : undefined;
+      this.uploads.push({ path: objectPath, bytes: raw.length, type: partType ?? header });
       return this.send(route, 200, { Key: url.pathname.replace("/storage/v1/object/", ""), Id: uid() });
     }
     return this.send(route, 404, { message: "not found" });

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="sparrow_accessibility_label">Sparrow focus blocking</string>
+  <string name="sparrow_accessibility_summary">Keeps the apps you chose away during your focus sessions.</string>
+  <string name="sparrow_accessibility_description">During a focus session you start, Sparrow checks which app is opening and, if it is one you chose to keep away, shows a calm reminder screen instead. Sparrow only reads the name of the app in the foreground. It does not read what is on your screen, what you type, or any messages, and it sends nothing about the apps you use to anyone. You can switch this off here at any time; Sparrow notes that blocking was switched off during a session, and your partner sees it only if you share your activity.</string>
+  <string name="sparrow_blocked_title">This can wait.</string>
+  <string name="sparrow_blocked_body">You asked Sparrow to keep this away during your focus time.</string>
+  <string name="sparrow_blocked_task">Focusing on: %1$s</string>
+  <string name="sparrow_blocked_left">%1$d min %2$02d s left</string>
+  <string name="sparrow_blocked_step">Start a 5-minute step</string>
+  <string name="sparrow_blocked_home">Go to the home screen</string>
+</resources>

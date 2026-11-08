@@ -122,18 +122,18 @@ Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 - Expo app with sign-in, today's plan, focus session start/stop, blocklist editor (pick installed apps → `android_packages`).
 - Registers device in `devices` with FCM push token.
 
-**M5b-2: Blocking engine (native, Kotlin)**
+**M5b-2: Blocking engine (native, Kotlin)** (written, not yet run on a device; see DECISIONS D29)
 - `AccessibilityService` listening to `TYPE_WINDOW_STATE_CHANGED` to detect the foreground app package.
 - If a session is active and the package is in the blocklist → launch Sparrow's full-screen "blocked" activity (current task + "start a 5-minute step" button).
 - Session state (active, ends_at, blocked packages) is persisted locally (DataStore) so blocking works **offline** and survives app restarts; expiry is checked against `ends_at`.
 - Always allow: phone/dialer, SMS, emergency, Sparrow itself, and the user's chosen "always allowed" apps.
 
-**M5b-3: Cross-device sync**
+**M5b-3: Cross-device sync** (written as 30 s polling with a per-device secret instead of FCM; see D29)
 - Session started on laptop → DB insert → Edge Function sends FCM **data message** → phone updates local state and starts enforcing (Realtime alone is not enough because it only works while the app is running).
 - Session started on phone → DB insert → extension receives it via Realtime.
 - **Done when:** start on laptop → phone blocks within ~10 s; start on phone → laptop blocks within ~10 s; works with the Sparrow app swiped away.
 
-**M5b-4: Tamper visibility & reliability**
+**M5b-4: Tamper visibility & reliability** (written; see D29)
 - Detect Accessibility service disabled → log `protection_disabled`; heartbeat like the extension.
 - Onboarding screen guiding the user to: enable the Accessibility service (with a clear, honest disclosure of what it reads and why), exempt Sparrow from battery optimization, and (for aggressive OEMs like Xiaomi/Oppo/Vivo/Samsung) enable autostart.
 - Note: uninstalling cannot be reliably prevented on a personal device — log and make it visible instead.

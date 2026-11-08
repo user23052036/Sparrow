@@ -51,4 +51,4 @@ Read them as signals, not grades. With 20 to 50 people a single person moves a r
 
 ## Not part of this beta
 
-Android blocking (M5b-2 to M5b-5) and Play internal testing, partner notifications by email or push (D15).
+A first real-device run of Android blocking (M5b-2 to M5b-4, D29), M5b-5, Play internal testing, partner notifications by email or push (D15).

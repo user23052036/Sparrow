@@ -4,6 +4,7 @@ import { copy } from "@sparrow/shared";
 import { errorText, supabase } from "../supabase";
 import { Button, Err } from "../ui";
 import { s } from "../theme";
+import { engine, isNativeAvailable } from "../../modules/sparrow-blocker/src";
 import { clock } from "../format";
 
 interface FocusState {
@@ -63,7 +64,10 @@ export function Focus() {
   async function start() {
     const { error } = await supabase.rpc("start_focus_session", { p_minutes: minutes });
     if (error) setErr(errorText(error));
-    else void load();
+    else {
+      void load();
+      void engine.syncNow(); // start blocking on this phone right away
+    }
   }
   async function end() {
     if (!state?.session_id) return;
@@ -73,6 +77,7 @@ export function Focus() {
       setExiting(false);
       setReason("");
       void load();
+      void engine.syncNow();
     }
   }
 
@@ -125,11 +130,11 @@ export function Focus() {
           <Button primary label="Start focusing" onPress={start} />
         </View>
       )}
-      <View style={s.note}>
-        <Text style={s.quiet}>
-          Blocking apps on this phone is coming next. For now, sessions you start here block sites in your browser extension, and the timer stays in sync.
-        </Text>
-      </View>
+      {isNativeAvailable && !engine.protectionOn() && (
+        <View style={s.note}>
+          <Text style={s.quiet}>{copy.protect.focusOff}</Text>
+        </View>
+      )}
     </ScrollView>
   );
 }

@@ -136,3 +136,27 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Not built, on purpose:** live charging or payouts (needs a payment provider, keys, legal review and refund handling; steps in docs/PAYMENTS.md), the accountability-partner marketplace and hiring, crypto stakes, public star ratings. These carry legal, vetting and fraud risk that code alone does not solve.
 **Risks:** the formulas (limit doubling, 25 percent share, rating weights, 10-person floor) are unvalidated guesses; watch `select public.pledge_metrics(30)` and beta feedback. Tested on real Postgres and the fake-Supabase e2e, not against a live Supabase project.
 **Status:** Practice mode final for the beta. Going live is a separate decision.
+
+## D26 — Micro-task stake: a stake paid in effort, capped at one step
+**Decision:** With Gentle Mode off (and not on a lighter day) a person can stake "one extra five-minute step tomorrow" instead of points (`commit_day(..., p_micro)`, migration `0017`). When the day is reviewed with at least one missed task, the server adds exactly one make-up step for the next day, named after the first missed task. It can be done or let go; letting go is allowed and only visible to the person. Points and a make-up step can't both be staked on the same day.
+**Reason:** The brief's non-money stake. Capping it at one step per day means it can never snowball into a backlog, which would be harmful for the target audience.
+**Status:** Final for the beta.
+
+## D27 — Voice-note proofs
+**Decision:** A proof can be a voice note of up to 60 seconds (`proofs.kind = 'voice'`, migration `0018`), recorded in the browser with MediaRecorder at about 32 kbps (a minute is about 240 KB, client cap 1 MB). It follows the photo rules: private bucket under `proofs/<user_id>/` (enforced by a trigger too), server timestamp, private by default, shared one at a time with a partner who can play it.
+**Not built:** transcription or any automatic check of what was said (D5: verification is social, not automated).
+**Status:** Final for the beta. Tested with Chromium's fake microphone, not on real phones yet.
+
+## D28 — Circles of 2 to 4, next to the one partner
+**Decision:** A person can be in one circle of two to four people (migration `0019`), in addition to an optional partner (D15 is unchanged: only the partner holds the key and verifies proofs). A circle sees each member's name and, unless that member switches it off, counts only: how many planned things moved forward today, whether the day is closed, and focus minutes. Never task titles, proofs, moods or tamper events. Members can send one cheer per person per day. Anyone can leave at any time; leaving makes a new invite code so old links stop working; an empty circle is deleted. Nobody can remove someone else, and nothing is ranked.
+**Reason:** The brief asks for groups. Extending the partner model to many people would multiply the partner key and proof verification, which carry the most pressure; a lighter, counts-only circle gives company without surveillance. Member keys (not user ids) are used inside the circle.
+**Risks:** no moderation tools (a circle is invite-only and anyone can leave). Revisit if beta users ask for removal or reporting.
+**Status:** Prototype.
+
+## D29 — Android blocking engine: device secret and polling instead of FCM
+**Decision:** M5b-2 to M5b-4 are written: an AccessibilityService that reads only the foreground app's package name, a local copy of the session (SharedPreferences) so blocking works offline and after restarts, a calm blocked screen, always-allowed apps (the shared list plus the phone's own dialer, SMS app, launcher and keyboard; Settings is always allowed so protection can always be switched off), and a Protect tab with the prominent disclosure, Accessibility, battery and OEM autostart steps.
+**How the phone talks to the server:** the service can't share the app's Supabase session (D9). Each phone gets its own random device secret (`issue_device_secret`, stored hashed, migration `0020`). With it, and only the anon key, the phone can call one function, `device_sync()`, every 30 seconds while the screen is on. That call is the heartbeat and also how a session started on the laptop reaches the phone (worst case ~30 s, same as the extension, D10). This replaces the planned FCM push for M5b-3, so no Firebase project is needed.
+**Screen off:** when the screen goes off during a session the phone reports "asleep", and the server doesn't count its silence as going quiet. Switching protection off is still recorded. The foreground app's heartbeat clears "asleep". Apps, like sites, can't be removed from the list during a session.
+**Registering:** `ENGINE_READY` now follows whether the native module is built in, and the phone registers only once Accessibility is switched on, so a phone that can't block never produces tamper events (D17's concern).
+**Not verified:** the Kotlin code that touches Android has not been compiled against the Android SDK or run on a phone (the build environment had no Android SDK). The pure rules (`BlockRules.kt`) are compiled and tested on a plain JVM (`android/run-jvm-tests.sh`), and the rest was type-checked against hand-written stubs only. Expect small fixes on the first device build. M5b-5 (VPN-based website blocking on the phone) stays deferred.
+**Status:** Written, untested on a device.
