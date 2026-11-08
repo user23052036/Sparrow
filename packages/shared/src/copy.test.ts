@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import { BANNED_WORDS, copy } from "./copy";
 
 describe("gentle-language checklist", () => {
-  const all = Object.values(copy)
-    .map((v) => (typeof v === "function" ? (v as (...a: number[]) => string)(1, 2) : v))
-    .join(" ")
-    .toLowerCase();
+  const flat = (v: unknown): string[] =>
+    typeof v === "function" ? [String((v as (...a: unknown[]) => unknown)("x", 2, 3))]
+    : Array.isArray(v) ? v.flatMap(flat)
+    : v && typeof v === "object" ? Object.values(v).flatMap(flat)
+    : [String(v)];
+  const all = flat(copy).join(" ").toLowerCase();
   it.each(BANNED_WORDS)("copy never uses %j", (w) => expect(all).not.toMatch(new RegExp(`\\b${w}\\b`)));
 });
 
@@ -37,4 +39,23 @@ describe("copy audit across the apps", () => {
   });
   it("support page tells people to contact emergency services when in danger", () =>
     expect(copy.helpIntro).toMatch(/emergency services/));
+});
+
+// Guard: user-facing sentences belong in copy.ts (PLAN.md §7). Flags JSX text that reads like a
+// sentence (3+ words). Developer/setup screens are exempt on purpose (see DECISIONS D18).
+const EXEMPT = ["NotConfigured.tsx", "extension/page.tsx", "auth/callback/page.tsx", "Branch.tsx"];
+describe("no inline sentences in screens", () => {
+  const tsx = sources(join(root, "apps/web")).filter((f) => f.endsWith(".tsx") && !EXEMPT.some((e) => f.endsWith(e)));
+  it("finds screens", () => expect(tsx.length).toBeGreaterThan(10));
+  it("has none", () => {
+    const hits: string[] = [];
+    for (const f of tsx) {
+      const src = readFileSync(f, "utf8");
+      for (const m of src.matchAll(/>\s*([A-Z][^<>{}\n]*\s[^<>{}\n]*\s[^<>{}\n]*)\s*</g)) {
+        const t = m[1].trim();
+        if (t.split(/\s+/).length >= 3 && /[a-z]/.test(t)) hits.push(`${f.replace(root, "")}: ${t}`);
+      }
+    }
+    expect(hits).toEqual([]);
+  });
 });

@@ -5,16 +5,16 @@ import { ProfileForm } from "../ProfileForm";
 export default function Settings() {
   return (
     <>
-      <h1>Settings</h1>
+      <h1>{copy.settings.title}</h1>
       <ProfileForm mode="settings" />
       <div className="panel">
-        <h3>Browser extension</h3>
-        <p className="quiet">The extension blocks distracting sites on this computer during focus sessions.</p>
-        <Link className="button" href="/extension">Connect the extension</Link>
+        <h3>{copy.settings.extensionTitle}</h3>
+        <p className="quiet">{copy.settings.extensionBody}</p>
+        <Link className="button" href="/extension">{copy.settings.extensionBtn}</Link>
       </div>
       <div className="panel">
-        <h3>Support</h3>
-        <p className="quiet">If things feel like too much, there are people who can help.</p>
+        <h3>{copy.settings.supportTitle}</h3>
+        <p className="quiet">{copy.settings.supportBody}</p>
         <Link className="button" href="/help">{copy.helpTitle}</Link>
       </div>
     </>

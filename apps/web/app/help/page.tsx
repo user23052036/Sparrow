@@ -10,20 +10,19 @@ export default function Help() {
       <h1>{copy.helpTitle}</h1>
       <p>{copy.helpIntro}</p>
       <div className="panel stack">
-        <h3>Talk to someone</h3>
+        <h3>{copy.help.talkTitle}</h3>
         <p>
-          <strong>Find a helpline in your country:</strong>{" "}
-          <a href="https://findahelpline.com" rel="noopener noreferrer" target="_blank">findahelpline.com</a> lists free,
-          confidential services worldwide.
+          <strong>{copy.help.findLabel}</strong>{" "}
+          <a href="https://findahelpline.com" rel="noopener noreferrer" target="_blank">findahelpline.com</a>{copy.help.findTail}
         </p>
         <p>
-          <strong>India:</strong> Tele-MANAS, the government mental-health helpline, is free and available around the clock
-          at <a href="tel:14416">14416</a> or <a href="tel:18008914416">1-800-891-4416</a>.
+          <strong>{copy.help.indiaLabel}</strong> {copy.help.indiaBody}
+          <a href="tel:14416">14416</a>{copy.help.or}<a href="tel:18008914416">1-800-891-4416</a>.
         </p>
-        <p className="small quiet">Numbers can change. If one doesn't connect, use the directory above.</p>
+        <p className="small quiet">{copy.help.numbersChange}</p>
       </div>
       <div className="panel stack">
-        <h3>Inside Sparrow</h3>
+        <h3>{copy.help.insideTitle}</h3>
         <p>{copy.helpInside}</p>
       </div>
     </main>

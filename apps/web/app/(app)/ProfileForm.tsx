@@ -29,37 +29,36 @@ export function ProfileForm({ mode }: { mode: "onboarding" | "settings" }) {
     setBusy(false);
     if (error) { setMsg(errorText(error)); return; }
     await refreshProfile();
-    if (mode === "onboarding") router.replace("/tasks?first=1"); else setMsg("Saved.");
+    if (mode === "onboarding") router.replace("/tasks?first=1"); else setMsg(copy.settings.saved);
   }
 
   return (
     <form onSubmit={save} className="panel stack">
       <div>
-        <label htmlFor="name">What should Sparrow call you?</label>
-        <input id="name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder="Optional" />
+        <label htmlFor="name">{copy.settings.name}</label>
+        <input id="name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} placeholder={copy.settings.namePlaceholder} />
       </div>
       <div>
-        <label htmlFor="tz">Your time zone</label>
+        <label htmlFor="tz">{copy.settings.timezone}</label>
         <select id="tz" value={tz} onChange={(e) => setTz(e.target.value)}>
           {zones().map((z) => <option key={z} value={z}>{z}</option>)}
         </select>
-        <p className="small quiet">Your day starts and ends at midnight in this time zone.</p>
+        <p className="small quiet">{copy.settings.timezoneHint}</p>
       </div>
       <div>
         <label className="check">
           <input type="checkbox" checked={gentle} onChange={(e) => setGentle(e.target.checked)} />
-          Gentle Mode
+          {copy.settings.gentleMode}
         </label>
         <p className="small quiet">
-          {gentle ? copy.gentleModeExplainer
-            : "With Gentle Mode off you can set aside points you've earned as a stake each morning. Real money is never involved."}
+          {gentle ? copy.gentleModeExplainer : copy.settings.gentleOff}
         </p>
       </div>
       <div className="row">
-        <button className="primary" disabled={busy}>{mode === "onboarding" ? "Continue" : "Save changes"}</button>
+        <button className="primary" disabled={busy}>{mode === "onboarding" ? copy.settings.continue : copy.settings.save}</button>
         {mode === "settings" && (
           <button type="button" className="ghost" onClick={async () => { await supabase().auth.signOut(); router.replace("/"); }}>
-            Sign out
+            {copy.settings.signOut}
           </button>
         )}
       </div>

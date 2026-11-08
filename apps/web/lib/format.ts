@@ -1,3 +1,5 @@
+import { copy } from "@sparrow/shared";
+
 export function minutesLeft(endsAt: string | Date, now = Date.now()): number {
   return Math.max(0, Math.ceil((new Date(endsAt).getTime() - now) / 60000));
 }
@@ -19,10 +21,4 @@ export function timeAgo(iso: string | null, now = Date.now()): string {
   return `${Math.round(h / 24)} d ago`;
 }
 
-export const MOODS = [
-  { value: 1, label: "Heavy" },
-  { value: 2, label: "Low" },
-  { value: 3, label: "Okay" },
-  { value: 4, label: "Good" },
-  { value: 5, label: "Bright" },
-] as const;
+export const MOODS = copy.moods.map((label, i) => ({ value: i + 1, label }));

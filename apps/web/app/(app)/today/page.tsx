@@ -99,9 +99,9 @@ function Morning({ data, gentle, lightDay, reload }: { data: Data; gentle: boole
   if (data.tasks.length === 0) {
     return (
       <div className="panel">
-        <h2>Good morning</h2>
-        <p>You don't have any tasks yet. Add one or two small ones and come back here.</p>
-        <Link className="button primary" href="/tasks">Add tasks</Link>
+        <h2>{copy.today.goodMorning}</h2>
+        <p>{copy.today.noTasks}</p>
+        <Link className="button primary" href="/tasks">{copy.today.addTasks}</Link>
       </div>
     );
   }
@@ -109,7 +109,7 @@ function Morning({ data, gentle, lightDay, reload }: { data: Data; gentle: boole
   return (
     <div className="stack">
       <div className="panel stack">
-        <h2>Good morning</h2>
+        <h2>{copy.today.goodMorning}</h2>
         <MoodPicker label={copy.moodPrompt} value={mood} onChange={setMood} />
         {lightDay && (
           <div className="note stack" role="status">
@@ -138,23 +138,23 @@ function Morning({ data, gentle, lightDay, reload }: { data: Data; gentle: boole
             </label>
           ))}
         </div>
-        <p className="small quiet">{picked.length} of up to {shape.maxTasks} picked{low && !lightDay && picked.length > 2 ? ". Two might be plenty today." : ""}</p>
+        <p className="small quiet">{copy.today.picked(picked.length, shape.maxTasks)}{low && !lightDay && picked.length > 2 ? copy.today.twoPlenty : ""}</p>
       </div>
       {shape.showStake && (
         <div className="panel stack">
-          <h3>Stake (optional)</h3>
+          <h3>{copy.today.stakeTitle}</h3>
           {maxStake <= 0 ? (
-            <p className="quiet">Earn some points first. You can stake points you've earned, never money.</p>
+            <p className="quiet">{copy.today.stakeNoPoints}</p>
           ) : (
             <>
-              <label htmlFor="stake">Points to set aside: {stake}</label>
+              <label htmlFor="stake">{copy.today.stakeLabel(stake)}</label>
               <input id="stake" type="range" min={0} max={maxStake} step={5} value={stake} onChange={(e) => setStake(Number(e.target.value))} />
               {stake > 0 && <p className="small quiet">{copy.stakeExplainer(stake)}</p>}
             </>
           )}
         </div>
       )}
-      <button className="primary" disabled={busy || picked.length === 0} onClick={commit}>Commit to today</button>
+      <button className="primary" disabled={busy || picked.length === 0} onClick={commit}>{copy.today.commit}</button>
       {err && <p className="error" role="alert">{err}</p>}
     </div>
   );
@@ -179,7 +179,7 @@ function ItemCard({ item, task, steps, date, proofs, userId, reload, verdict, pa
     if (error) setErr(errorText(error)); else reload();
   }
   const nextStep = steps.find((s) => s.done_on !== date);
-  const label: Record<ItemStatus, string> = { pending: "Not yet", done: "Done", partial: "Partly done", missed: "Didn't happen", rescheduled: "Moved" };
+  const label: Record<ItemStatus, string> = copy.today.status;
 
   return (
     <li className="item stack">
@@ -196,7 +196,7 @@ function ItemCard({ item, task, steps, date, proofs, userId, reload, verdict, pa
                 <span>{s.title}</span>
               </label>
               {s.done_on !== date && timerFor !== s.id && (
-                <button type="button" className="ghost" onClick={() => setTimerFor(s.id)}>Start now</button>
+                <button type="button" className="ghost" onClick={() => setTimerFor(s.id)}>{copy.today.startNow}</button>
               )}
             </li>
           ))}
@@ -207,22 +207,22 @@ function ItemCard({ item, task, steps, date, proofs, userId, reload, verdict, pa
           onDone={() => stepDone(timerFor, true)} onCancel={() => setTimerFor(null)} />
       )}
       {!timerFor && steps.length === 0 && item.status === "pending" && (
-        <p className="small quiet">Tip: give this a first five-minute step on the Tasks page.</p>
+        <p className="small quiet">{copy.today.stepTip}</p>
       )}
       <div className="row">
-        <button type="button" aria-pressed={item.status === "done"} onClick={() => setStatus("done")}>Done</button>
-        <button type="button" aria-pressed={item.status === "partial"} onClick={() => setStatus("partial")}>Partly</button>
-        <Link className="button ghost" href={`/focus?item=${item.id}`}>Focus on this</Link>
-        {nextStep && !timerFor && <span className="small quiet">Next: {nextStep.title}</span>}
+        <button type="button" aria-pressed={item.status === "done"} onClick={() => setStatus("done")}>{copy.today.done}</button>
+        <button type="button" aria-pressed={item.status === "partial"} onClick={() => setStatus("partial")}>{copy.today.partly}</button>
+        <Link className="button ghost" href={`/focus?item=${item.id}`}>{copy.today.focusOnThis}</Link>
+        {nextStep && !timerFor && <span className="small quiet">{copy.today.nextStep(nextStep.title)}</span>}
       </div>
       {(item.status === "done" || item.status === "partial" || task.proof_required) && (
         proofs > 0
-          ? <p className="small status-done">{proofs} proof{proofs === 1 ? "" : "s"} saved</p>
+          ? <p className="small status-done">{copy.today.proofsSaved(proofs)}</p>
           : <ProofCapture itemId={item.id} userId={userId} onSaved={reload} partnerName={partnerName} />
       )}
       {verdict && partnerName && (
         <p className="note small" role="status">
-          {verdict.verdict === "approve" ? `${partnerName} says this looks good.` : `${partnerName} asked: ${verdict.comment ?? "can you tell me more?"}`}
+          {verdict.verdict === "approve" ? copy.today.partnerApproves(partnerName) : copy.today.partnerAsked(partnerName, verdict.comment ?? copy.today.partnerAskedFallback)}
         </p>
       )}
       {err && <p className="error" role="alert">{err}</p>}
@@ -240,9 +240,7 @@ function Review({ plan, items, tasks, isToday, onDone }: {
   const [mood, setMood] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const opts: { v: ItemStatus; l: string }[] = [
-    { v: "done", l: "Done" }, { v: "partial", l: "Partly" }, { v: "missed", l: "Didn't happen" }, { v: "rescheduled", l: "Move it" },
-  ];
+  const opts: { v: ItemStatus; l: string }[] = (["done", "partial", "missed", "rescheduled"] as const).map((v) => ({ v, l: copy.today.reviewOptions[v] }));
 
   async function submit() {
     setBusy(true); setErr(null);
@@ -264,7 +262,7 @@ function Review({ plan, items, tasks, isToday, onDone }: {
 
   return (
     <div className="panel stack">
-      <h2>{isToday ? "Evening review" : `Close ${new Date(plan.date + "T12:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}`}</h2>
+      <h2>{isToday ? copy.today.reviewTitle : copy.today.closeDay(new Date(plan.date + "T12:00").toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }))}</h2>
       <p className="quiet">{copy.eveningPrompt}</p>
       {items.map((i) => (
         <fieldset key={i.id} style={{ border: "none", padding: 0, margin: "0 0 0.75rem" }}>
@@ -277,8 +275,8 @@ function Review({ plan, items, tasks, isToday, onDone }: {
           </div>
         </fieldset>
       ))}
-      <MoodPicker label="How are you leaving the day?" value={mood} onChange={setMood} />
-      <button className="primary" disabled={busy} onClick={submit}>Finish the day</button>
+      <MoodPicker label={copy.today.leavingMood} value={mood} onChange={setMood} />
+      <button className="primary" disabled={busy} onClick={submit}>{copy.today.finishDay}</button>
       {err && <p className="error" role="alert">{err}</p>}
       <p className="small quiet"><Link href="/help">{copy.supportLink}</Link></p>
     </div>
@@ -309,8 +307,8 @@ export default function Today() {
 
   const todayItems = useMemo(() => (data ? data.items.filter((i) => i.daily_plan_id === data.plan.id) : []), [data]);
 
-  if (err) return <p className="error" role="alert">{err} <button onClick={reload}>Try again</button></p>;
-  if (!data || !profile || !session) return <p className="quiet">Loading your day…</p>;
+  if (err) return <p className="error" role="alert">{err} <button onClick={reload}>{copy.today.tryAgain}</button></p>;
+  if (!data || !profile || !session) return <p className="quiet">{copy.today.loading}</p>;
 
   const { plan } = data;
   const taskOf = (id: string) => data.tasks.find((t) => t.id === id);
@@ -331,8 +329,8 @@ export default function Today() {
   return (
     <div className="stack">
       <div className="spread">
-        <h1 style={{ margin: 0 }}>Today{greeting}</h1>
-        <span className="small quiet">{data.balance} points</span>
+        <h1 style={{ margin: 0 }}>{copy.today.title(greeting)}</h1>
+        <span className="small quiet">{copy.today.points(data.balance)}</span>
       </div>
       {result && <p className="note" role="status">{result}</p>}
       {tomorrowOffer && (
@@ -353,8 +351,8 @@ export default function Today() {
       )}
       {data.unreviewed.map((u) => (
         <div key={u.id} className="panel spread">
-          <span>You haven't looked back at {new Date(u.date + "T12:00").toLocaleDateString(undefined, { weekday: "long" })} yet.</span>
-          <button onClick={() => setReviewing(u)}>Close that day</button>
+          <span>{copy.today.unreviewed(new Date(u.date + "T12:00").toLocaleDateString(undefined, { weekday: "long" }))}</span>
+          <button onClick={() => setReviewing(u)}>{copy.today.closeThatDay}</button>
         </div>
       ))}
 
@@ -363,7 +361,7 @@ export default function Today() {
       {plan.committed_at && !plan.reviewed_at && (
         <>
           <Branch items={todayItems.map((i) => ({ id: i.id, title: taskOf(i.task_id)?.title ?? "", status: i.status }))} />
-          {plan.stake_amount > 0 && <p className="small quiet">{plan.stake_amount} points set aside for today.</p>}
+          {plan.stake_amount > 0 && <p className="small quiet">{copy.today.stakeSetAside(plan.stake_amount)}</p>}
           <ul className="panel" style={{ listStyle: "none" }}>
             {todayItems.map((i) => {
               const t = taskOf(i.task_id);
@@ -374,15 +372,15 @@ export default function Today() {
               ) : null;
             })}
           </ul>
-          <button className="primary" onClick={() => setReviewing(plan)}>Review my day</button>
+          <button className="primary" onClick={() => setReviewing(plan)}>{copy.today.reviewMyDay}</button>
         </>
       )}
 
       {plan.reviewed_at && (
         <div className="panel stack">
           <Branch items={todayItems.map((i) => ({ id: i.id, title: taskOf(i.task_id)?.title ?? "", status: i.status }))} />
-          <h2>Today is closed</h2>
-          <p>You earned {plan.points_earned ?? 0} points today. Rest well. Tomorrow starts fresh.</p>
+          <h2>{copy.today.closedTitle}</h2>
+          <p>{copy.today.closedBody(plan.points_earned ?? 0)}</p>
         </div>
       )}
     </div>

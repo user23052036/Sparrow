@@ -3,15 +3,16 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { copy } from "@sparrow/shared";
 import { isConfigured, supabase } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
 
 const NAV = [
-  { href: "/today", label: "Today" },
-  { href: "/tasks", label: "Tasks" },
-  { href: "/focus", label: "Focus" },
-  { href: "/partner", label: "Partner" },
-  { href: "/settings", label: "Settings" },
+  { href: "/today", label: copy.nav.today },
+  { href: "/tasks", label: copy.nav.tasks },
+  { href: "/focus", label: copy.nav.focus },
+  { href: "/partner", label: copy.nav.partner },
+  { href: "/settings", label: copy.nav.settings },
 ];
 
 function Guard({ children }: { children: ReactNode }) {
@@ -49,7 +50,7 @@ function Guard({ children }: { children: ReactNode }) {
     return () => { alive = false; clearInterval(t); };
   }, [session, profile?.onboarded, path]);
 
-  if (loading || !session || !profile) return <main className="shell"><p className="quiet">Loading…</p></main>;
+  if (loading || !session || !profile) return <main className="shell"><p className="quiet">{copy.nav.loading}</p></main>;
 
   return (
     <>
@@ -70,7 +71,7 @@ function Guard({ children }: { children: ReactNode }) {
       </header>
       <main className="shell">{children}</main>
       <footer className="shell small quiet" style={{ paddingTop: 0 }}>
-        <Link href="/help">Support resources</Link>
+        <Link href="/help">{copy.nav.support}</Link>
       </footer>
     </>
   );

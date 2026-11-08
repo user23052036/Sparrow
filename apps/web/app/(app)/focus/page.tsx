@@ -31,19 +31,19 @@ function EarlyExit({ sessionId, onEnded, onCancel }: { sessionId: string; onEnde
     <div className="panel stack" aria-live="polite">
       {wait > 0 ? (
         <>
-          <h3>Take a breath first</h3>
-          <p>Wait {wait} seconds. If the urge passes, you can just go back to your session.</p>
-          <button className="primary" onClick={onCancel}>Keep focusing</button>
+          <h3>{copy.focus.breathTitle}</h3>
+          <p>{copy.focus.breathBody(wait)}</p>
+          <button className="primary" onClick={onCancel}>{copy.focus.keepFocusing}</button>
         </>
       ) : (
         <>
           <label htmlFor="reason">{copy.earlyExitPrompt}</label>
           <input id="reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
           <div className="row">
-            <button className="primary" onClick={onCancel}>Keep focusing</button>
-            <button disabled={reason.trim().length < 3} onClick={end}>End session</button>
+            <button className="primary" onClick={onCancel}>{copy.focus.keepFocusing}</button>
+            <button disabled={reason.trim().length < 3} onClick={end}>{copy.focus.endSession}</button>
           </div>
-          <p className="small quiet">Ending early is noted in your history, just so you can see your patterns.</p>
+          <p className="small quiet">{copy.focus.endedNote}</p>
           {err && <p className="error" role="alert">{err}</p>}
         </>
       )}
@@ -66,11 +66,11 @@ function LockedExit({ sessionId, name, req, onChanged }: { sessionId: string; na
       {req?.status === "denied" && <p className="note" role="status">{copy.partnerKeepGoing(name)}</p>}
       {open ? (
         <div className="stack">
-          <label htmlFor="key-reason">{`Tell ${name} why you want to stop`}</label>
+          <label htmlFor="key-reason">{copy.focus.askWhy(name)}</label>
           <input id="key-reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
           <div className="row">
             <button className="primary" disabled={reason.trim().length < 3} onClick={ask}>{copy.partnerKeyRequest(name)}</button>
-            <button className="ghost" onClick={() => setOpen(false)}>Keep focusing</button>
+            <button className="ghost" onClick={() => setOpen(false)}>{copy.focus.keepFocusing}</button>
           </div>
         </div>
       ) : (
@@ -147,14 +147,14 @@ function FocusInner() {
   useEffect(() => {
     if (state?.active && state.session_id && remaining <= 0) {
       supabase().rpc("end_focus_session", { p_session_id: state.session_id }).then(() => {
-        setMsg("Session complete. Nicely done."); extSyncNow(); void load();
+        setMsg(copy.focus.complete); extSyncNow(); void load();
       });
     }
   }, [remaining, state, load]);
 
   async function start(minutes: number) {
     setErr(null); setMsg(null);
-    if (domains.length === 0) { setErr("Add at least one site to block first."); return; }
+    if (domains.length === 0) { setErr(copy.focus.addOne); return; }
     const { error } = await supabase().rpc("start_focus_session", { p_minutes: minutes, p_item_id: itemId, p_locked: lockIt && partnerName !== null });
     if (error) setErr(errorText(error)); else { extSyncNow(); await load(); }
   }
@@ -170,33 +170,33 @@ function FocusInner() {
     e.preventDefault();
     const parts = input.split(/[\s,]+/).filter(Boolean);
     const valid = normalizeDomainList(parts);
-    if (parts.length && valid.length === 0) { setErr("That doesn't look like a website address. Try something like youtube.com."); return; }
+    if (parts.length && valid.length === 0) { setErr(copy.focus.badSite); return; }
     setErr(null); setInput("");
     void saveDomains([...domains, ...valid]);
   }
 
   const blockers = devices.filter((d) => d.platform !== "web");
-  const deviceName = (id: string | null) => devices.find((d) => d.id === id)?.label ?? "A device";
+  const deviceName = (id: string | null) => devices.find((d) => d.id === id)?.label ?? copy.focus.fallbackDevice;
   const eventText: Record<string, string> = {
-    heartbeat_lost: "went quiet during this session (closed, disabled, or offline)",
-    protection_disabled: "reported that blocking was switched off",
+    heartbeat_lost: copy.focus.eventQuiet,
+    protection_disabled: copy.focus.eventOff,
     early_exit: "",
   };
 
-  if (!state) return <p className="quiet">Loading…</p>;
+  if (!state) return <p className="quiet">{copy.focus.loading}</p>;
 
   return (
     <div className="stack">
-      <h1>Focus</h1>
+      <h1>{copy.focus.title}</h1>
       {msg && <p className="note" role="status">{msg}</p>}
 
       {state.active && state.session_id ? (
         <div className="panel stack">
-          <p className="quiet" style={{ margin: 0 }}>Focusing{itemTitle ? ` on ${itemTitle}` : ""}</p>
+          <p className="quiet" style={{ margin: 0 }}>{copy.focus.focusing(itemTitle)}</p>
           <div className="big-timer" aria-live="off">{clock(remaining)}</div>
-          <p className="small quiet">{domains.length} site{domains.length === 1 ? "" : "s"} blocked on every connected device.</p>
+          <p className="small quiet">{copy.focus.sitesBlocked(domains.length)}</p>
           {events.filter((e) => e.kind !== "early_exit").map((e) => (
-            <p key={e.id} className="note small">{deviceName(e.device_id)} {eventText[e.kind]} at {new Date(e.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.</p>
+            <p key={e.id} className="note small">{copy.focus.eventAt(deviceName(e.device_id), eventText[e.kind], new Date(e.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }))}</p>
           ))}
           {state.locked ? (
             <>
@@ -206,44 +206,44 @@ function FocusInner() {
           ) : exiting
             ? <EarlyExit sessionId={state.session_id} onCancel={() => setExiting(false)}
                 onEnded={() => { setExiting(false); extSyncNow(); void load(); }} />
-            : <div><button className="ghost" onClick={() => setExiting(true)}>End early</button></div>}
+            : <div><button className="ghost" onClick={() => setExiting(true)}>{copy.focus.endEarly}</button></div>}
         </div>
       ) : (
         <div className="panel stack">
-          <h3>Start a session{itemTitle ? ` for ${itemTitle}` : ""}</h3>
+          <h3>{copy.focus.startTitle(itemTitle)}</h3>
           <div className="row">
-            {DURATIONS.map((m) => <button key={m} className={m === 25 ? "primary" : ""} onClick={() => start(m)}>{m} min</button>)}
+            {DURATIONS.map((m) => <button key={m} className={m === 25 ? "primary" : ""} onClick={() => start(m)}>{copy.focus.minutes(m)}</button>)}
           </div>
           {partnerName && (
             <label className="check">
               <input type="checkbox" checked={lockIt} onChange={(e) => setLockIt(e.target.checked)} />
-              Lock it with {partnerName}: only they can end it early (up to 2 hours)
+              {copy.focus.lockIt(partnerName)}
             </label>
           )}
           {blockers.length === 0 && (
-            <p className="note small">No blocking device connected yet. <Link href="/extension">Connect the browser extension</Link> so sites are actually blocked.</p>
+            <p className="note small">{copy.focus.noBlocker} <Link href="/extension">{copy.focus.connectExt}</Link>{copy.focus.noBlockerTail}</p>
           )}
         </div>
       )}
       {err && <p className="error" role="alert">{err}</p>}
 
       <div className="panel stack">
-        <h3>Sites to block</h3>
-        {state.active && <p className="small quiet">You can add sites during a session, but removing them waits until it ends.</p>}
+        <h3>{copy.focus.sitesTitle}</h3>
+        {state.active && <p className="small quiet">{copy.focus.addDuring}</p>}
         <div className="row">
           {domains.map((d) => (
             <span key={d} className="chip">{d}
-              {!state.active && <button aria-label={`Stop blocking ${d}`} onClick={() => saveDomains(domains.filter((x) => x !== d))}>×</button>}
+              {!state.active && <button aria-label={copy.focus.stopBlocking(d)} onClick={() => saveDomains(domains.filter((x) => x !== d))}>×</button>}
             </span>
           ))}
-          {domains.length === 0 && <span className="quiet">Nothing yet.</span>}
+          {domains.length === 0 && <span className="quiet">{copy.focus.nothingYet}</span>}
         </div>
         <form onSubmit={addFromInput} className="row">
-          <input aria-label="Website to block" value={input} onChange={(e) => setInput(e.target.value)} placeholder="youtube.com" style={{ flex: 1, minWidth: 180 }} />
-          <button>Add</button>
+          <input aria-label={copy.focus.websiteLabel} value={input} onChange={(e) => setInput(e.target.value)} placeholder="youtube.com" style={{ flex: 1, minWidth: 180 }} />
+          <button>{copy.focus.add}</button>
         </form>
         <div className="row small">
-          <span className="quiet">Common picks:</span>
+          <span className="quiet">{copy.focus.commonPicks}</span>
           {SUGGESTED.filter((s) => !domains.includes(s)).map((s) => (
             <button key={s} className="ghost" onClick={() => saveDomains([...domains, s])}>+ {s}</button>
           ))}
@@ -251,13 +251,13 @@ function FocusInner() {
       </div>
 
       <div className="panel stack">
-        <h3>Devices</h3>
-        {blockers.length === 0 ? <p className="quiet">No devices yet.</p> : (
+        <h3>{copy.focus.devices}</h3>
+        {blockers.length === 0 ? <p className="quiet">{copy.focus.noDevices}</p> : (
           <ul style={{ paddingLeft: "1.1rem", margin: 0 }}>
-            {blockers.map((d) => <li key={d.id}>{d.label ?? d.platform} <span className="small quiet">· last seen {timeAgo(d.last_heartbeat_at, now)}</span></li>)}
+            {blockers.map((d) => <li key={d.id}>{d.label ?? d.platform} <span className="small quiet">{copy.focus.lastSeen(timeAgo(d.last_heartbeat_at, now))}</span></li>)}
           </ul>
         )}
-        <Link href="/extension" className="small">Manage the browser extension</Link>
+        <Link href="/extension" className="small">{copy.focus.manageExt}</Link>
       </div>
     </div>
   );
