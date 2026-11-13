@@ -10,7 +10,7 @@ function MemberRow({ m, onCheer, busy }: { m: CircleMember; onCheer: (key: strin
   const focus = m.focus_minutes ? copy.circle.focusLine(m.focus_minutes) : "";
   return (
     <li className="item spread" aria-label={m.me ? copy.circle.you : m.name}>
-      <div className="stack" style={{ gap: "0.15rem" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.15rem" }}>
         <strong>{m.me ? copy.circle.you : m.name}</strong>
         <span className="small">{circleDayLine(m.today, m.shares || m.me)}</span>
         {focus && <span className="small quiet">{focus}</span>}
