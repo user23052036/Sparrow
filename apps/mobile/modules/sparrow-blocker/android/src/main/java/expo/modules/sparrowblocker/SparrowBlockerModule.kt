@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.net.VpnService
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
@@ -11,6 +12,7 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.sparrowblocker.engine.EngineStore
 import expo.modules.sparrowblocker.engine.SparrowAccessibilityService
+import expo.modules.sparrowblocker.engine.SparrowVpnService
 import expo.modules.sparrowblocker.engine.SyncClient
 
 /**
@@ -47,6 +49,7 @@ class SparrowBlockerModule : Module() {
 
     Function("clearConfig") {
       EngineStore(context).clear()
+      SparrowVpnService.apply(context)
     }
 
     Function("setAlsoAllowed") { packages: List<String> ->
@@ -61,6 +64,7 @@ class SparrowBlockerModule : Module() {
       } catch (ignored: SyncClient.SignedOut) {
         null
       }
+      SparrowVpnService.apply(context)
       val now = store.state()
       mapOf(
         "ok" to (st != null),
@@ -125,6 +129,32 @@ class SparrowBlockerModule : Module() {
       false
     }
 
+    // ------------------------------------------------------------ website blocking (M5b-5)
+    Function("getWebBlocking") {
+      mapOf(
+        "enabled" to EngineStore(context).webBlocking(),
+        "allowed" to SparrowVpnService.allowed(context),
+        "running" to SparrowVpnService.running,
+      )
+    }
+
+    Function("setWebBlocking") { enabled: Boolean ->
+      EngineStore(context).saveWebBlocking(enabled)
+      SparrowVpnService.apply(context)
+    }
+
+    // Shows Android's own "allow this VPN" question. Returns true when it was already allowed.
+    Function("requestWebBlocking") {
+      val ask = VpnService.prepare(context) ?: return@Function true
+      val activity = appContext.currentActivity
+      if (activity != null) {
+        activity.startActivityForResult(ask, VPN_REQUEST)
+      } else {
+        context.startActivity(ask.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      }
+      false
+    }
+
     Function("manufacturer") {
       Build.MANUFACTURER ?: ""
     }
@@ -137,6 +167,7 @@ class SparrowBlockerModule : Module() {
   }
 
   companion object {
+    private const val VPN_REQUEST = 4711
     private val AUTOSTART = listOf(
       ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
       ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"),

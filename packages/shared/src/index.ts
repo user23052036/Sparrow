@@ -15,3 +15,5 @@ export * from "./rating";
 export * from "./suggest";
 export * from "./voice";
 export * from "./circle";
+export * from "./exif";
+export * from "./proofcontext";

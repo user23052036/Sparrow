@@ -59,3 +59,40 @@ test("a full circle explains itself kindly", async ({ page, fake }) => {
   await expect(page.getByText("This circle is full (four people).")).toBeVisible();
   await expect(page.getByRole("button", { name: copy.circleJoin.join })).toHaveCount(0);
 });
+
+test("start a circle under a made-up name, change it, and go back to your own", async ({ page, fake }) => {
+  fake.seedUser();
+  await signIn(page, fake);
+  await page.goto("/circle");
+  await page.getByLabel(copy.circle.nameLabel).fill("Quiet hours");
+  await page.getByLabel(copy.circle.aliasLabel).fill("x");
+  await expect(page.getByText(copy.circle.aliasBad)).toBeVisible();
+  await expect(page.getByRole("button", { name: copy.circle.create })).toBeDisabled();
+  await page.getByLabel(copy.circle.aliasLabel).fill("  Night   Owl ");
+  await page.getByRole("button", { name: copy.circle.create }).click();
+
+  await expect(page.getByText(copy.circle.aliasShown("Night Owl"))).toBeVisible();
+  expect(fake.circle.my_alias).toBe("Night Owl");
+
+  await page.getByLabel(copy.circle.aliasLabel).fill("Wren-2");
+  await page.getByRole("button", { name: copy.circle.aliasSave }).click();
+  await expect(page.getByText(copy.circle.aliasShown("Wren-2"))).toBeVisible();
+
+  await page.getByRole("button", { name: copy.circle.aliasClear }).click();
+  await expect(page.getByText(copy.circle.aliasOwn)).toBeVisible();
+  expect(fake.circle.my_alias).toBeNull();
+});
+
+test("joining under a name someone already uses is refused kindly, another name works", async ({ page, fake }) => {
+  fake.seedUser();
+  await signIn(page, fake);
+  await page.goto("/circle/join?code=0123456789abcdef");
+  await page.getByLabel(copy.circle.aliasLabel).fill("ravi");
+  await page.getByRole("button", { name: copy.circleJoin.join }).click();
+  await expect(page.locator("p[role=alert]")).toContainText("already goes by that name");
+
+  await page.getByLabel(copy.circle.aliasLabel).fill("Heron");
+  await page.getByRole("button", { name: copy.circleJoin.join }).click();
+  await page.waitForURL("**/circle");
+  await expect(page.getByText(copy.circle.aliasShown("Heron"))).toBeVisible();
+});

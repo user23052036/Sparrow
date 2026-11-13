@@ -7,9 +7,7 @@
     "userInterfaceStyle": "automatic",
     "platforms": ["android"],
     "android": {
-      "package": "com.sparrow.app",
-      "googleServicesFile": "./google-services.json"
-    },
-    "plugins": ["expo-notifications"]
+      "package": "com.sparrow.app"
+    }
   }
 }

@@ -49,6 +49,7 @@ object BlockRules {
     packages: Collection<String>,
     task: String?,
     sessionId: String?,
+    domains: Collection<String> = emptyList(),
   ): EngineState {
     if (!active || endsAtServerMs == null) return EngineState.IDLE
     val skew = serverNowMs - localNowMs
@@ -57,6 +58,7 @@ object BlockRules {
       endsAtMs = endsAtServerMs - skew,
       packages = packages.filter { it.isNotBlank() }.toSet(),
       task = task?.takeIf { it.isNotBlank() },
+      domains = domains.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet(),
     )
   }
 
@@ -107,8 +109,10 @@ data class EngineState(
   val endsAtMs: Long,
   val packages: Set<String>,
   val task: String?,
+  /** Sites to keep away in the phone's browsers (M5b-5); empty when web blocking has nothing to do. */
+  val domains: Set<String> = emptySet(),
 ) {
-  fun isActive(nowMs: Long): Boolean = endsAtMs > nowMs && packages.isNotEmpty()
+  fun isActive(nowMs: Long): Boolean = endsAtMs > nowMs && (packages.isNotEmpty() || domains.isNotEmpty())
 
   companion object {
     val IDLE = EngineState(null, 0L, emptySet(), null)

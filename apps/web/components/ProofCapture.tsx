@@ -1,11 +1,21 @@
 "use client";
 import { useState } from "react";
-import { copy, storageType, voiceExtension, voiceSeconds } from "@sparrow/shared";
+import { copy, PHOTO_OLDER_AFTER_HOURS, storageType, voiceExtension, voiceSeconds } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
-import { compressImage, imageDHash } from "@/lib/image";
+import { compressImage, imageDHash, photoAge } from "@/lib/image";
 import { VoiceRecorder, type Recording } from "@/components/VoiceRecorder";
 
-export function ProofCapture({ itemId, userId, onSaved, partnerName }: { itemId: string; userId: string; onSaved: () => void; partnerName?: string | null }) {
+export function ProofCapture({
+  itemId,
+  userId,
+  onSaved,
+  partnerName,
+}: {
+  itemId: string;
+  userId: string;
+  onSaved: (note: string) => void;
+  partnerName?: string | null;
+}) {
   const [mode, setMode] = useState<"closed" | "photo" | "text" | "voice">("closed");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -17,20 +27,22 @@ export function ProofCapture({ itemId, userId, onSaved, partnerName }: { itemId:
     setBusy(true);
     setMsg(null);
     try {
-      const [blob, hash] = await Promise.all([compressImage(file), imageDHash(file)]);
+      const [blob, hash, age] = await Promise.all([compressImage(file), imageDHash(file), photoAge(file)]);
       const path = `${userId}/${crypto.randomUUID()}.jpg`;
       const sb = supabase();
       const up = await sb.storage.from("proofs").upload(path, blob, { contentType: "image/jpeg" });
       if (up.error) throw up.error;
       const { data, error } = await sb
         .from("proofs")
-        .insert({ plan_item_id: itemId, kind: "photo", storage_path: path, image_phash: hash, visibility })
+        .insert({ plan_item_id: itemId, kind: "photo", storage_path: path, image_phash: hash, visibility, ...(age === null ? {} : { photo_age_hours: age }) })
         .select("flagged_similar")
         .single();
       if (error) throw error;
-      setMsg(data?.flagged_similar ? copy.duplicatePhoto : copy.proof.photoSaved);
+      const older = age !== null && age > PHOTO_OLDER_AFTER_HOURS;
+      const note = data?.flagged_similar ? copy.duplicatePhoto : older ? copy.proof.olderPhoto : copy.proof.photoSaved;
+      setMsg(note);
       setMode("closed");
-      onSaved();
+      onSaved(note);
     } catch (e) {
       setMsg(errorText(e));
     } finally {
@@ -52,7 +64,7 @@ export function ProofCapture({ itemId, userId, onSaved, partnerName }: { itemId:
       if (error) throw error;
       setMsg(copy.proof.voiceSaved);
       setMode("closed");
-      onSaved();
+      onSaved(copy.proof.voiceSaved);
     } catch (e) {
       setMsg(errorText(e));
     } finally {
@@ -73,7 +85,7 @@ export function ProofCapture({ itemId, userId, onSaved, partnerName }: { itemId:
     setText("");
     setMode("closed");
     setMsg(copy.proof.noteSaved);
-    onSaved();
+    onSaved(copy.proof.noteSaved);
   }
 
   return (

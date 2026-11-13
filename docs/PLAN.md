@@ -138,8 +138,8 @@ Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 - Onboarding screen guiding the user to: enable the Accessibility service (with a clear, honest disclosure of what it reads and why), exempt Sparrow from battery optimization, and (for aggressive OEMs like Xiaomi/Oppo/Vivo/Samsung) enable autostart.
 - Note: uninstalling cannot be reliably prevented on a personal device — log and make it visible instead.
 
-**M5b-5 (optional, later): Website blocking in mobile browsers**
-- Local `VpnService` DNS filter for blocked domains. Caveat: conflicts with any other VPN the user runs. Defer unless browser-based distraction on the phone is a real problem in testing.
+**M5b-5: Website blocking in mobile browsers** (written as an optional switch, not yet run on a device; see DECISIONS D30)
+- Local `VpnService` DNS filter for blocked domains. Caveat: conflicts with any other VPN the user runs, so it is off by default and only runs during a session with listed sites.
 
 **Distribution notes (verify before release):**
 - Google Play reviews apps using the Accessibility API; prepare the required declaration and prominent in-app disclosure, and check current policy at submission time.
@@ -158,7 +158,7 @@ Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 - **Done when:** low mood visibly changes the flow; no screen fails the checklist.
 
 ### M8 — Closed beta
-- **Built:** PWA install, feedback button, privacy page, owner-only `beta_metrics()`, scheduled heartbeat check, extension store packaging (`docs/STORE_LISTING.md`). **Left for a human:** deployment, SMTP, Web Store submission, recruiting (`docs/BETA.md`). Android distribution waits for M5b-2 to M5b-5.
+- **Built:** PWA install, feedback button, privacy page, owner-only `beta_metrics()`, scheduled heartbeat check, extension store packaging (`docs/STORE_LISTING.md`). **Left for a human:** deployment, SMTP, Web Store submission, recruiting (`docs/BETA.md`). Android distribution waits for a first device run of M5b-2 to M5b-5 (D29, D30, D33).
 - PWA install prompt, Chrome Web Store submission, Android internal testing track (or direct APK), feedback button, privacy-respecting analytics.
 - **Metrics:** daily completion rate; 1/7/30-day retention; focus sessions per active user; early-exit and tamper rates; proof rate; buddy-pair retention; self-reported helpfulness and mood trend.
 - **Done when:** 20–50 users, including people outside the founder's circle.
@@ -173,7 +173,7 @@ Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 
 ## 8. Later phases (only if beta data supports them)
 
-- **Phase 2:** Accountability circles (small, anonymous option); AI plausibility score on proofs (assistive only); desktop native agent (Tauri) to block desktop apps, not just sites.
+- **Phase 2:** Accountability circles (built, D28; anonymous option built as circle names, D31); plausibility help on proofs (built as rule-based notes without a score, D32; no AI); desktop native agent (Tauri) to block desktop apps, not just sites (not built, D34).
 - **Phase 3 (after legal review):** real-money pledges via a payment provider using a charge-on-failure model, low caps, cooling-off period before raising stakes; charity partners.
 - **Phase 4:** iOS (Screen Time APIs, requires Apple's Family Controls entitlement); physical milestone badges; partner API.
 

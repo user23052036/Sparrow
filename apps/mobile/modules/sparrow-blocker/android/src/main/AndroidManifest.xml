@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.INTERNET" />
+  <!-- M5b-5: read which DNS servers the phone is using, so unlisted sites are answered by the same servers as before. -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
   <!-- Lets the app list launchable apps without the Play-restricted QUERY_ALL_PACKAGES permission. -->
   <queries>
@@ -26,6 +28,17 @@
       <meta-data
         android:name="android.accessibilityservice"
         android:resource="@xml/sparrow_accessibility" />
+    </service>
+
+    <!-- M5b-5: local DNS filter for listed websites. Bound only by the system (BIND_VPN_SERVICE); no traffic leaves the phone through it. -->
+    <service
+      android:name="expo.modules.sparrowblocker.engine.SparrowVpnService"
+      android:label="@string/sparrow_vpn_label"
+      android:permission="android.permission.BIND_VPN_SERVICE"
+      android:exported="false">
+      <intent-filter>
+        <action android:name="android.net.VpnService" />
+      </intent-filter>
     </service>
 
     <activity

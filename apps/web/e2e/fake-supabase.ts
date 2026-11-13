@@ -6,7 +6,17 @@
  * reuses the shared scoring and light-day constants so the two cannot silently drift.
  */
 import type { BrowserContext, Request, Route } from "@playwright/test";
-import { KIND_ACT_POINTS, LIGHT_DAY_MAX_TASKS, nextDay, pledgeLimit, scoreDay, settlePledge, type ItemStatus } from "@sparrow/shared";
+import {
+  KIND_ACT_POINTS,
+  LIGHT_DAY_MAX_TASKS,
+  nextDay,
+  normalizeCircleAlias,
+  PHOTO_OLDER_AFTER_HOURS,
+  pledgeLimit,
+  scoreDay,
+  settlePledge,
+  type ItemStatus,
+} from "@sparrow/shared";
 
 export const SUPABASE_URL = "http://localhost:54321";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -74,14 +84,15 @@ export class FakeSupabase {
   circlePreview: Record<string, unknown> = { valid: true, name: "Morning birds", members: 2 };
   cheers: string[] = [];
   /** A circle with the signed-in person and the given others (each sharing a small day). */
-  giveCircle(name: string, others: string[]) {
+  giveCircle(name: string, others: string[], alias: string | null = null) {
     this.circle = {
       state: "active",
       circle: { name, invite_code: "0123456789abcdef", size: others.length + 1, max: 4 },
       i_share: true,
+      my_alias: alias,
       cheers_today: [],
       members: [
-        { key: "me-key", name: "Sam", me: true, shares: true, cheered: false, today: null, focus_minutes: 0 },
+        { key: "me-key", name: alias ?? "Sam", me: true, shares: true, cheered: false, today: null, focus_minutes: 0 },
         ...others.map((n, i) => ({
           key: `key-${i}`,
           name: n,
@@ -94,6 +105,16 @@ export class FakeSupabase {
       ],
     };
   }
+  /** Same checks as _circle_alias() and _circle_name_taken() in migration 0022. */
+  private circleAlias(raw: unknown, taken: string[]): string | null {
+    const a = normalizeCircleAlias(typeof raw === "string" ? raw : "");
+    if (a === null) throw new RpcError("a circle name is 2 to 20 letters, numbers, spaces, - or _");
+    if (a === "") return null;
+    if (taken.some((t) => t.toLowerCase() === a.toLowerCase())) throw new RpcError("someone in this circle already goes by that name");
+    return a;
+  }
+  /** What proof_context() answers, by proof id (see rls_test.sql for the real rules). */
+  proofContexts: Record<string, Record<string, unknown>> = {};
   /** Set to make the delete-account function answer 500, like a storage outage. */
   failDelete = false;
   requests: string[] = [];
@@ -468,19 +489,44 @@ export class FakeSupabase {
         }
         return ok(m);
       }
+      case "proof_context": {
+        const own = this.db.proofs.find((r) => r.id === args.p_proof_id);
+        const ctx =
+          this.proofContexts[String(args.p_proof_id)] ??
+          (own && {
+            kind: own.kind,
+            days_after: 0,
+            soon_after_planning: false,
+            similar_photo: Boolean(own.flagged_similar),
+            photo_age: own.kind !== "photo" || own.photo_age_hours == null ? null : Number(own.photo_age_hours) > PHOTO_OLDER_AFTER_HOURS ? "older" : "fresh",
+          });
+        if (!ctx) throw new RpcError("that proof isn't available");
+        return ok(ctx);
+      }
       case "circle_overview":
         return ok(this.circle);
       case "create_circle": {
         if (this.circle.state === "active") throw new RpcError("you are already in a circle");
-        this.giveCircle(String(args.p_name), []);
+        this.giveCircle(String(args.p_name), [], this.circleAlias(args.p_alias, []));
         return ok({});
       }
       case "preview_circle_invite":
         return ok(this.circlePreview);
       case "join_circle": {
         if (this.circle.state === "active") throw new RpcError("you are already in a circle");
-        this.giveCircle(String(this.circlePreview.name), ["Ravi", "Meera"]);
+        this.giveCircle(String(this.circlePreview.name), ["Ravi", "Meera"], this.circleAlias(args.p_alias, ["Ravi", "Meera"]));
         return ok({});
+      }
+      case "set_circle_alias": {
+        if (this.circle.state !== "active") throw new RpcError("you are not in a circle");
+        const members = this.circle.members as Row[];
+        const a = this.circleAlias(
+          args.p_alias,
+          members.filter((m) => !m.me).map((m) => String(m.name)),
+        );
+        this.circle.my_alias = a;
+        members.find((m) => m.me)!.name = a ?? "Sam";
+        return ok(a ?? "Sam");
       }
       case "leave_circle":
         this.circle = { state: "none" };

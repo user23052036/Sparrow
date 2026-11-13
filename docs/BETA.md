@@ -51,4 +51,11 @@ Read them as signals, not grades. With 20 to 50 people a single person moves a r
 
 ## Not part of this beta
 
-A first real-device run of Android blocking (M5b-2 to M5b-4, D29), M5b-5, Play internal testing, partner notifications by email or push (D15).
+A first real-device run of Android blocking (M5b-2 to M5b-5; D29, D30), Play internal testing, partner notifications by email or push (D15).
+
+## First Android build (needs a human, about half an hour)
+
+1. Push the branch and open the **Actions** tab on GitHub. The "Android build" workflow builds the debug APK with the real Android SDK. If it is red, the log names the Kotlin file and line; that is the list of small fixes D29 and D33 expect.
+2. On a computer with Android Studio: `cd apps/mobile && cp .env.example .env` (fill in the Supabase URL and anon key), connect a phone with USB debugging and run `npx expo run:android`. No Firebase project is needed.
+3. On the phone, open **Protect** and follow the steps. Then check, in this order: a listed app shows "This can wait." during a session; a session started on the laptop reaches the phone within about 30 seconds with Sparrow swiped away; switching the Accessibility service off during a session shows up on the Focus page; the screen-off case does not.
+4. Optional website blocking (D30): switch it on in Protect, allow the VPN, start a session with a site on the list and open that site in the phone's browser. It should not load, other sites should, and the VPN key icon should go away when the session ends. Things to watch: whether it starts while Sparrow is in the background, and whether Private DNS set to "Automatic" delays the first page.

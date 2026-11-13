@@ -884,7 +884,7 @@ select pg_temp.expect_error($q$select issue_device_secret('d1d1d1d1-aaaa-0000-00
 select set_config('test.secret', issue_device_secret('d1d1d1d1-aaaa-0000-0000-000000000001'), false);
 select pg_temp.check(length(current_setting('test.secret')) = 64, 'the device secret is long and random');
 select pg_temp.check((select secret_hash from devices where platform = 'android') <> current_setting('test.secret'), 'only a hash of the secret is stored');
-update blocklists set android_packages = '{com.instagram.android,com.zhiliaoapp.musically}';
+update blocklists set android_packages = '{com.instagram.android,com.zhiliaoapp.musically}', domains = '{reddit.com,youtube.com}';
 reset role;
 select pg_temp.as_user('d1d1d1d1-0000-0000-0000-000000000002');
 select pg_temp.expect_error($q$select issue_device_secret('d1d1d1d1-aaaa-0000-0000-000000000001')$q$, 'nobody else can issue a secret for my phone');
@@ -896,6 +896,7 @@ select set_config('request.jwt.claim.sub', '', false);
 select pg_temp.expect_error($q$select device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', 'wrong', true, false)$q$, 'a wrong secret is refused');
 select pg_temp.expect_error($q$select device_sync('d1d1d1d1-aaaa-0000-0000-000000000002', current_setting('test.secret'), true, false)$q$, 'a secret works only for its own device');
 select pg_temp.check(not (device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false) ->> 'active')::boolean, 'no session: nothing to block');
+select pg_temp.check(jsonb_typeof(device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false) -> 'domains') = 'array', 'the site list is always an array');
 select pg_temp.expect_error($q$select get_focus_state()$q$, 'the anon key alone still cannot read focus state');
 reset role;
 
@@ -907,6 +908,7 @@ reset role;
 set role anon;
 select pg_temp.check((device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false) -> 'packages') ? 'com.instagram.android', 'a session started elsewhere reaches the phone with its app list');
 select pg_temp.check((device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false) ->> 'task') = 'Phone task', 'the phone learns the task to show on the blocked screen');
+select pg_temp.check((device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false) -> 'domains') ? 'reddit.com', 'the phone also gets the site list for web blocking (0021)');
 reset role;
 -- an asleep phone that goes quiet is not "going quiet"; an awake one is
 update focus_sessions set started_at = now() - interval '10 minutes' where user_id = 'd1d1d1d1-0000-0000-0000-000000000001';
@@ -935,4 +937,87 @@ reset role;
 set role anon;
 select pg_temp.expect_error($q$select device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret'), true, false)$q$, 'a rotated secret stops the old one');
 select pg_temp.check((device_sync('d1d1d1d1-aaaa-0000-0000-000000000001', current_setting('test.secret2'), true, false) ->> 'active')::boolean, 'the new secret works');
+reset role;
+
+-- ------------------------------------------------- circle names (0022)
+insert into auth.users values
+  ('e1e1e1e1-0000-0000-0000-000000000001', 'e1@test'), ('e1e1e1e1-0000-0000-0000-000000000002', 'e2@test'),
+  ('e1e1e1e1-0000-0000-0000-000000000003', 'e3@test');
+update profiles set display_name = 'Real ' || right(id::text, 1) where id::text like 'e1e1e1e1-%';
+select pg_temp.as_user('e1e1e1e1-0000-0000-0000-000000000001');
+select pg_temp.expect_error($q$select create_circle('Quiet hours', 'x')$q$, 'a circle name needs at least two characters');
+select pg_temp.expect_error($q$select create_circle('Quiet hours', 'drop;table')$q$, 'a circle name allows only simple characters');
+select create_circle('Quiet hours', '  Night   Owl ');
+update circle_members set alias = 'Sneaky';
+select pg_temp.check((circle_overview() ->> 'my_alias') = 'Night Owl', 'the creator can use a made-up name from the start (spaces tidied), and clients cannot write it directly');
+select set_config('test.alias_code', (select invite_code from circles where name = 'Quiet hours'), false);
+reset role;
+select pg_temp.as_user('e1e1e1e1-0000-0000-0000-000000000002');
+select pg_temp.expect_error($q$select join_circle(current_setting('test.alias_code'), 'night owl')$q$, 'a name already used in the circle cannot be taken');
+select join_circle(current_setting('test.alias_code'), 'Heron');
+select pg_temp.check(not (circle_overview()::text ~ 'Real 1'), 'the circle never sees the profile name of someone with a circle name');
+select pg_temp.check(exists (select 1 from jsonb_array_elements(circle_overview() -> 'members') m where m ->> 'name' = 'Night Owl' and not (m ->> 'me')::boolean), 'members are shown by their circle name');
+select pg_temp.check((select count(*) from circle_members) = 1, 'I still read only my own membership row, so nobody else''s alias column');
+select send_cheer((select (m ->> 'key')::uuid from jsonb_array_elements(circle_overview() -> 'members') m where m ->> 'name' = 'Night Owl'));
+reset role;
+select pg_temp.as_user('e1e1e1e1-0000-0000-0000-000000000001');
+select pg_temp.check(circle_overview() -> 'cheers_today' ? 'Heron' and not (circle_overview()::text ~ 'Real 2'), 'a cheer is signed with the circle name');
+select pg_temp.expect_error($q$select set_circle_alias('HERON')$q$, 'changing to a taken name is refused');
+select pg_temp.check(set_circle_alias('') = 'Real 1', 'clearing the circle name goes back to the profile name');
+select pg_temp.check(circle_overview() ->> 'my_alias' is null, 'the alias is cleared');
+select pg_temp.check(set_circle_alias('Wren-2') = 'Wren-2', 'the circle name can be changed later');
+select pg_temp.check((export_my_data() -> 'circle' ->> 'alias') = 'Wren-2', 'export includes my circle name');
+reset role;
+select pg_temp.as_user('e1e1e1e1-0000-0000-0000-000000000003');
+select join_circle(current_setting('test.alias_code'));
+select pg_temp.check(exists (select 1 from jsonb_array_elements(circle_overview() -> 'members') m where m ->> 'name' = 'Real 3' and (m ->> 'me')::boolean), 'joining without a circle name still uses the profile name');
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error($q$select set_circle_alias('Ghost')$q$, 'anonymous visitors cannot set a circle name');
+reset role;
+
+-- ------------------------------------------------- proof context (0023)
+insert into auth.users values
+  ('f1f1f1f1-0000-0000-0000-000000000001', 'f1@test'), ('f1f1f1f1-0000-0000-0000-000000000002', 'f2@test'),
+  ('f1f1f1f1-0000-0000-0000-000000000003', 'f3@test');
+select pg_temp.as_user('f1f1f1f1-0000-0000-0000-000000000001');
+insert into tasks (title) values ('Context task');
+select commit_day(array(select id from tasks), 3, 0);
+insert into proofs (id, plan_item_id, kind, storage_path, image_phash, photo_age_hours, visibility)
+  values ('f1f1f1f1-9999-0000-0000-000000000001', (select id from plan_items), 'photo', auth.uid() || '/old.jpg', '0f0f0f0f0f0f0f0f', 72, 'buddy');
+insert into proofs (id, plan_item_id, kind, storage_path, image_phash, photo_age_hours)
+  values ('f1f1f1f1-9999-0000-0000-000000000002', (select id from plan_items), 'photo', auth.uid() || '/new.jpg', 'f0f0f0f0f0f0f0f0', 1);
+insert into proofs (id, plan_item_id, kind, text_body, visibility)
+  values ('f1f1f1f1-9999-0000-0000-000000000003', (select id from plan_items), 'text', 'Did it', 'buddy');
+select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, text_body, photo_age_hours) values ((select id from plan_items), 'text', 'x', 3)$q$, 'only a photo has a photo age');
+select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path, photo_age_hours) values ((select id from plan_items), 'photo', 'p.jpg', -5)$q$, 'a photo age cannot be negative');
+update proofs set photo_age_hours = 0 where id = 'f1f1f1f1-9999-0000-0000-000000000001';
+select pg_temp.check((select photo_age_hours from proofs where id = 'f1f1f1f1-9999-0000-0000-000000000001') = 72, 'the photo age cannot be changed after saving');
+select pg_temp.check((proof_context('f1f1f1f1-9999-0000-0000-000000000001') ->> 'photo_age') = 'older', 'a photo dated days earlier is noted as older');
+select pg_temp.check((proof_context('f1f1f1f1-9999-0000-0000-000000000002') ->> 'photo_age') = 'fresh', 'a photo dated today is noted as fresh');
+select pg_temp.check(proof_context('f1f1f1f1-9999-0000-0000-000000000003') ->> 'photo_age' is null, 'a note has no photo age');
+select pg_temp.check((proof_context('f1f1f1f1-9999-0000-0000-000000000003') ->> 'days_after')::int = 0, 'added on the planned day');
+select pg_temp.check((proof_context('f1f1f1f1-9999-0000-0000-000000000003') ->> 'soon_after_planning')::boolean, 'added within minutes of planning is noted');
+select pg_temp.check(not (proof_context('f1f1f1f1-9999-0000-0000-000000000001')::text ~ 'old.jpg|0f0f0f0f|f1f1f1f1'), 'the context holds no path, hash or ids');
+select create_buddy_invite();
+select set_config('test.ctx_code', (select invite_code from buddy_links where status = 'pending'), false);
+reset role;
+-- the day was planned two days ago, and a while before the proofs
+update daily_plans set date = date - 2, committed_at = committed_at - interval '2 days' where user_id = 'f1f1f1f1-0000-0000-0000-000000000001';
+select pg_temp.as_user('f1f1f1f1-0000-0000-0000-000000000002');
+select pg_temp.expect_error($q$select proof_context('f1f1f1f1-9999-0000-0000-000000000001')$q$, 'a stranger gets no context, even for a shared proof');
+select accept_buddy_invite(current_setting('test.ctx_code'));
+select pg_temp.check((proof_context('f1f1f1f1-9999-0000-0000-000000000001') ->> 'days_after')::int = 2, 'the partner sees how many days after the planned day it was added');
+select pg_temp.check(not (proof_context('f1f1f1f1-9999-0000-0000-000000000001') ->> 'soon_after_planning')::boolean, 'not soon after planning anymore');
+select pg_temp.check((proof_context('f1f1f1f1-9999-0000-0000-000000000001') ->> 'photo_age') = 'older', 'the partner sees the photo-date note for a shared photo');
+select pg_temp.expect_error($q$select proof_context('f1f1f1f1-9999-0000-0000-000000000002')$q$, 'the partner gets no context for a private proof');
+select pg_temp.expect_error($q$select proof_context(gen_random_uuid())$q$, 'an unknown id gives the same answer');
+reset role;
+select pg_temp.as_user('f1f1f1f1-0000-0000-0000-000000000003');
+select pg_temp.expect_error($q$select proof_context('f1f1f1f1-9999-0000-0000-000000000001')$q$, 'someone outside the partnership gets nothing');
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error($q$select proof_context('f1f1f1f1-9999-0000-0000-000000000001')$q$, 'anonymous visitors get nothing');
 reset role;
