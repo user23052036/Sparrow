@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { circleDayLine, circleInviteLink, copy, normalizeCircleAlias, parseCircleCode, type CircleMember, type CircleOverview } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
+import { CircleGoalPanel } from "@/components/CircleGoalPanel";
 
 type Active = Extract<CircleOverview, { state: "active" }>;
 
@@ -85,6 +86,7 @@ function ActiveCircle({ ov, call, busy }: { ov: Active; call: (fn: string, args?
           <MemberRow key={m.key} m={m} busy={busy} onCheer={(key) => call("send_cheer", { p_member_key: key })} />
         ))}
       </ul>
+      <CircleGoalPanel />
       <div className="panel stack">
         <h3 style={{ margin: 0 }}>{copy.circle.inviteTitle}</h3>
         {left > 0 ? (

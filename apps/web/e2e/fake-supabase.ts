@@ -7,6 +7,9 @@
  */
 import type { BrowserContext, Request, Route } from "@playwright/test";
 import {
+  CRAFT_RECIPES,
+  FOCUS_LINK_MAX,
+  isCraftedKey,
   KIND_ACT_POINTS,
   LIGHT_DAY_MAX_TASKS,
   nextDay,
@@ -14,6 +17,9 @@ import {
   PHOTO_OLDER_AFTER_HOURS,
   pledgeLimit,
   scoreDay,
+  suggestCircleGoal,
+  validCircleGoal,
+  validFocusLinkMinutes,
   settlePledge,
   type ItemStatus,
 } from "@sparrow/shared";
@@ -50,7 +56,29 @@ export class FakeSupabase {
     pledges: [],
     makeup_steps: [],
     circles: [],
+    focus_links: [],
   };
+  /** Focus links (D35): the keys handed out, and the sessions they started. The real rules are in rls_test.sql. */
+  linkKeys: Record<string, string> = {};
+  linkSession: { ends_at: string; minutes: number } | null = null;
+  /** Crafted badges (D36), as my_collection() would answer with this.progress.badges. */
+  crafted: string[] = [];
+  private collection() {
+    const held = new Set<string>([...(this.progress.badges as string[]), ...this.crafted]);
+    const ready = Object.entries(CRAFT_RECIPES)
+      .filter(([k, parts]) => !held.has(k) && parts.every((x) => held.has(x)))
+      .map(([k]) => k);
+    return { crafted: [...this.crafted], ready };
+  }
+  /** Circle goal (D37) as circle_goal() would answer it. */
+  circleGoal: Record<string, unknown> | null = null;
+  private goalState() {
+    const size = this.circle.state === "active" ? (this.circle.circle as { size: number }).size : 0;
+    const open = this.circleGoal?.state === "open";
+    const base = { can_start: size >= 2 && !open, suggested: suggestCircleGoal(size) };
+    if (this.circle.state !== "active") return { state: "none", can_start: false };
+    return this.circleGoal ? { ...this.circleGoal, ...base } : { state: "none", ...base };
+  }
   uploads: { path: string; bytes: number; type: string }[] = [];
   deleteCalls: unknown[] = [];
   /** What partner_overview() answers (defaults to "no partner"). */
@@ -359,9 +387,21 @@ export class FakeSupabase {
     return scoreDay(items.map((i) => i.status as ItemStatus)).completion;
   }
   private async rpc(route: Route, name: string) {
-    if (!this.signedIn) return this.send(route, 401, { message: "JWT expired" });
     const args = (route.request().postDataJSON() ?? {}) as Row;
     const ok = (v: unknown) => this.send(route, 200, v ?? null);
+    // the one call that works without signing in: the key is the permission (0024)
+    if (name === "use_focus_link") {
+      const id = this.linkKeys[String(args.p_key)];
+      const link = this.db.focus_links.find((l) => l.id === id);
+      if (!link) return this.send(route, 400, { code: "28000", message: "this focus link isn't valid anymore", details: null, hint: null });
+      if (this.linkSession) return ok({ started: false, running: true, ...this.linkSession });
+      const minutes = Number(link.minutes);
+      this.linkSession = { ends_at: new Date(Date.now() + minutes * 60000).toISOString(), minutes };
+      link.use_count = Number(link.use_count) + 1;
+      link.last_used_at = new Date().toISOString();
+      return ok({ started: true, running: true, ...this.linkSession });
+    }
+    if (!this.signedIn) return this.send(route, 401, { message: "JWT expired" });
 
     switch (name) {
       case "get_today": {
@@ -502,6 +542,63 @@ export class FakeSupabase {
           });
         if (!ctx) throw new RpcError("that proof isn't available");
         return ok(ctx);
+      }
+      case "create_focus_link": {
+        const label = String(args.p_label ?? "").trim();
+        if (!label) throw new RpcError("give the link a short name (up to 40 letters)");
+        if (!validFocusLinkMinutes(Number(args.p_minutes))) throw new RpcError("a focus link starts 5 to 120 minutes");
+        if (this.db.focus_links.length >= FOCUS_LINK_MAX) throw new RpcError("you can have up to five focus links; remove one first");
+        const id = uid();
+        const key =
+          "spt_" +
+          String(this.db.focus_links.length + 1)
+            .repeat(64)
+            .slice(0, 64);
+        this.db.focus_links.push({
+          id,
+          label,
+          minutes: Number(args.p_minutes),
+          created_at: new Date(Date.now() + ++counter).toISOString(),
+          last_used_at: null,
+          use_count: 0,
+        });
+        this.linkKeys[key] = id;
+        return ok({ id, label, minutes: Number(args.p_minutes), key });
+      }
+      case "remove_focus_link": {
+        const before = this.db.focus_links.length;
+        this.db.focus_links = this.db.focus_links.filter((l) => l.id !== args.p_id);
+        return ok(this.db.focus_links.length < before);
+      }
+      case "my_collection":
+        return ok(this.collection());
+      case "craft_badge": {
+        const key = String(args.p_key);
+        if (!isCraftedKey(key)) throw new RpcError("that badge can't be crafted");
+        if (!this.crafted.includes(key)) {
+          if (!this.collection().ready.includes(key)) throw new RpcError("you don't have every badge this one is made from yet");
+          this.crafted.push(key);
+        }
+        return ok(this.collection());
+      }
+      case "circle_goal":
+        return ok(this.goalState());
+      case "start_circle_goal": {
+        const st = this.goalState();
+        if (this.circle.state !== "active") throw new RpcError("you are not in a circle");
+        if (!st.can_start)
+          throw new RpcError(
+            this.circleGoal?.state === "open" ? "your circle already has a shared goal" : "a shared goal needs at least two people in the circle",
+          );
+        const target = args.p_target == null ? Number((st as { suggested: number }).suggested) : Number(args.p_target);
+        if (!validCircleGoal(target)) throw new RpcError("a shared goal is 3 to 100 things");
+        this.circleGoal = { state: "open", target, moved: 0, reached: false, let_go: false, ends_at: new Date(Date.now() + 7 * 86_400_000).toISOString() };
+        return ok(this.goalState());
+      }
+      case "let_go_circle_goal": {
+        if (this.circle.state !== "active") throw new RpcError("you are not in a circle");
+        if (this.circleGoal?.state === "open") Object.assign(this.circleGoal, { state: "ended", let_go: true });
+        return ok(this.goalState());
       }
       case "circle_overview":
         return ok(this.circle);
