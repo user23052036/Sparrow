@@ -110,6 +110,8 @@ class SparrowAccessibilityService : AccessibilityService() {
       } finally {
         syncing.set(false)
       }
+      // M5b-5: start or stop website blocking to match the session (does nothing unless the person switched it on).
+      SparrowVpnService.apply(this)
       // A session that just arrived should cover the app that is already open.
       main.post { currentPkg?.let { if (screenOn) evaluate(it) } }
     }

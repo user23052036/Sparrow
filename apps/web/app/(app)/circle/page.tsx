@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { circleDayLine, circleInviteLink, copy, parseCircleCode, type CircleMember, type CircleOverview } from "@sparrow/shared";
+import { circleDayLine, circleInviteLink, copy, normalizeCircleAlias, parseCircleCode, type CircleMember, type CircleOverview } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 
 type Active = Extract<CircleOverview, { state: "active" }>;
@@ -24,6 +24,43 @@ function MemberRow({ m, onCheer, busy }: { m: CircleMember; onCheer: (key: strin
           </button>
         ))}
     </li>
+  );
+}
+
+/** D31: go by a made-up name in the circle, or go back to your own. */
+function AliasPanel({ ov, call, busy }: { ov: Active; call: (fn: string, args?: Record<string, unknown>) => Promise<void>; busy: boolean }) {
+  const [alias, setAlias] = useState(ov.my_alias ?? "");
+  const tidy = normalizeCircleAlias(alias);
+  return (
+    <form
+      className="panel stack"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (tidy) void call("set_circle_alias", { p_alias: tidy });
+      }}
+    >
+      <h3 style={{ margin: 0 }}>{copy.circle.aliasTitle}</h3>
+      <p style={{ margin: 0 }}>{ov.my_alias ? copy.circle.aliasShown(ov.my_alias) : copy.circle.aliasOwn}</p>
+      <label htmlFor="circle-alias">{copy.circle.aliasLabel}</label>
+      <input id="circle-alias" value={alias} maxLength={20} placeholder={copy.circle.aliasPlaceholder} onChange={(e) => setAlias(e.target.value)} />
+      {tidy === null && <p className="small quiet">{copy.circle.aliasBad}</p>}
+      <div className="row">
+        <button disabled={busy || !tidy || tidy === (ov.my_alias ?? "")}>{copy.circle.aliasSave}</button>
+        {ov.my_alias && (
+          <button
+            type="button"
+            className="ghost"
+            disabled={busy}
+            onClick={() => {
+              setAlias("");
+              void call("set_circle_alias", { p_alias: null });
+            }}
+          >
+            {copy.circle.aliasClear}
+          </button>
+        )}
+      </div>
+    </form>
   );
 }
 
@@ -69,6 +106,7 @@ function ActiveCircle({ ov, call, busy }: { ov: Active; call: (fn: string, args?
           <p style={{ margin: 0 }}>{copy.circle.full}</p>
         )}
       </div>
+      <AliasPanel ov={ov} call={call} busy={busy} />
       <div className="panel stack">
         <label className="check">
           <input type="checkbox" checked={ov.i_share} disabled={busy} onChange={(e) => call("set_circle_sharing", { p_on: e.target.checked })} />
@@ -106,6 +144,8 @@ export default function CirclePage() {
   const [ov, setOv] = useState<CircleOverview | null>(null);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [alias, setAlias] = useState("");
+  const tidyAlias = normalizeCircleAlias(alias);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -154,14 +194,19 @@ export default function CirclePage() {
             className="panel stack"
             onSubmit={(e) => {
               e.preventDefault();
-              void call("create_circle", { p_name: name.trim() });
+              void call("create_circle", { p_name: name.trim(), p_alias: tidyAlias || null });
             }}
           >
             <h3 style={{ margin: 0 }}>{copy.circle.createTitle}</h3>
             <label htmlFor="circle-name">{copy.circle.nameLabel}</label>
             <input id="circle-name" value={name} maxLength={40} placeholder={copy.circle.namePlaceholder} onChange={(e) => setName(e.target.value)} />
+            <label htmlFor="circle-alias-new">{copy.circle.aliasLabel}</label>
+            <input id="circle-alias-new" value={alias} maxLength={20} placeholder={copy.circle.aliasPlaceholder} onChange={(e) => setAlias(e.target.value)} />
+            <p className="small quiet" style={{ margin: 0 }}>
+              {tidyAlias === null ? copy.circle.aliasBad : copy.circle.aliasHint}
+            </p>
             <div>
-              <button className="primary" disabled={busy || !name.trim()}>
+              <button className="primary" disabled={busy || !name.trim() || tidyAlias === null}>
                 {copy.circle.create}
               </button>
             </div>

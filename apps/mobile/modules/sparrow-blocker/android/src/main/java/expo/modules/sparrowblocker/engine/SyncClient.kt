@@ -45,6 +45,8 @@ object SyncClient {
       val json = JSONObject(text)
       val pkgs = json.optJSONArray("packages")
       val list = (0 until (pkgs?.length() ?: 0)).map { pkgs!!.optString(it) }
+      val doms = json.optJSONArray("domains")
+      val sites = (0 until (doms?.length() ?: 0)).map { doms!!.optString(it) }
       val state = BlockRules.fromSync(
         serverNowMs = BlockRules.parseIsoMillis(json.optString("server_now")) ?: localNow,
         localNowMs = localNow,
@@ -53,6 +55,7 @@ object SyncClient {
         packages = list,
         task = if (json.isNull("task")) null else json.optString("task"),
         sessionId = if (json.isNull("session_id")) null else json.optString("session_id"),
+        domains = sites,
       )
       store.saveState(state)
       store.saveStatus("ok")

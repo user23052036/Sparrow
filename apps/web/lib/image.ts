@@ -1,5 +1,5 @@
 "use client";
-import { compressWithin, copy, dHashFromGray } from "@sparrow/shared";
+import { compressWithin, copy, dHashFromGray, EXIF_SCAN_BYTES, photoAgeHours } from "@sparrow/shared";
 
 async function loadBitmap(file: Blob): Promise<ImageBitmap> {
   return await createImageBitmap(file);
@@ -33,4 +33,16 @@ export async function imageDHash(file: Blob): Promise<string> {
   const gray: number[] = [];
   for (let i = 0; i < data.length; i += 4) gray.push(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
   return dHashFromGray(gray);
+}
+
+/**
+ * Hours between the photo's own date (EXIF) and now, or null when it has none. Read from the
+ * original file, because compressImage() strips EXIF. A hint only (DECISIONS D32).
+ */
+export async function photoAge(file: Blob): Promise<number | null> {
+  try {
+    return photoAgeHours(new Uint8Array(await file.slice(0, EXIF_SCAN_BYTES).arrayBuffer()), new Date());
+  } catch {
+    return null;
+  }
 }

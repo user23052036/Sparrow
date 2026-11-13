@@ -39,6 +39,7 @@ class EngineStore(context: Context) {
       endsAtMs = ends,
       packages = prefs.getStringSet("packages", emptySet())?.toSet() ?: emptySet(),
       task = prefs.getString("task", null),
+      domains = prefs.getStringSet("domains", emptySet())?.toSet() ?: emptySet(),
     )
   }
 
@@ -48,6 +49,7 @@ class EngineStore(context: Context) {
       .putLong("ends", s.endsAtMs)
       .putStringSet("packages", HashSet(s.packages))
       .putString("task", s.task)
+      .putStringSet("domains", HashSet(s.domains))
       .putLong("syncedAt", System.currentTimeMillis())
       .apply()
   }
@@ -59,6 +61,13 @@ class EngineStore(context: Context) {
 
   fun saveAlsoAllowed(list: Collection<String>) {
     prefs.edit().putStringSet("alsoAllowed", HashSet(list)).apply()
+  }
+
+  /** M5b-5: the person switched on website blocking on this phone (off by default). */
+  fun webBlocking(): Boolean = prefs.getBoolean("webBlocking", false)
+
+  fun saveWebBlocking(on: Boolean) {
+    prefs.edit().putBoolean("webBlocking", on).apply()
   }
 
   /** "signed_out" when the server refused the secret (e.g. another sign-in replaced it). */

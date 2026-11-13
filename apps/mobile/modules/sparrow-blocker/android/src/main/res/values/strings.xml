@@ -9,4 +9,5 @@
   <string name="sparrow_blocked_left">%1$d min %2$02d s left</string>
   <string name="sparrow_blocked_step">Start a 5-minute step</string>
   <string name="sparrow_blocked_home">Go to the home screen</string>
+  <string name="sparrow_vpn_label">Sparrow website blocking</string>
 </resources>

@@ -2,7 +2,7 @@
 
 A gentle daily accountability app for people who struggle with focus, motivation, internet and phone addiction, or low mood.
 
-**Status:** Working prototype: website + Chrome extension, plus an Android app with an app-blocking engine (M5b-2 to M5b-4) that is written but not yet tried on a real phone (see `docs/DECISIONS.md`, D29).
+**Status:** Working prototype: website + Chrome extension, plus an Android app with an app- and website-blocking engine (M5b-2 to M5b-5) that is written but not yet tried on a real phone (see `docs/DECISIONS.md`, D29, D30, D33).
 
 ## What works in this prototype
 
@@ -24,6 +24,9 @@ A gentle daily accountability app for people who struggle with focus, motivation
 - **Make-up step stake:** instead of points, stake one five-minute step for tomorrow if something doesn't happen. Just one, however the day goes, and you can let it go.
 - **Voice-note proof:** record up to a minute about what you did. Private unless you share it with your partner, who can play it.
 - **Circles:** a small group of two to four people who see each other's counts (not task titles) and focus minutes, and can send one cheer a day. Separate from your partner.
+- **Circle names:** go by a made-up name in your circle, from the moment you create or join it; the circle then never sees your real one.
+- **About this proof:** next to a shared proof, your partner sees a few plain notes (added on the planned day or later, whether a photo's own date is older). Notes from simple checks, never a score.
+- **Websites on the phone (optional):** the Android app can keep listed sites away in the phone's browsers during a session. Written, not yet tried on a phone.
 - **Your data:** download everything Sparrow holds about you, or delete the account (photos included), from Settings.
 - **Install and feedback:** the website installs as an app (PWA), has a feedback button, and a plain-language privacy page.
 - **Privacy:** every table has Row-Level Security; proofs are private by default.
@@ -46,7 +49,7 @@ You need Node.js 20+ and a free [Supabase](https://supabase.com) account.
 ### 1. Create the Supabase project
 
 1. Create a new project in Supabase.
-2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0020`).
+2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0023`).
 3. **Authentication → URL Configuration:** set Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to Redirect URLs.
 4. **Authentication → Sign In / Providers → User Signups:** turn **Confirm email** off, so new accounts work immediately without an email service. (Turn it back on once you connect your own SMTP provider for real users.)
 
@@ -76,14 +79,15 @@ You need Android Studio (SDK + an emulator or a phone with USB debugging) and JD
 
 ```bash
 cp apps/mobile/.env.example apps/mobile/.env     # same Supabase URL + anon key as the website
-# Firebase (only needed for push, which stays off until the blocker ships):
-#   create a Firebase project, add an Android app with id com.sparrow.app,
-#   and save its google-services.json as apps/mobile/google-services.json
 cd apps/mobile && npx expo install --fix         # align package versions with your Expo SDK
 npx expo run:android                              # builds and installs the development build
 ```
 
-It signs in, shows your plan, starts and stops focus sessions, and lets you pick apps for your list. To block apps, open the **Protect** tab: read the disclosure, switch on "Sparrow focus blocking" in Accessibility, let Sparrow run in the background, and (on Xiaomi, Oppo, Vivo, Samsung and similar) allow autostart. From then on, a session started on any device reaches the phone within about 30 seconds, also when the app is closed, and the listed apps show a calm "This can wait." screen until it ends. Phone, messages, emergency, Settings and your home screen are never blocked. Firebase is not needed for blocking. **The blocking engine was written without a device or the Android SDK, so expect small fixes on the first build.**
+It signs in, shows your plan, starts and stops focus sessions, and lets you pick apps for your list. To block apps, open the **Protect** tab: read the disclosure, switch on "Sparrow focus blocking" in Accessibility, let Sparrow run in the background, and (on Xiaomi, Oppo, Vivo, Samsung and similar) allow autostart. From then on, a session started on any device reaches the phone within about 30 seconds, also when the app is closed, and the listed apps show a calm "This can wait." screen until it ends. Phone, messages, emergency, Settings and your home screen are never blocked. No Firebase project is needed.
+
+The Protect tab also has an optional switch for **websites in the phone's browsers**: a local DNS filter that Android calls a VPN, although nothing leaves the phone through it. It is off by default because Android allows only one VPN at a time (D30).
+
+**The blocking engine has not run on a phone yet.** All of its Kotlin type-checks against the real Android API (`check-android-api.sh`), and the "Android build" GitHub workflow builds the debug APK with the real SDK on every change to `apps/mobile`; its first run is the first real build, so expect small fixes (D33).
 
 ## Tests
 
@@ -95,8 +99,9 @@ npm run test:e2e          # Playwright in Chromium against a fake Supabase (firs
 npm run typecheck
 npm run build
 npm run test:functions   # delete-account Edge Function logic (node --test)
-bash supabase/tests/run.sh   # migrations (0001 to 0020) + privacy/RLS checks on a local PostgreSQL 15+
-apps/mobile/modules/sparrow-blocker/android/run-jvm-tests.sh   # Android blocking rules on a plain JVM (needs kotlinc)
+bash supabase/tests/run.sh   # migrations (0001 to 0023) + privacy/RLS checks on a local PostgreSQL 15+
+apps/mobile/modules/sparrow-blocker/android/run-jvm-tests.sh       # Android app and website blocking rules on a plain JVM (needs kotlinc)
+apps/mobile/modules/sparrow-blocker/android/check-android-api.sh   # type-checks all the Android Kotlin against the real API jar (needs kotlinc)
 ```
 
 ## Known limits

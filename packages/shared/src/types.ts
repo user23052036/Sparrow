@@ -148,6 +148,19 @@ export type CircleOverview =
       state: "active";
       circle: { name: string; invite_code: string; size: number; max: number };
       i_share: boolean;
+      /** My made-up name in this circle, or null when I go by my profile name (D31). */
+      my_alias?: string | null;
       cheers_today: string[];
       members: CircleMember[];
     };
+
+/** What proof_context() answers: plain facts about one proof, never a score (D32). */
+export interface ProofContext {
+  kind: "photo" | "text" | "voice";
+  /** Days between the planned day and the day the proof was added (0 = the same day). */
+  days_after: number;
+  soon_after_planning: boolean;
+  similar_photo: boolean;
+  /** From the photo's own date, as reported by the person's browser; null when unknown or not a photo. */
+  photo_age: "fresh" | "older" | null;
+}

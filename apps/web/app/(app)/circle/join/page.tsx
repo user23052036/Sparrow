@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { copy, parseCircleCode } from "@sparrow/shared";
+import { copy, normalizeCircleAlias, parseCircleCode } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 
 interface Preview {
@@ -16,6 +16,8 @@ function JoinInner() {
   const router = useRouter();
   const code = parseCircleCode(useSearchParams().get("code") ?? "");
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [alias, setAlias] = useState("");
+  const tidyAlias = normalizeCircleAlias(alias);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -35,7 +37,7 @@ function JoinInner() {
   async function join() {
     setBusy(true);
     setErr(null);
-    const { error } = await supabase().rpc("join_circle", { p_code: code });
+    const { error } = await supabase().rpc("join_circle", { p_code: code, p_alias: tidyAlias || null });
     setBusy(false);
     if (error) setErr(errorText(error));
     else router.replace("/circle");
@@ -60,8 +62,13 @@ function JoinInner() {
               <li key={b}>{b}</li>
             ))}
           </ul>
+          <label htmlFor="join-alias">{copy.circle.aliasLabel}</label>
+          <input id="join-alias" value={alias} maxLength={20} placeholder={copy.circle.aliasPlaceholder} onChange={(e) => setAlias(e.target.value)} />
+          <p className="small quiet" style={{ margin: 0 }}>
+            {tidyAlias === null ? copy.circle.aliasBad : copy.circle.aliasHint}
+          </p>
           <div className="row">
-            <button className="primary" disabled={busy} onClick={join}>
+            <button className="primary" disabled={busy || tidyAlias === null} onClick={join}>
               {copy.circleJoin.join}
             </button>
             <Link className="button ghost" href="/today">

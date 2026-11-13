@@ -15,6 +15,16 @@ export interface EngineState {
   lastSyncMs: number;
 }
 
+/** M5b-5: website blocking in the phone's browsers (a local DNS filter). */
+export interface WebBlocking {
+  /** The person switched it on. */
+  enabled: boolean;
+  /** Android's "allow this VPN" question was answered with yes. */
+  allowed: boolean;
+  /** The filter is up right now (only during a session that has sites on the list). */
+  running: boolean;
+}
+
 interface Native {
   getInstalledApps(): InstalledApp[];
   configure(url: string, anonKey: string, deviceId: string, secret: string): void;
@@ -29,6 +39,9 @@ interface Native {
   openBatterySettings(): void;
   openAutostartSettings(): boolean;
   manufacturer(): string;
+  getWebBlocking(): WebBlocking;
+  setWebBlocking(enabled: boolean): void;
+  requestWebBlocking(): boolean;
 }
 
 let native: Native | null = null;
@@ -63,4 +76,8 @@ export const engine = {
   openBatterySettings: () => native?.openBatterySettings(),
   openAutostartSettings: (): boolean => native?.openAutostartSettings() ?? false,
   manufacturer: (): string => native?.manufacturer() ?? "",
+  webBlocking: (): WebBlocking => native?.getWebBlocking() ?? { enabled: false, allowed: false, running: false },
+  setWebBlocking: (enabled: boolean) => native?.setWebBlocking(enabled),
+  /** Shows Android's own question when needed. True when it was already allowed. */
+  requestWebBlocking: (): boolean => native?.requestWebBlocking() ?? false,
 };

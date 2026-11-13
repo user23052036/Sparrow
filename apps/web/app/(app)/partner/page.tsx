@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { copy, eventLabel, inviteLink, parseInviteCode, type PartnerOverview, type PartnerProof } from "@sparrow/shared";
+import { copy, eventLabel, inviteLink, parseInviteCode, proofContextLines, type PartnerOverview, type PartnerProof, type ProofContext } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 import { timeAgo } from "@/lib/format";
 import { PartnerPenalty } from "@/components/PartnerPenalty";
@@ -17,6 +17,15 @@ function ProofCard({ proof, reload }: { proof: PartnerProof; reload: () => void 
   const [asking, setAsking] = useState(false);
   const [comment, setComment] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  const [context, setContext] = useState<ProofContext | null>(null);
+
+  // Plain facts about when and how the proof was added (D32). Missing context is fine: nothing is shown.
+  useEffect(() => {
+    supabase()
+      .rpc("proof_context", { p_proof_id: proof.id })
+      .then(({ data, error }) => setContext(error ? null : (data as ProofContext)));
+  }, [proof.id]);
+  const notes = proofContextLines(context);
 
   useEffect(() => {
     if (proof.kind === "text" || !proof.path) return;
@@ -60,6 +69,19 @@ function ProofCard({ proof, reload }: { proof: PartnerProof; reload: () => void 
         <p className="quiet">{copy.partnerUi.loadingPhoto}</p>
       )}
       {proof.flagged && <p className="note small">{copy.partnerUi.reused}</p>}
+      {notes.length > 0 && (
+        <details className="small">
+          <summary>{copy.proofContext.title}</summary>
+          <ul style={{ margin: "0.4rem 0", paddingLeft: "1.1rem" }}>
+            {notes.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
+          <p className="quiet" style={{ margin: 0 }}>
+            {copy.proofContext.about}
+          </p>
+        </details>
+      )}
       {proof.verdict && (
         <p className="small status-done">{proof.verdict === "approve" ? copy.partnerUi.youApproved : copy.partnerUi.youAsked(proof.comment ?? "")}</p>
       )}

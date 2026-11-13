@@ -1,0 +1,53 @@
+# Builds the Android app (debug) with the real Android SDK and Gradle, so the Kotlin blocking
+# engine is compiled and its manifest merged on every change, without anyone needing Android
+# Studio. GitHub's Ubuntu runners come with the Android SDK.
+#
+# This workflow was written without being able to run it (see docs/DECISIONS.md, D33): if the
+# first run is red, the log names the file and line. It is separate from CI on purpose, so an
+# Android problem never blocks the website and extension.
+#
+# The APK it uploads is a *debug* build: it opens only together with the Metro bundler
+# (`npx expo start --dev-client` on a computer on the same network, or `npx expo run:android`
+# over USB). It is for trying the app on a phone, not for giving to other people.
+name: Android build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "packages/shared/**"
+      - ".github/workflows/android-build.yml"
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/android-build.yml"
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - name: Generate the native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the debug APK
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sparrow-debug-apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+          if-no-files-found: error

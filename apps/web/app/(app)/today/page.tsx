@@ -282,6 +282,8 @@ function ItemCard({
 }) {
   const [timerFor, setTimerFor] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // What saving a proof had to say (e.g. "looks like an earlier photo"); kept here because the capture form goes away once a proof exists.
+  const [proofNote, setProofNote] = useState<string | null>(null);
   const sb = supabase();
 
   async function setStatus(s: ItemStatus) {
@@ -349,8 +351,21 @@ function ItemCard({
         (proofs > 0 ? (
           <p className="small status-done">{copy.today.proofsSaved(proofs)}</p>
         ) : (
-          <ProofCapture itemId={item.id} userId={userId} onSaved={reload} partnerName={partnerName} />
+          <ProofCapture
+            itemId={item.id}
+            userId={userId}
+            onSaved={(note) => {
+              setProofNote(note);
+              reload();
+            }}
+            partnerName={partnerName}
+          />
         ))}
+      {proofNote && proofs > 0 && (
+        <p className="note small" role="status">
+          {proofNote}
+        </p>
+      )}
       {verdict && partnerName && (
         <p className="note small" role="status">
           {verdict.verdict === "approve"

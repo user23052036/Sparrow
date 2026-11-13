@@ -160,3 +160,39 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Registering:** `ENGINE_READY` now follows whether the native module is built in, and the phone registers only once Accessibility is switched on, so a phone that can't block never produces tamper events (D17's concern).
 **Not verified:** the Kotlin code that touches Android has not been compiled against the Android SDK or run on a phone (the build environment had no Android SDK). The pure rules (`BlockRules.kt`) are compiled and tested on a plain JVM (`android/run-jvm-tests.sh`), and the rest was type-checked against hand-written stubs only. Expect small fixes on the first device build. M5b-5 (VPN-based website blocking on the phone) stays deferred.
 **Status:** Written, untested on a device.
+
+## D30 — Website blocking on the phone: a local DNS filter, optional and off by default
+**Decision:** M5b-5 is written. During a focus session the phone can keep the sites on the person's list away in its browsers with a local `VpnService` (`SparrowVpnService`). Only one made-up address (the DNS server Sparrow announces) is routed to it, so the only thing it ever sees is the phone asking where a site is. A listed site (or anything under it) gets "no such name"; every other question is passed to the DNS servers the phone was already using, outside the VPN, and the answer is handed back. Pages and all other traffic never pass through Sparrow, and nothing is logged or sent. `device_sync()` now also returns the site list (migration `0021`).
+**Why optional and off by default:** Android allows one VPN at a time, so this pauses any other VPN while it runs. It has its own disclosure and switch on the Protect tab and needs Android's own "allow VPN" question. It runs only while a session with listed sites is active and stops by itself when the session ends, also offline. Sparrow's own server can never be blocked, whatever the list says.
+**Limits, on purpose (D6):** a blocked site shows the browser's own "can't be reached" page (showing Sparrow's calm screen would mean intercepting encrypted traffic). A browser or phone set to its own secure DNS (Private DNS with a named provider, or a browser's DNS-over-HTTPS) gets around it; Sparrow does not try to stop that. If the VPN is switched off in Android's settings during a session, website blocking stops and no tamper event is recorded; only the Accessibility service is treated as "protection" (D29).
+**Tested:** the DNS rules (reading a question, matching, the refusal, the reply packet and its checksum, malformed input) run on a plain JVM (`run-jvm-tests.sh`, 12 tests); the SQL change is in `rls_test.sql`. **Not verified:** the service itself has never run on a phone. In particular, whether Android lets the Accessibility service start it while the app is in the background, and how opportunistic Private DNS behaves with the made-up server, need a real device.
+**Play:** apps using `VpnService` need Google's VPN declaration in addition to the Accessibility one. Check the policy at submission time.
+**Status:** Written, untested on a device.
+
+## D31 — Circle names: the anonymous option for circles
+**Decision:** A member can go by a made-up name in their circle (2 to 20 letters, numbers, spaces, `-` or `_`; migration `0022`). It can be chosen when creating or joining, so the profile name is never shown first, and changed or cleared later. With a circle name set, the circle never sees the profile name: members, cheers and the overview all use it. A name another member is already shown as (their circle name or their own name) can't be taken.
+**Reason:** The plan's Phase 2 asks for an anonymous option. Circles already share only counts (D28), so the name was the one identifying thing left.
+**Not built:** matching strangers into circles. A circle is still invite-only, so the people in it usually know who they invited; the made-up name protects against the rest of the circle, not against the person who sent the link.
+**Status:** Prototype.
+
+## D32 — Proof context: plain notes from simple checks, never a score
+**Decision:** The plan's Phase 2 "plausibility score (assistive only)" is built as rule-based notes without a number. `proof_context()` (migration `0023`) returns, for one proof, to its owner or to the partner it was shared with: how many days after the planned day it was added, whether it was added within five minutes of planning the day, and for photos whether the photo's own date (EXIF, read in the browser before the image is re-encoded) is more than a day older than the moment it was added. The Partner page shows these under "About this proof" with the line that they are not a verdict. A person adding an older photo is told kindly and can still save it.
+**Why no score and no AI:** a number next to someone's proof reads as a judgement of the person, which is what D3, D5 and the gentle-language rules exist to avoid, and a model call would need an outside service and send proofs to it. The photo date is reported by the person's own browser and is easy to remove or edit, so it is a hint like the "similar photo" flag, and it never changes points, pledges or ratings.
+**Privacy:** the context holds nothing that wasn't shared: no other proofs, no focus sessions, no paths or ids. Private proofs give the partner no context, and an unknown id answers the same as a forbidden one.
+**Also fixed:** the note shown after saving a photo (for example "looks like one you've used before") used to disappear as soon as the day reloaded; it now stays under the task.
+**Status:** Final for the beta.
+
+## D33 — Checking the Android code without a phone: real API type-check, a build workflow, no Firebase
+**Decision:** Three things reduce the "never compiled" risk from D29 without a device:
+- `android/check-android-api.sh` type-checks all the module's Kotlin (engine, VPN filter, Expo bridge) against the real Android API jar (API 34), with small stand-ins for `R` and the handful of expo-modules-core names the bridge uses. This replaces the hand-written Android stubs from D29 and runs in CI (`android-rules` job) next to the JVM tests.
+- `.github/workflows/android-build.yml` runs `expo prebuild` and `gradlew :app:assembleDebug` on GitHub's runners (which have the Android SDK) and uploads the debug APK. It could not be run from where it was written, so treat its first run as the first real build.
+- `googleServicesFile` and the unused `expo-notifications` plugin are removed from the app config. Since D29 the phone polls instead of using push, and the missing `google-services.json` would have stopped every build. `expo prebuild` now succeeds from a clean checkout and autolinking finds the `sparrow-blocker` module (both checked).
+**Still not verified:** a Gradle build, manifest merging, and anything at run time on a phone.
+**Status:** Final until the first device run.
+
+## D34 — Not built in this pass, and why
+- **Desktop native agent (Tauri)** from Phase 2: a separate application with OS-specific blocking, code signing and installers; it can't be exercised without the target desktops.
+- **AI scoring of proofs, Google Calendar sync, partner email or push, wearables, open API, mentors, micro-verifier marketplace, physical badges, iOS:** each needs an outside service, credentials, vetting or a legal step (see D21, D24, D25).
+- **Live money, partner marketplace, crypto, public ratings:** unchanged from D25.
+**Status:** Open; each is its own decision.
+
