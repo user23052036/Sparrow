@@ -26,6 +26,9 @@ A gentle daily accountability app for people who struggle with focus, motivation
 - **Circles:** a small group of two to four people who see each other's counts (not task titles) and focus minutes, and can send one cheer a day. Separate from your partner.
 - **Circle names:** go by a made-up name in your circle, from the moment you create or join it; the circle then never sees your real one.
 - **About this proof:** next to a shared proof, your partner sees a few plain notes (added on the planned day or later, whether a photo's own date is older). Notes from simple checks, never a score.
+- **Focus links:** a link that starts a focus session when it's opened, for an NFC tag at your desk, a home-screen shortcut or a phone, watch or smart-speaker routine. It can only start a session; it can't end one or read anything.
+- **Badge collection:** craft a new badge from badges you already hold. Nothing is used up, and it stays private.
+- **Circle goal:** a circle can set one shared goal for seven days. It shows one number for everyone, never who moved how many.
 - **Websites on the phone (optional):** the Android app can keep listed sites away in the phone's browsers during a session. Written, not yet tried on a phone.
 - **Your data:** download everything Sparrow holds about you, or delete the account (photos included), from Settings.
 - **Install and feedback:** the website installs as an app (PWA), has a feedback button, and a plain-language privacy page.
@@ -49,7 +52,7 @@ You need Node.js 20+ and a free [Supabase](https://supabase.com) account.
 ### 1. Create the Supabase project
 
 1. Create a new project in Supabase.
-2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0023`).
+2. Open **SQL Editor** and run each file in `supabase/migrations/` **in order** (`0001` → `0027`).
 3. **Authentication → URL Configuration:** set Site URL to `http://localhost:3000` and add `http://localhost:3000/auth/callback` to Redirect URLs.
 4. **Authentication → Sign In / Providers → User Signups:** turn **Confirm email** off, so new accounts work immediately without an email service. (Turn it back on once you connect your own SMTP provider for real users.)
 
@@ -99,7 +102,7 @@ npm run test:e2e          # Playwright in Chromium against a fake Supabase (firs
 npm run typecheck
 npm run build
 npm run test:functions   # delete-account Edge Function logic (node --test)
-bash supabase/tests/run.sh   # migrations (0001 to 0023) + privacy/RLS checks on a local PostgreSQL 15+
+bash supabase/tests/run.sh   # migrations (0001 to 0027) + privacy/RLS checks on a local PostgreSQL 15+
 apps/mobile/modules/sparrow-blocker/android/run-jvm-tests.sh       # Android app and website blocking rules on a plain JVM (needs kotlinc)
 apps/mobile/modules/sparrow-blocker/android/check-android-api.sh   # type-checks all the Android Kotlin against the real API jar (needs kotlinc)
 ```

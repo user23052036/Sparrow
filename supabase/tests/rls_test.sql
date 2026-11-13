@@ -1021,3 +1021,192 @@ set role anon;
 select set_config('request.jwt.claim.sub', '', false);
 select pg_temp.expect_error($q$select proof_context('f1f1f1f1-9999-0000-0000-000000000001')$q$, 'anonymous visitors get nothing');
 reset role;
+
+-- ------------------------------------------------- focus links (0024)
+insert into auth.users values
+  ('24242424-0000-0000-0000-000000000001', 'l1@test'), ('24242424-0000-0000-0000-000000000002', 'l2@test');
+select pg_temp.as_user('24242424-0000-0000-0000-000000000001');
+insert into tasks (title) values ('Link owner secret task');
+update blocklists set domains = '{secret-site.example}';
+select pg_temp.expect_error($q$select create_focus_link('   ', 25)$q$, 'a focus link needs a name');
+select pg_temp.expect_error($q$select create_focus_link('Desk tag', 3)$q$, 'a focus link starts at least 5 minutes');
+select pg_temp.expect_error($q$select create_focus_link('Desk tag', 121)$q$, 'a focus link starts at most 120 minutes');
+select set_config('test.link_key', create_focus_link('  Desk   tag ', 25) ->> 'key', false);
+select pg_temp.check(current_setting('test.link_key') ~ '^spt_[0-9a-f]{64}$', 'the key has the documented shape');
+select pg_temp.check((select label from focus_links) = 'Desk tag', 'the name is tidied');
+select pg_temp.check(not exists (select 1 from focus_links where key_hash = current_setting('test.link_key')), 'the key is stored hashed, never in clear');
+select pg_temp.expect_error($q$insert into focus_links (user_id, label, minutes, key_hash) values (auth.uid(), 'x', 25, repeat('a', 64))$q$, 'clients cannot make links directly');
+update focus_links set minutes = 120, label = 'Changed';
+select pg_temp.check((select minutes from focus_links) = 25, 'clients cannot change a link directly');
+delete from focus_links;
+select pg_temp.check((select count(*) from focus_links) = 1, 'clients cannot remove a link directly');
+reset role;
+-- no session at all: just the anon role and the key
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error($q$select use_focus_link('spt_' || repeat('0', 64))$q$, 'an unknown key starts nothing');
+select pg_temp.expect_error($q$select use_focus_link('not a key')$q$, 'a malformed key starts nothing');
+select pg_temp.expect_error($q$select use_focus_link(null)$q$, 'a missing key starts nothing');
+select pg_temp.expect_error($q$select create_focus_link('Ghost', 25)$q$, 'anonymous visitors cannot make links');
+select set_config('test.link_out', use_focus_link(current_setting('test.link_key'))::text, false);
+select pg_temp.check((current_setting('test.link_out')::jsonb ->> 'started')::boolean, 'the key starts a session without signing in');
+select pg_temp.check((current_setting('test.link_out')::jsonb ->> 'minutes')::int = 25, 'for the length the owner chose');
+select pg_temp.check(not (current_setting('test.link_out') ~ 'secret|24242424|Desk'), 'the answer holds no task, site, name or id');
+select set_config('test.link_out', use_focus_link(current_setting('test.link_key'))::text, false);
+select pg_temp.check(not (current_setting('test.link_out')::jsonb ->> 'started')::boolean and (current_setting('test.link_out')::jsonb ->> 'running')::boolean,
+  'opening it again while a session runs starts no second one');
+reset role;
+select pg_temp.check((select count(*) from focus_sessions where user_id = '24242424-0000-0000-0000-000000000001') = 1, 'exactly one session exists');
+select pg_temp.check((select not locked and started_by_link is not null from focus_sessions where user_id = '24242424-0000-0000-0000-000000000001'),
+  'a link session is never locked and remembers its link');
+select pg_temp.check((select use_count = 1 and last_used_at is not null from focus_links), 'only a real start is counted');
+select pg_temp.as_user('24242424-0000-0000-0000-000000000001');
+select pg_temp.check((get_focus_state() ->> 'active')::boolean, 'the owner''s devices see the session');
+select end_focus_session((select id from focus_sessions), 'stretching instead');
+select pg_temp.check(not (export_my_data()::text ~ 'key_hash') and jsonb_array_length(export_my_data() -> 'focus_links') = 1, 'the export lists the link without its key hash');
+select create_focus_link('Two', 5); select create_focus_link('Three', 5); select create_focus_link('Four', 5); select create_focus_link('Five', 120);
+select pg_temp.expect_error($q$select create_focus_link('Six', 25)$q$, 'at most five links per person');
+reset role;
+select pg_temp.as_user('24242424-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from focus_links) = 0, 'someone else sees none of my links');
+select pg_temp.check(not remove_focus_link((select id from focus_links limit 1)), 'removing nothing answers false');
+reset role;
+select set_config('test.link_id', (select id::text from focus_links where label = 'Desk tag'), false);
+select pg_temp.as_user('24242424-0000-0000-0000-000000000002');
+select pg_temp.check(not remove_focus_link(current_setting('test.link_id')::uuid), 'someone else cannot remove my link');
+reset role;
+select pg_temp.as_user('24242424-0000-0000-0000-000000000001');
+select pg_temp.check(remove_focus_link(current_setting('test.link_id')::uuid), 'the owner can remove a link');
+select pg_temp.check((select started_by_link is null from focus_sessions), 'the session history stays when its link is removed');
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error($q$select use_focus_link(current_setting('test.link_key'))$q$, 'a removed link stops working at once');
+reset role;
+
+-- ------------------------------------------------- badge crafting (0025)
+insert into auth.users values
+  ('25252525-0000-0000-0000-000000000001', 'k1@test'), ('25252525-0000-0000-0000-000000000002', 'k2@test');
+select pg_temp.as_user('25252525-0000-0000-0000-000000000001');
+select pg_temp.check(my_collection() = '{"crafted": [], "ready": []}'::jsonb, 'a new person has nothing crafted and nothing ready');
+select pg_temp.expect_error($q$select craft_badge('honest_work')$q$, 'crafting needs every ingredient');
+select pg_temp.expect_error($q$select craft_badge('first_plan')$q$, 'an earned badge is not a crafted one');
+select pg_temp.expect_error($q$select craft_badge(null)$q$, 'a missing key is refused');
+insert into tasks (id, title) values ('25252525-2222-0000-0000-000000000001', 'Craft task');
+select commit_day(array(select id from tasks), 3, 0);
+insert into proofs (plan_item_id, kind, text_body) values ((select id from plan_items), 'text', 'Did it');
+select pg_temp.check(my_collection() -> 'ready' = '[]'::jsonb, 'one ingredient of two is not enough');
+select start_focus_session(5);
+reset role;
+update focus_sessions set started_at = now() - interval '1 hour', ends_at = now() - interval '30 minutes' where user_id = '25252525-0000-0000-0000-000000000001';
+select pg_temp.as_user('25252525-0000-0000-0000-000000000001');
+select pg_temp.check(my_collection() -> 'ready' = '["honest_work"]'::jsonb, 'with both ingredients the badge is ready to craft');
+select pg_temp.expect_error($q$insert into crafted_badges (user_id, key) values (auth.uid(), 'full_nest')$q$, 'clients cannot craft directly');
+select pg_temp.check(craft_badge('honest_work') = '{"crafted": ["honest_work"], "ready": []}'::jsonb, 'crafting stores the badge and it is no longer listed as ready');
+select craft_badge('honest_work');
+select pg_temp.check((select count(*) from crafted_badges) = 1, 'crafting twice keeps one');
+select pg_temp.check(my_progress() -> 'badges' @> '["first_proof","first_focus"]'::jsonb, 'the ingredients are not used up');
+select pg_temp.expect_error($q$select craft_badge('full_nest')$q$, 'the collection badge needs the other crafted ones');
+delete from crafted_badges;
+select pg_temp.check((select count(*) from crafted_badges) = 1, 'clients cannot remove a crafted badge directly');
+select pg_temp.check((export_my_data() -> 'crafted_badges' -> 0 ->> 'key') = 'honest_work', 'the export lists crafted badges');
+reset role;
+-- give the rest: a seven-day run of full days, a kind act and a day of helping
+delete from daily_plans where user_id = '25252525-0000-0000-0000-000000000001';
+insert into daily_plans (id, user_id, date, committed_at, reviewed_at)
+  select ('25252525-1111-0000-0000-00000000000' || n)::uuid, '25252525-0000-0000-0000-000000000001', current_date - n, now(), now() from generate_series(1, 7) n;
+insert into plan_items (daily_plan_id, user_id, task_id, status)
+  select ('25252525-1111-0000-0000-00000000000' || n)::uuid, '25252525-0000-0000-0000-000000000001', '25252525-2222-0000-0000-000000000001', 'done' from generate_series(1, 7) n;
+insert into proofs (plan_item_id, user_id, kind, text_body)
+  values ((select id from plan_items where daily_plan_id = '25252525-1111-0000-0000-000000000001'), '25252525-0000-0000-0000-000000000001', 'text', 'Again');
+insert into kind_acts (user_id, plan_id, note) values ('25252525-0000-0000-0000-000000000001', '25252525-1111-0000-0000-000000000001', 'Made tea for a neighbour');
+select pg_temp.as_user('25252525-0000-0000-0000-000000000001');
+select pg_temp.check(my_collection() -> 'ready' = '["steady_hands"]'::jsonb, 'a run of full days makes the next badge ready, but not the one that needs helping');
+select craft_badge('steady_hands');
+select pg_temp.expect_error($q$select craft_badge('warm_heart')$q$, 'warm heart waits for a day of helping');
+reset role;
+select pg_temp.as_user('25252525-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from crafted_badges) = 0 and my_collection() -> 'crafted' = '[]'::jsonb, 'someone else sees none of my crafted badges');
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error($q$select my_collection()$q$, 'anonymous visitors have no collection');
+select pg_temp.expect_error($q$select craft_badge('honest_work')$q$, 'anonymous visitors cannot craft');
+reset role;
+
+-- ------------------------------------------------- circle goals (0026)
+insert into auth.users values
+  ('26262626-0000-0000-0000-000000000001', 'g1@test'), ('26262626-0000-0000-0000-000000000002', 'g2@test'),
+  ('26262626-0000-0000-0000-000000000003', 'g3@test'), ('26262626-0000-0000-0000-000000000004', 'g4@test');
+select pg_temp.as_user('26262626-0000-0000-0000-000000000001');
+select pg_temp.check(circle_goal() = '{"state": "none", "can_start": false}'::jsonb, 'no circle, no goal');
+select pg_temp.expect_error($q$select start_circle_goal(10)$q$, 'a goal needs a circle');
+select create_circle('Goal getters');
+select pg_temp.expect_error($q$select start_circle_goal(10)$q$, 'a goal needs at least two people');
+select set_config('test.goal_code', (select invite_code from circles where name = 'Goal getters'), false);
+insert into tasks (title) values ('G1 a'), ('G1 b'), ('G1 c');
+select commit_day(array(select id from tasks), 3, 0);
+select set_item_status((select i.id from plan_items i join tasks t on t.id = i.task_id where t.title = 'G1 a'), 'done');
+reset role;
+select pg_temp.as_user('26262626-0000-0000-0000-000000000002');
+select join_circle(current_setting('test.goal_code'));
+insert into tasks (title) values ('G2 a'), ('G2 b');
+select commit_day(array(select id from tasks), 3, 0);
+select pg_temp.check((circle_goal() ->> 'can_start')::boolean and (circle_goal() ->> 'suggested')::int = 10, 'two people can start a goal; five each is suggested');
+select pg_temp.expect_error($q$select start_circle_goal(2)$q$, 'a goal is at least 3 things');
+select pg_temp.expect_error($q$select start_circle_goal(101)$q$, 'a goal is at most 100 things');
+select pg_temp.expect_error($q$insert into circle_goals (circle_id, target, ends_at) select id, 3, now() + interval '1 day' from circles$q$, 'clients cannot make a goal directly');
+select pg_temp.check((start_circle_goal(3) ->> 'state') = 'open', 'any member can start the goal');
+select pg_temp.expect_error($q$select start_circle_goal(5)$q$, 'one open goal per circle');
+select pg_temp.check((circle_goal() ->> 'moved')::int = 0, 'things moved before the goal started are not counted');
+select set_item_status((select i.id from plan_items i join tasks t on t.id = i.task_id where t.title = 'G2 a'), 'done');
+select set_item_status((select i.id from plan_items i join tasks t on t.id = i.task_id where t.title = 'G2 b'), 'partial');
+select pg_temp.check((circle_goal() ->> 'moved')::int = 2 and not (circle_goal() ->> 'reached')::boolean, 'done and partly done both move the goal');
+select pg_temp.check(not (circle_goal()::text ~ 'G2|G1|26262626'), 'the goal holds one number: no titles, names or ids');
+update circle_goals set target = 1, reached_at = now();
+select pg_temp.check((select target = 3 and reached_at is null from circle_goals), 'clients cannot change a goal directly');
+reset role;
+select pg_temp.as_user('26262626-0000-0000-0000-000000000001');
+select set_circle_sharing(false);
+select set_item_status((select i.id from plan_items i join tasks t on t.id = i.task_id where t.title = 'G1 b'), 'done');
+select pg_temp.check((circle_goal() ->> 'moved')::int = 2, 'a member who keeps their day private is not counted');
+select set_circle_sharing(true);
+select pg_temp.check((circle_goal() ->> 'moved')::int = 3 and (circle_goal() ->> 'reached')::boolean, 'sharing again counts it, and the goal is reached');
+select set_item_status((select i.id from plan_items i join tasks t on t.id = i.task_id where t.title = 'G1 b'), 'pending');
+select pg_temp.check((circle_goal() ->> 'moved')::int = 2 and (circle_goal() ->> 'reached')::boolean, 'a goal that was reached stays reached');
+select pg_temp.check((export_my_data() -> 'circle_goals_started') = '[]'::jsonb, 'the export lists only goals I started');
+reset role;
+select pg_temp.as_user('26262626-0000-0000-0000-000000000003');
+select pg_temp.check((select count(*) from circle_goals) = 0 and (circle_goal() ->> 'state') = 'none', 'someone outside the circle sees no goal');
+select pg_temp.expect_error($q$select let_go_circle_goal()$q$, 'someone outside the circle cannot let it go');
+reset role;
+select pg_temp.as_user('26262626-0000-0000-0000-000000000002');
+select pg_temp.check((select count(*) from circle_goals) = 1, 'a member can read the circle''s goal row');
+select pg_temp.check(jsonb_array_length(export_my_data() -> 'circle_goals_started') = 1, 'the starter''s export lists the goal');
+select pg_temp.check((let_go_circle_goal() ->> 'state') = 'ended' and (circle_goal() ->> 'let_go')::boolean, 'any member can let the goal go');
+select pg_temp.check((circle_goal() ->> 'can_start')::boolean, 'a new goal can start after the last one ended');
+select pg_temp.check((start_circle_goal() ->> 'target')::int = 10, 'without a number the suggestion is used');
+reset role;
+-- time passes: the open goal runs out, and after three more days it leaves the page
+update circle_goals set started_at = started_at - interval '8 days', ends_at = ends_at - interval '8 days';
+select pg_temp.as_user('26262626-0000-0000-0000-000000000001');
+select pg_temp.check((circle_goal() ->> 'state') = 'ended' and not (circle_goal() ->> 'reached')::boolean and (circle_goal() ->> 'moved')::int = 0,
+  'a goal that ran out is shown as ended, counting only its own week');
+reset role;
+update circle_goals set started_at = started_at - interval '3 days', ends_at = ends_at - interval '3 days';
+select pg_temp.as_user('26262626-0000-0000-0000-000000000001');
+select pg_temp.check((circle_goal() ->> 'state') = 'none' and (circle_goal() ->> 'can_start')::boolean, 'three days later the page offers a fresh start');
+select start_circle_goal(4);
+select leave_circle();
+reset role;
+select pg_temp.as_user('26262626-0000-0000-0000-000000000002');
+select pg_temp.check((circle_goal() ->> 'state') = 'open' and not (circle_goal() ->> 'can_start')::boolean, 'the goal stays with the circle when its starter leaves');
+select leave_circle();
+reset role;
+select pg_temp.check((select count(*) from circle_goals g join circles c on c.id = g.circle_id where c.name = 'Goal getters') = 0
+  and not exists (select 1 from circles where name = 'Goal getters'), 'an empty circle takes its goals with it');
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error($q$select circle_goal()$q$, 'anonymous visitors see no goal');
+select pg_temp.expect_error($q$select start_circle_goal(5)$q$, 'anonymous visitors cannot start a goal');
+reset role;

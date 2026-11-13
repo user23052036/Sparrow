@@ -197,3 +197,24 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 - **Live money, partner marketplace, crypto, public ratings:** unchanged from D25.
 **Status:** Open; each is its own decision.
 
+
+## D35 — Focus links: a key that can only start focus
+**Decision:** The brief's "wearables and smart-home triggers" is built as focus links (migration `0024`). A person can make up to five links, each with a name and a length (5 to 120 minutes). Opening `/go#<key>` (an NFC tag, a home-screen shortcut, a watch, phone or smart-speaker routine), or sending the one web request shown next to it, starts a focus session of that length; the extension and the phone then block as usual (D10, D29). No sign-in is needed to use a link: the key is the whole permission.
+**What a key cannot do:** end a session, lock one, start a second one while one runs, or read anything (no tasks, names, sites or ids come back, only whether a session started and when it ends). So the worst a leaked key can do is start focus time, and the owner can remove the link at once. Keys are stored as a SHA-256 hash and shown once. The key travels after `#` so it is not sent to the web server when the page is opened.
+**Why not a general API:** an open API with read access (the brief's "open API for partners") would put tasks, moods and proofs behind a long-lived secret. A write-only key with one harmless action gives the useful part (start focus from anything) without that risk.
+**Risks:** a link opened while a blocking device is offline starts a session that the device joins late, which can log "went quiet" like any other session. A link preview service that runs page scripts could start a session by fetching the link; none was seen, and the cost is a focus session the owner can end.
+**Tested:** SQL suite (anonymous use, hashing, limits, removal, export), unit tests pinning the limits to the migration, Playwright against the fake. **Not tested:** a real NFC tag, automation app or a real Supabase project.
+**Status:** Prototype.
+
+## D36 — Badge crafting: digital, private, nothing used up
+**Decision:** The brief's "badge crafting and collections" is built for the digital badges (migration `0025`). Four crafted badges are made from badges a person already holds: Steady hands, Honest work, Warm heart, and Full nest (the other three plus a full week). Crafting is a button the person presses, so it is stored; the server checks the ingredients.
+**Why ingredients are kept:** taking earned badges away to make a new one would turn progress into a loss, which the gentle-language rules (PLAN §7) and D23 avoid. Crafting earns no points and is shown to nobody else, so there is nothing to gain by gaming it.
+**Not built:** physical badges and limited runs (need a fulfilment partner, D34).
+**Status:** Final for the beta.
+
+## D37 — Circle goals: one shared number, no ranking
+**Decision:** The brief's "group challenges" is built as a circle goal (migration `0026`): a circle of two or more can set one goal at a time, "together, move N planned things forward in seven days" (3 to 100; five per person is suggested). The page shows one number for the whole circle. Only members who share their counts are counted, done and partly done both count, and only things moved after the goal started. Any member can start a goal or let it go. A goal that was reached stays reached, also if someone later changes an item or leaves. It stays on the page for three days after it ends.
+**Why cooperative and without a breakdown:** the brief describes groups competing. In a circle of two to four people a per-person number is a ranking of friends, which D4, D28 and the brief's own "safeguards against bullying or excessive pressure" argue against. One number means nobody can be pointed at. No points are given for reaching it, so padding a day earns nothing.
+**Limit:** with two members who both share, a person can work out the other's count by subtracting their own. That is the same information the circle already shows per day (D28), and switching sharing off removes it from the goal too.
+**Risks:** the suggested size (five per person per week) is a guess; watch whether circles reach their goals.
+**Status:** Prototype.

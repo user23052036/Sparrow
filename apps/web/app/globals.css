@@ -221,6 +221,7 @@ button[aria-pressed="true"] {
 
 input[type="text"],
 input[type="email"],
+input[type="number"],
 input:not([type]),
 textarea,
 select {
@@ -382,4 +383,8 @@ label {
     transition: none !important;
     animation: none !important;
   }
+}
+
+input[type="number"] {
+  max-width: 9rem;
 }

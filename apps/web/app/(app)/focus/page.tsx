@@ -6,6 +6,7 @@ import { copy, normalizeDomainList, type Device } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 import { clock, timeAgo } from "@/lib/format";
 import { extSyncNow } from "@/lib/extension";
+import { FocusLinks } from "@/components/FocusLinks";
 
 interface FocusState {
   active: boolean;
@@ -406,6 +407,8 @@ function FocusInner() {
           {copy.focus.manageExt}
         </Link>
       </div>
+
+      <FocusLinks />
     </div>
   );
 }

@@ -173,8 +173,9 @@ Built with Expo dev build + Kotlin native module `sparrow-blocker`.
 
 ## 8. Later phases (only if beta data supports them)
 
-- **Phase 2:** Accountability circles (built, D28; anonymous option built as circle names, D31); plausibility help on proofs (built as rule-based notes without a score, D32; no AI); desktop native agent (Tauri) to block desktop apps, not just sites (not built, D34).
+- **Phase 2:** Accountability circles (built, D28; anonymous option built as circle names, D31; group challenges built as one shared circle goal, D37); plausibility help on proofs (built as rule-based notes without a score, D32; no AI); desktop native agent (Tauri) to block desktop apps, not just sites (not built, D34).
 - **Phase 3 (after legal review):** real-money pledges via a payment provider using a charge-on-failure model, low caps, cooling-off period before raising stakes; charity partners.
+- **From the brief, built without outside services:** smart-home and wearable triggers as focus links (D35); badge crafting and collections, digital only (D36).
 - **Phase 4:** iOS (Screen Time APIs, requires Apple's Family Controls entitlement); physical milestone badges; partner API.
 
 ## 9. How to work on this repo (for AI models)
