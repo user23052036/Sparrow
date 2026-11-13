@@ -87,7 +87,7 @@ It signs in, shows your plan, starts and stops focus sessions, and lets you pick
 
 The Protect tab also has an optional switch for **websites in the phone's browsers**: a local DNS filter that Android calls a VPN, although nothing leaves the phone through it. It is off by default because Android allows only one VPN at a time (D30).
 
-**The blocking engine has not run on a phone yet.** All of its Kotlin type-checks against the real Android API (`check-android-api.sh`), and the "Android build" GitHub workflow builds the debug APK with the real SDK on every change to `apps/mobile`; its first run is the first real build, so expect small fixes (D33).
+**The blocking engine has not run on a phone yet.** All of its Kotlin type-checks against the real Android API (`check-android-api.sh`), and the "Android build" GitHub workflow builds it with Gradle and the real SDK on every change to `apps/mobile` (passing since its first run, D33). What is left is behaviour on a real phone.
 
 ## Tests
 

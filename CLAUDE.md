@@ -5,8 +5,8 @@ without asking permission for each step, but decisions in DECISIONS.md are not r
 
 ## Where things stand
 - Status, branches and open items: the Claude project doc `claude/STATUS.md` (kept up to date at the end of each session).
-- Latest local branch: `finish-plan` (on top of `next-features`). Migrations run `0001` → `0023`. Decisions run to D34.
-- Android blocking engine (D29) and phone website blocking (D30) are written and type-check against the real Android API jar, but have never been built with Gradle or run on a phone. The `Android build` GitHub workflow is the first real build (D33).
+- `main` has everything up to PR #7 (`finish-plan`). Latest local branch: `android-first-build`. Migrations run `0001` → `0023`. Decisions run to D34.
+- Android blocking engine (D29) and phone website blocking (D30) are written and type-check against the real Android API jar, and build with Gradle in the `Android build` GitHub workflow (green since its first run, D33), but have never run on a phone.
 
 ## Layout
 `apps/web` Next.js PWA · `apps/extension` MV3 extension, plain JS · `apps/mobile` Expo + Kotlin module
@@ -33,7 +33,8 @@ curl -sSL -o /tmp/k.zip https://github.com/JetBrains/kotlin/releases/download/v2
 PATH=/tmp/kt/kotlinc/bin:$PATH apps/mobile/modules/sparrow-blocker/android/run-jvm-tests.sh
 # Real Android API jar: github.com/<repo>/raw is blocked but raw.githubusercontent.com works (the script downloads it itself)
 PATH=/tmp/kt/kotlinc/bin:$PATH apps/mobile/modules/sparrow-blocker/android/check-android-api.sh
-# `cd apps/mobile && npx expo prebuild --platform android --no-install` works here (template comes from npm); Gradle does not (no Maven). Delete apps/mobile/android afterwards.
+# `cd apps/mobile && npx expo prebuild --platform android --no-install` works here (template comes from npm); Gradle does not (no Maven). Delete apps/mobile/android afterwards. `npx expo export:embed --platform android --dev false --entry-file index.ts --bundle-output /tmp/b/index.android.bundle --assets-dest /tmp/b/res` checks the JS bundle a release build embeds.
+# GitHub Actions results: the API is blocked here, but the Actions pages can be read through the owner's Chrome.
 cd apps/web && npx playwright test   # builds the app first (~1.5 min); Chromium is preinstalled
 ```
 

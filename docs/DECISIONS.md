@@ -187,7 +187,8 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 - `android/check-android-api.sh` type-checks all the module's Kotlin (engine, VPN filter, Expo bridge) against the real Android API jar (API 34), with small stand-ins for `R` and the handful of expo-modules-core names the bridge uses. This replaces the hand-written Android stubs from D29 and runs in CI (`android-rules` job) next to the JVM tests.
 - `.github/workflows/android-build.yml` runs `expo prebuild` and `gradlew :app:assembleDebug` on GitHub's runners (which have the Android SDK) and uploads the debug APK. It could not be run from where it was written, so treat its first run as the first real build.
 - `googleServicesFile` and the unused `expo-notifications` plugin are removed from the app config. Since D29 the phone polls instead of using push, and the missing `google-services.json` would have stopped every build. `expo prebuild` now succeeds from a clean checkout and autolinking finds the `sparrow-blocker` module (both checked).
-**Still not verified:** a Gradle build, manifest merging, and anything at run time on a phone.
+**Update, 13 Nov 2026:** the workflow's first two runs (the pull request and `main`) passed: Gradle compiled the whole module against the real SDK, merged the manifest and produced a debug APK, with no changes needed to the Kotlin. The workflow now also tries a standalone APK with the app's code bundled in (signed with the debug key, for your own phone only); the JavaScript bundling half of that was checked locally with `expo export:embed`, the Gradle half has not run yet, so that step is allowed to stop without turning the workflow red.
+**Still not verified:** anything at run time on a phone.
 **Status:** Final until the first device run.
 
 ## D34 — Not built in this pass, and why

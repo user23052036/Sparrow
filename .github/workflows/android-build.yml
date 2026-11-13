@@ -2,13 +2,18 @@
 # engine is compiled and its manifest merged on every change, without anyone needing Android
 # Studio. GitHub's Ubuntu runners come with the Android SDK.
 #
-# This workflow was written without being able to run it (see docs/DECISIONS.md, D33): if the
-# first run is red, the log names the file and line. It is separate from CI on purpose, so an
-# Android problem never blocks the website and extension.
+# The debug build has passed here since its first run (13 Nov 2026, see docs/DECISIONS.md, D33).
+# It is separate from CI on purpose, so an Android problem never blocks the website and extension.
 #
-# The APK it uploads is a *debug* build: it opens only together with the Metro bundler
-# (`npx expo start --dev-client` on a computer on the same network, or `npx expo run:android`
-# over USB). It is for trying the app on a phone, not for giving to other people.
+# Two APKs are uploaded:
+# - sparrow-debug-apk: opens only together with the Metro bundler (`npx expo run:android` over
+#   USB, or `npx expo start` on a computer on the same network).
+# - sparrow-standalone-apk: has the app's code inside, so it runs on a phone by itself. It is
+#   signed with the public debug key, so it is for trying on your own phone, never for giving
+#   to other people or a store. It talks to Supabase only if the repository has the secrets
+#   EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY (Settings > Secrets and
+#   variables > Actions); without them it builds but shows the "not set up" screen. This
+#   step has not passed yet when it was added, so it may not stop the workflow.
 name: Android build
 on:
   workflow_dispatch:
@@ -45,6 +50,20 @@ jobs:
       - name: Build the debug APK
         working-directory: apps/mobile/android
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Build the standalone APK (app code bundled in)
+        id: standalone
+        continue-on-error: true
+        working-directory: apps/mobile/android
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - uses: actions/upload-artifact@v4
+        if: steps.standalone.outcome == 'success'
+        with:
+          name: sparrow-standalone-apk
+          path: apps/mobile/android/app/build/outputs/apk/release/*.apk
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: sparrow-debug-apk
