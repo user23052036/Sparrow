@@ -37,7 +37,7 @@ export function ProfileForm({ mode }: { mode: "onboarding" | "settings" }) {
       return;
     }
     await refreshProfile();
-    if (mode === "onboarding") router.replace("/tasks?first=1");
+    if (mode === "onboarding") router.replace("/start");
     else setMsg(copy.settings.saved);
   }
 

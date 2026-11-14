@@ -12,6 +12,8 @@ test("a new person signs up, onboards, adds a task, plans and closes the day", a
   await expect(page.getByRole("heading", { name: copy.onboarding.title })).toBeVisible();
   await page.getByLabel(copy.settings.name).fill("Sam");
   await page.getByRole("button", { name: copy.settings.continue }).click();
+  // The guided first day has its own spec (first-day.spec.ts); this flow takes the way around it.
+  await page.getByRole("link", { name: copy.start.skipTour }).click();
 
   // First task
   await expect(page.getByRole("heading", { name: copy.tasks.title })).toBeVisible();
