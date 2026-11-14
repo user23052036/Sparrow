@@ -1,27 +1,41 @@
 # CLAUDE.md: context for AI sessions on Sparrow
 
-Read `docs/PLAN.md` and `docs/DECISIONS.md` (D1-D37) before changing anything. The owner wants work done
-without asking permission for each step, but decisions in DECISIONS.md are not reversed without a new entry.
+Read these, in this order, before changing anything:
+1. `docs/AUTONOMY.md` how to work without the owner: preflight, git and pull-request loop, agents, standing rules.
+2. `docs/ROADMAP.md` the audit, the position, and the task list (T0.1 to T5.4) with pre-assigned migration numbers.
+3. `docs/STATUS.md` what is done and the next task ID.
+4. `docs/PLAN.md` and `docs/DECISIONS.md` (D1 to D41; D38 to D41 came from the roadmap and their status line changes when their tasks land).
+
+The owner wants work done without being asked for permission, commands, pushes or confirmations. Decisions in
+DECISIONS.md are not reversed without a new entry. If a task would contradict one, park that part in
+`docs/STATUS.md` ("Parked for the owner") and take the next task; do not stop to ask.
 
 ## Where things stand
-- Status, branches and open items: the Claude project doc `claude/STATUS.md` (kept up to date at the end of each session).
-- `main` has everything up to PR #8 (`android-first-build`). Latest local branch: `brief-extras` (focus links, badge crafting, circle goals: D35-D37). Migrations run `0001` → `0027`. Decisions run to D37.
-- Android blocking engine (D29) and phone website blocking (D30) are written and type-check against the real Android API jar, and build with Gradle in the `Android build` GitHub workflow (green since its first run, D33), but have never run on a phone.
+- `main` is at 66cc94d: PR #9 (`brief-extras`) is merged, so `main` has everything through D37 and migration `0027`.
+  A local checkout may sit on the old `brief-extras` branch with a stale `main`: run `git fetch origin` and branch from `origin/main`.
+- Start at the task ID that `docs/STATUS.md` names as next (T0.1 on 2026-11-15).
+- Android blocking engine (D29) and phone website blocking (D30) build with Gradle in the `Android build` workflow but have never run on a phone or emulator.
+- Never run against a real Supabase project; not deployed. Tasks T0.2 to T0.5 build the path to that.
 
 ## Layout
 `apps/web` Next.js PWA · `apps/extension` MV3 extension, plain JS · `apps/mobile` Expo + Kotlin module
 `modules/sparrow-blocker` · `packages/shared` types, rules, all UI copy · `supabase/migrations`, `supabase/tests`.
 
 ## Rules of the repo
-- New migration file for every DB change; never edit an applied one. Every new public function: `revoke ... from public, anon; grant ... to authenticated` (internal `_helpers`: revoke from all).
+- New migration file for every DB change; never edit an applied one. Roadmap migration numbers are pre-assigned (`0028` onward): use the number the task names. Every new public function: `revoke ... from public, anon; grant ... to authenticated` (internal `_helpers`: revoke from all).
 - Business rules live in Postgres (D13). Change `supabase/tests/rls_test.sql` together with the migration; use a fresh user-id prefix (used: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1, f1f1f1f1, 24242424, 25252525, 26262626).
 - All user-facing sentences go in `packages/shared/src/copy.ts` (a test fails on inline JSX sentences and on banned words like "failed", "lazy", "broken").
 - Playwright e2e runs against an in-memory fake (`apps/web/e2e/fake-supabase.ts`, D19): add any new table/RPC there.
 - Shared constants mirrored in SQL or Kotlin have a test pinning them (scoring, light day, pledge, ALWAYS_ALLOWED_PACKAGES vs `BlockRules.kt`, focus-link limits vs `0024`, craft recipes vs `0025`, circle-goal limits vs `0026`, the circle-name pattern and the one-day photo line vs migrations `0022`/`0023`).
 - Android: anything without Android imports goes in `BlockRules.kt` / `DnsRules.kt` with a JVM test; `android/apicheck-stubs` must keep up with the expo-modules-core names `SparrowBlockerModule.kt` uses.
-- Tests ship with features. Before finishing: `npm run lint && npm run format:check && npm run typecheck && npm test && npm run test:extension && npm run test:functions`, `bash supabase/tests/run.sh`, `npm run test:e2e`, `apps/mobile/modules/sparrow-blocker/android/run-jvm-tests.sh` and `apps/mobile/modules/sparrow-blocker/android/check-android-api.sh`.
+- Tests ship with features. Before finishing: `npm run lint && npm run format:check && npm run typecheck && npm test && npm run test:extension && npm run test:functions`, `bash supabase/tests/run.sh`, `npm run test:e2e`, `apps/mobile/modules/sparrow-blocker/android/run-jvm-tests.sh` and `apps/mobile/modules/sparrow-blocker/android/check-android-api.sh`. If a tool is missing locally (PostgreSQL 16, Java 17, kotlinc), say which check you could not run and rely on the pull request's CI jobs for it.
+- Secrets never go into this repository (it is public), docs, commit messages or logs. Workflows read GitHub Actions secrets and must pass with a notice when one is absent (`docs/AUTONOMY.md` section 6 lists them).
+- Never: force-push, rewrite `main`, edit an applied migration, weaken or delete a test to get green, or switch off a CI job.
 
-## Running checks in the cloud sandbox
+## Working locally on the owner's Mac (preferred)
+Use the Mac's own git and network: branch from `origin/main`, build the task, run the check list, commit, `git push -u origin <branch>`, then `gh pr create`, `gh pr checks --watch` and `gh pr merge --squash` when `gh` is signed in (`gh auth status`). **The owner has authorized pushing straight to `main`** when `gh` is missing, a merge is refused or CI cannot be read: after the full check list passes, `git fetch && git rebase origin/main`, then `git switch main && git merge --ff-only <branch> && git push origin main`, and say in STATUS what was not run. Never `--force`. If `main` rejects the push (branch protection), keep a pull request open and stack the next task on it instead of working around it. A migration reaches `main` only after `bash supabase/tests/run.sh` has passed (once T0.2 exists, a push to `main` that touches `supabase/` deploys to the real database). Full loop and agent roles: `docs/AUTONOMY.md` sections 1b, 3 and 5. Update `docs/STATUS.md` at the end of every session.
+
+## Cloud sandbox only (a Claude session on claude.ai, not a local run)
 ```bash
 npm ci
 # PostgreSQL 16 (binaries present, must run as the postgres user)
@@ -34,12 +48,9 @@ PATH=/tmp/kt/kotlinc/bin:$PATH apps/mobile/modules/sparrow-blocker/android/run-j
 # Real Android API jar: github.com/<repo>/raw is blocked but raw.githubusercontent.com works (the script downloads it itself)
 PATH=/tmp/kt/kotlinc/bin:$PATH apps/mobile/modules/sparrow-blocker/android/check-android-api.sh
 # `cd apps/mobile && npx expo prebuild --platform android --no-install` works here (template comes from npm); Gradle does not (no Maven). Delete apps/mobile/android afterwards. `npx expo export:embed --platform android --dev false --entry-file index.ts --bundle-output /tmp/b/index.android.bundle --assets-dest /tmp/b/res` checks the JS bundle a release build embeds.
-# GitHub Actions results: the API is blocked here, but the Actions pages can be read through the owner's Chrome.
 cd apps/web && npx playwright test   # builds the app first (~1.5 min); Chromium is preinstalled
 ```
+A cloud session can push only if the repository is attached to it with push access; run the preflight in `docs/AUTONOMY.md` section 1. If it is not attached, use the patch flow: commit in a cloud clone, `git format-patch origin/main -o patches/`, write the patches to `~/Sparrow/.sparrow-patches/` with the device file tools, and do not run git on the Mac from the cloud shell (it needs a delete-permission prompt first, or git cannot remove its own `.lock` files).
 
-## Getting work onto the Mac and GitHub
-- The cloud sandbox can clone the public repo but cannot push (repo not in the session's authorized sources), and the Mac shell has no GitHub credentials. The owner pushes: `cd ~/Sparrow && git push -u origin <branch>`. (Adding the repo to the session's sources would let the cloud session push.)
-- Flow that works: clone in the cloud, branch from the latest branch, commit, `git format-patch <base> -o /tmp/patches`, copy the patches to `/mnt/user-data/outputs/`, write them into `~/Sparrow/.sparrow-patches/` with device_commit_files, then on the Mac: `git checkout -b <branch> <base>` and `GIT_COMMITTER_NAME="Souvik Mandal" GIT_COMMITTER_EMAIL="souvik.mandal@osfin.ai" git am .sparrow-patches/*.patch`, remove `.sparrow-patches`, and compare `git rev-parse HEAD^{tree}` with the cloud clone.
-- Request delete permission for `/Users/user/Sparrow` BEFORE running git on the Mac: without it git cannot remove its own `.lock` files and every later git command fails with "File exists".
-- Commit author: Souvik Mandal <souvik.mandal@osfin.ai>. End commit messages with the session's Co-Authored-By / Claude-Session lines.
+## Commits
+Author: whatever `git config user.name` and `user.email` already say on the machine; do not change git config. End commit messages with the session's Co-Authored-By / Claude-Session lines.

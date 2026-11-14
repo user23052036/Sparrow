@@ -218,3 +218,22 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Limit:** with two members who both share, a person can work out the other's count by subtracting their own. That is the same information the circle already shows per day (D28), and switching sharing off removes it from the goal too.
 **Risks:** the suggested size (five per person per week) is a guess; watch whether circles reach their goals.
 **Status:** Prototype.
+
+## D38 — Web Push for partner requests and reminders
+**Decision:** Partner key requests, answers, shared proofs and the optional morning and evening reminders are sent with Web Push (VAPID). This reverses the "needs a provider" part of D21: Web Push needs only a VAPID key pair that Sparrow generates itself, no third-party account. In-app notices remain the fallback for anyone who does not turn push on.
+**Privacy:** no message ever carries a task title, proof text or anything the person wrote; the notification says only what kind of event happened and opens the app.
+**Status:** Approved in `docs/ROADMAP.md` (tasks T2.1, T2.2). Not built yet.
+
+## D39 — Guest partner
+**Decision:** A partner can act through a secret link without an account, using the same hashed-secret pattern as focus links (D35) and device secrets (D29). A guest can see pending key requests and proofs shared with them, approve a request or send encouragement, and register for Web Push. Nothing else. The owner can revoke the link at any time; a guest can turn into a full account by signing up from the same page.
+**Reason:** the position ("a friend holds the key") only works if the friend does not first have to adopt the app.
+**Status:** Approved in `docs/ROADMAP.md` (task T2.3). Not built yet.
+
+## D40 — Labs
+**Decision:** Pledges, partner pledge, ratings, leaderboard, badge crafting and circle goals are off by default behind one Settings switch (`profiles.labs`). No data or migration is removed, and turning the switch on brings everything back as it was.
+**Reason:** with zero users each of these is cost without evidence, and together they hide the core loop (plan, lock, friend holds the key).
+**Status:** Approved in `docs/ROADMAP.md` (task T5.1). Not built yet.
+
+## D41 — Static web hosting
+**Decision:** Prefer a static export of the web app on GitHub Pages, so deployment needs no extra account. Fall back to Vercel only if the export cannot work, and record why in a new entry.
+**Status:** Approved in `docs/ROADMAP.md` (task T0.3). Not built yet.
