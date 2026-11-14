@@ -1,62 +1,70 @@
-# Sparrow: current status (2026-11-15)
+# Sparrow: current status (2026-11-15, end of the first local run)
 
-Repo: github.com/user23052036/Sparrow. **`main` is at 66cc94d: PR #9 (`brief-extras`) is merged**, so
-`main` holds everything through D37 / migration 0027 (focus links, badge crafting, circle goals).
+Repo: github.com/user23052036/Sparrow. `main` is at the T2.2 merge (PR #22): everything through D42 and
+migration `0029`. Live site (static export, no backend yet): https://user23052036.github.io/Sparrow/
 
 ## Start here
 1. `docs/AUTONOMY.md`: how to run without the owner (preflight, modes A/B/C, agents, credentials).
-2. `docs/ROADMAP.md`: audit, market, position, tasks T0.1 to T5.4 with pre-assigned migration numbers.
-3. Repo `CLAUDE.md` and `docs/DECISIONS.md`.
-These files live in the repo under `docs/` (committed by T0.1) and are the source of truth.
-No `.claude/settings.json` exists.
+2. `docs/ROADMAP.md`: audit, position, tasks T0.1 to T5.4 with pre-assigned migration numbers.
+3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D42).
 
-**Next task: T1.1.**
+**Next task: T2.3 (guest partner, migration `0030`).** Then T2.4 (`0031`), T2.5, WS3 (android lane, T3.2
+uses `0032`), WS4 (`0033`, `0034`), WS5 (`0035`).
 
-## Roadmap progress
-- T0.1 done (PR #10): docs committed, D38 to D41 written.
-- T0.2 done: `.github/workflows/deploy-db.yml`. On pull requests it runs `supabase db push` (CLI 2.122.1)
-  into a throwaway PostgreSQL 16 with the stub; on `main` it links, pushes and deploys functions, or
-  ends green with a notice when the three secrets are missing (none are set as of 2026-11-15).
-  Merged as PR #12 (PR #11 was closed: its first commit had a throwaway CI password GitGuardian
-  flagged; that incident on the GitGuardian dashboard is a false positive). Skip path seen green on main.
-- T0.3: static export on GitHub Pages (`deploy-web.yml`, D41). `STATIC_EXPORT=1` and
-  `NEXT_PUBLIC_BASE_PATH=/Sparrow`; `apps/web/lib/site.ts` adds the base path to links people copy
-  (invites, focus links, the sign-in email link); the service worker and manifest use paths relative to
-  where they are served. Pages was switched on with build type "workflow" through the API.
-  Owner, once Supabase exists: set the two `NEXT_PUBLIC_SUPABASE_*` repository variables, set
-  Supabase's Site URL to `https://user23052036.github.io/Sparrow/` and add
-  `https://user23052036.github.io/Sparrow/auth/callback` to its allowed redirect URLs.
+## Done in this run (Mode C: Claude Code on the owner's Mac, `gh` signed in, PR loop)
+Each task: own branch from `origin/main`, full local check list, PR, CI green, squash merge. T0.3, T1.2,
+T2.1 and T2.2 also had an independent reviewer agent; every defect it found was fixed before merging.
 
-## Verified on 2026-11-15 (main, cloud workspace)
-- `npm ci`, lint, typecheck: clean. 163 shared tests, 25 extension tests, 7 function tests: pass.
-- Not re-run this session: SQL suite, Playwright, Android JVM tests and API check.
-- Cloud session without the repo attached: clone works; push and the GitHub API are refused by the
-  session's git proxy; Supabase, Vercel, Expo, Maven and dl.google.com hosts are refused.
-- Mac shell (Linux VM): npm reachable; GitHub, Supabase, Vercel not.
+| Task | PR | What |
+| --- | --- | --- |
+| T0.1 | #10 | Roadmap, autonomy guide and status committed; D38 to D41 written. |
+| T0.2 | #12 | `deploy-db.yml`: PRs push every migration with the Supabase CLI into a throwaway PostgreSQL 16; `main` links, pushes, deploys functions, or skips green without secrets (seen green). #11 was closed: GitGuardian flagged a throwaway CI password in its first commit (false positive on their dashboard). |
+| T0.3 | #13 | Static export on GitHub Pages (D41): `STATIC_EXPORT=1`, base path `/Sparrow`, `lib/site.ts`. Pages enabled through the API; the deploy fetches the landing page (live). |
+| T1.1 | #14 | `today/page.tsx` split into seven files, none over 210 lines. |
+| T0.4 | #15 | Live smoke test (`e2e-live/`, `smoke-live.yml`): sign up, commit a day, focus start/stop, delete account. Skips green without the Supabase variables; the same flow runs against the fake in every PR. |
+| T0.5 | #16 | Emulator test (`android-emulator.yml`, `emulator-test.sh`). **First run of the Android engine ever: green.** On API 34, opening Clock during a session put `BlockedActivity` on top within a second; after the session, Clock opened normally. |
+| T1.3 | #18 | Landing page states the position and three steps; explains Sparrow even with no backend. |
+| T1.2 | #17 | Extension: `SPARROW_SITE` store build (folder paths allowed), base-path-aware `OPEN_APP`, `<all_urls>` replaced by per-site optional access from the popup (D42). |
+| T1.4 | #19 | Guided first day `/start`: one task, a five-minute step, run it, invite a key holder (skippable). |
+| T1.5 | #20 | CSP, no framing, referrer policy: real headers under `next start`, `<meta>` plus frame guard in the export. |
+| T2.1 | #21 | Web Push (D38, `0028`): `push_subscriptions`, `claim_push`, `notify` function, service worker handlers, Settings switch, push-service allow-list. |
+| T2.2 | #22 | Reminders (`0029`): morning/evening times, `claim_due_reminders`, `remind` function, pg_cron + pg_net job scheduled by the deploy workflow. |
 
-## Done before this roadmap
-Web app, extension, partner and partner key, safety and mood flows, Android shell and blocking engine
-(written, built by Gradle in CI, never run on a device), copy checks, CI, account deletion, if-then,
-calendar import, kind act, Progress and export, practice-mode pledges, partner pledge, ratings,
-leaderboard, micro-task stake, voice proofs, circles, phone website blocking, circle names, proof
-context, focus links, badge crafting, circle goals (D1 to D37, migrations 0001 to 0027).
+## Checks run in this run
+- Locally, per task, with Node 24 (`fnm exec --using=24`; the Mac's default Node 20 is below the repo's
+  engines): lint, format, typecheck, shared (163), extension (35), function (28) tests, Playwright
+  (86 at the end).
+- SQL suite: in a `postgres:16` Docker container (colima, already installed on the Mac, was started for
+  this): `docker run -d --name sparrow-pg -e POSTGRES_PASSWORD=postgres -v ~/Sparrow:/repo postgres:16`, then
+  `docker exec -u postgres sparrow-pg bash /repo/supabase/tests/run.sh`. Passed for every migration.
+- Not run locally (no Java or kotlinc on the Mac): Android JVM tests and the API check. They ran green in
+  every PR's `android-rules` job; the Gradle build and the emulator job ran green in CI.
+- CI read with `gh pr checks` for every PR; all green before each merge.
 
-## Known gaps (detail in ROADMAP section 1)
-- Never run against a real Supabase project; not deployed; Android never run on a phone or emulator.
-- No notifications anywhere, so a partner never learns of a key request unless the app is open.
-- Extension content script and fallback origin are localhost only.
-- No guided first run; six unvalidated extras sit beside the core loop.
+## Not verified yet (needs the owner's Supabase project)
+- Anything against a real Supabase project: deploy, live smoke test, Web Push delivery through a real
+  push service (`npm:web-push` under Supabase's Deno runtime), pg_cron/pg_net reminders.
+- The extension in a real Chrome (optional site access prompt and redirect after granting).
+- The Android engine on a real phone (the emulator run covers app blocking only, not the VPN filter).
 
-## Parked for the owner
-- Attach the repository to cloud sessions with push access, or run Claude Code locally in `~/Sparrow`.
-- Create a Supabase project; add the GitHub secrets and variables listed in AUTONOMY section 6.
+## Parked for the owner (nothing here blocks the next tasks)
+- Create a Supabase project, then add repository secrets `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`,
+  `SUPABASE_DB_PASSWORD` and variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Then run
+  the "Deploy database" workflow once: it pushes the migrations, deploys the functions, creates the VAPID
+  keys and schedules reminders. Enable pg_cron and pg_net in Database > Extensions first.
+- In Supabase: Site URL `https://user23052036.github.io/Sparrow/`, allowed redirect
+  `https://user23052036.github.io/Sparrow/auth/callback`, "Confirm email" off for the beta (D14).
 - One phone test, store developer accounts, testers.
 
-## Working notes (still true)
+## Working notes
 - SQL test user prefixes used so far: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1,
-  f1f1f1f1, 24242424, 25252525, 26262626.
-- The e2e fake answers `use_focus_link` before its signed-in check (the only anonymous RPC).
-- Cloud workspace: PostgreSQL 16 binaries are present and must run as the `postgres` user; kotlinc comes
-  from GitHub releases; no Gradle (Maven is unreachable). Commands are in the repo's `CLAUDE.md`.
-- If git is ever run on the Mac through the linked-computer shell, request delete permission for
-  `/Users/user/Sparrow` first, or git cannot remove its own lock files.
+  f1f1f1f1, 24242424, 25252525, 26262626, 28282828 (push), 29292929 (reminders). Next: 30303030.
+- The test stub now has Supabase's `service_role` role (bypass RLS); grant server-only functions to it.
+- The e2e fake answers `use_focus_link` before its signed-in check (the only anonymous RPC). It now also
+  models focus sessions, key requests, push subscriptions and the notify function.
+- Edge Functions share code through `supabase/functions/_shared/` (push delivery and allow-list).
+  Notification words live in `copy.push` and are pinned by the functions' tests.
+- `remind` is deployed with `--no-verify-jwt`; its permission is the database-made secret in `reminder_job`.
+- Branch from a freshly fetched `origin/main`: `gh pr merge` does not update the local remote-tracking ref.
+- The Supabase CLI writes `supabase/.temp/` (ignored).
+- Cloud workspace notes are in the repo's `CLAUDE.md`.
