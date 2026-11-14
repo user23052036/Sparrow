@@ -69,6 +69,7 @@ jobs:
           done
           grep -q "src=\"$NEXT_PUBLIC_BASE_PATH/_next/static/" index.html || { echo "::error::pages do not load scripts from $NEXT_PUBLIC_BASE_PATH"; exit 1; }
           grep -q "href=\"$NEXT_PUBLIC_BASE_PATH/manifest.webmanifest\"" index.html || { echo "::error::the manifest link has no base path"; exit 1; }
+          grep -q 'http-equiv="Content-Security-Policy"' index.html || { echo "::error::the pages carry no Content-Security-Policy"; exit 1; }
           touch .nojekyll
       - if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v5
