@@ -22,6 +22,16 @@ revoke all on public.reminder_sent from anon, authenticated;
 create function public._reminder_window() returns interval language sql immutable as $$ select interval '2 hours' $$;
 create function public._reminders_per_day() returns int language sql immutable as $$ select 2 $$;
 
+-- The person's local clock, or null for a time zone Postgres doesn't know (so one odd profile can't stop the job).
+create function public._local_time(p_now timestamptz, p_tz text) returns timestamp
+language plpgsql stable set search_path = '' as $$
+begin
+  return p_now at time zone p_tz;
+exception when others then
+  return null;
+end;
+$$;
+
 -- Reminders due at p_now, marked as sent in the same step so two runs never send one twice.
 create function public.claim_due_reminders(p_now timestamptz default now())
 returns table (user_id uuid, slot text)
@@ -29,16 +39,20 @@ language plpgsql security definer set search_path = '' as $$
 begin
   return query
   with local as (
-    select p.id, (p_now at time zone p.timezone) as at_local, p.remind_morning, p.remind_evening
+    select p.id, p.timezone as tz, (public._local_time(p_now, p.timezone))::date as today, p.remind_morning, p.remind_evening
       from public.profiles p
-     where p.remind_morning is not null or p.remind_evening is not null
+     where (p.remind_morning is not null or p.remind_evening is not null)
+       and public._local_time(p_now, p.timezone) is not null
   ), candidates as (
-    select l.id, (l.at_local)::date as d, s.slot, s.t
+    -- Real moments, not times of day: a slot is due from its local date and time until the window closes, so a
+    -- 23:57 reminder caught by the 00:00 run still counts for the day it belongs to.
+    select l.id, d.d, s.slot
       from local l
      cross join lateral (values ('morning', l.remind_morning), ('evening', l.remind_evening)) as s(slot, t)
+     cross join lateral (values (l.today), (l.today - 1)) as d(d)
      where s.t is not null
-       and (l.at_local)::time >= s.t
-       and (l.at_local)::time - s.t < public._reminder_window() -- a difference, so a late-evening time doesn't wrap past midnight
+       and ((d.d + s.t) at time zone l.tz) <= p_now
+       and p_now < ((d.d + s.t) at time zone l.tz) + public._reminder_window()
   ), due as (
     select c.* from candidates c
      where not exists (select 1 from public.reminder_sent r where r.user_id = c.id and r.local_date = c.d and r.slot = c.slot)
@@ -87,6 +101,7 @@ begin
       select net.http_post(
         url := (select function_url from public.reminder_job),
         body := '{}'::jsonb,
+        timeout_milliseconds := 30000,
         headers := jsonb_build_object('Content-Type', 'application/json', 'x-reminder-secret', (select secret::text from public.reminder_job)))
     $job$);
   exception when others then
@@ -96,7 +111,7 @@ begin
 end;
 $$;
 
-revoke execute on function public._reminder_window(), public._reminders_per_day() from public, anon, authenticated;
+revoke execute on function public._reminder_window(), public._reminders_per_day(), public._local_time(timestamptz, text) from public, anon, authenticated;
 revoke execute on function public.claim_due_reminders(timestamptz), public.reminder_secret_ok(text), public.configure_reminders(text)
   from public, anon, authenticated;
 do $$

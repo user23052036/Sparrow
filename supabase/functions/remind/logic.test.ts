@@ -35,6 +35,23 @@ describe("reminders", () => {
     );
   });
 
+  it("keeps going when one person's browsers can't be read", async () => {
+    const { d, sent } = deps([
+      { user_id: A, slot: "morning" },
+      { user_id: B, slot: "morning" },
+    ]);
+    const read = d.subscriptionsOf;
+    d.subscriptionsOf = async (u) => {
+      if (u === A) throw new Error("database hiccup");
+      return read(u);
+    };
+    assert.deepEqual(await runReminders(d), { sent: 1, removed: 0, failed: 1, people: 2 });
+    assert.deepEqual(
+      sent.map((s) => s.to),
+      ["b-phone"],
+    );
+  });
+
   it("does nothing when nothing is due", async () => {
     const { d, sent } = deps([]);
     assert.deepEqual(await runReminders(d), { sent: 0, removed: 0, failed: 0, people: 0 });

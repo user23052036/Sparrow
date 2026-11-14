@@ -21,6 +21,13 @@ export interface Deps extends Delivery {
 export async function runReminders(deps: Deps): Promise<Tally & { people: number }> {
   const due = await deps.claimDue();
   const tally: Tally = { sent: 0, removed: 0, failed: 0 };
-  for (const r of due) await deliver(r.user_id, JSON.stringify(buildReminder(r.slot)), deps, tally);
+  for (const r of due) {
+    // One person's trouble (a database hiccup) must not cost everyone after them their reminder.
+    try {
+      await deliver(r.user_id, JSON.stringify(buildReminder(r.slot)), deps, tally);
+    } catch {
+      tally.failed++;
+    }
+  }
   return { ...tally, people: due.length };
 }
