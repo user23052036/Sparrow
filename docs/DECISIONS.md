@@ -236,4 +236,6 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 
 ## D41 — Static web hosting
 **Decision:** Prefer a static export of the web app on GitHub Pages, so deployment needs no extra account. Fall back to Vercel only if the export cannot work, and record why in a new entry.
-**Status:** Approved in `docs/ROADMAP.md` (task T0.3). Not built yet.
+**How:** `.github/workflows/deploy-web.yml` builds with `STATIC_EXPORT=1` (Next.js `output: "export"`) and `NEXT_PUBLIC_BASE_PATH=/Sparrow`, checks the export, publishes it with the built-in Pages token and fetches the landing page. Every route is a client page, so all of them export. Links people copy or open from email (`apps/web/lib/site.ts`), the service worker and the manifest work under the base path. Local development and the e2e suite still run at the root with `next start`.
+**Not covered by the export:** response headers (a static host cannot set them), so the security headers (T1.5) go into a `<meta>` tag.
+**Status:** Built (T0.3).

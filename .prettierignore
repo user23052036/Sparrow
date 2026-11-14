@@ -8,3 +8,4 @@ next-env.d.ts
 *.sql
 apps/mobile/android
 apps/web/public/sw.js
+apps/web/out

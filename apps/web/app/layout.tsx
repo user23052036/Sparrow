@@ -1,12 +1,13 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PwaRegister } from "@/components/PwaRegister";
+import { basePath } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Sparrow",
   description: "Gentle daily accountability: small steps, real focus, kind follow-through.",
-  manifest: "/manifest.webmanifest",
-  icons: { icon: "/icon.svg" },
+  manifest: `${basePath}/manifest.webmanifest`,
+  icons: { icon: `${basePath}/icon.svg` },
 };
 
 export const viewport: Viewport = {

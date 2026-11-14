@@ -7,6 +7,7 @@ import { timeAgo } from "@/lib/format";
 import { PartnerPenalty } from "@/components/PartnerPenalty";
 import { SupportNudge } from "@/components/SupportNudge";
 import { PartnerRating } from "@/components/PartnerRating";
+import { siteUrl } from "@/lib/site";
 
 type Active = Extract<PartnerOverview, { state: "active" }>;
 
@@ -327,14 +328,14 @@ export default function PartnerPage() {
             <input
               readOnly
               aria-label={copy.partnerUi.inviteLinkLabel}
-              value={inviteLink(typeof window === "undefined" ? "" : window.location.origin, ov.invite_code)}
+              value={inviteLink(siteUrl(), ov.invite_code)}
               onFocus={(e) => e.currentTarget.select()}
             />
             <div className="row">
               <button
                 className="primary"
                 onClick={async () => {
-                  await navigator.clipboard.writeText(inviteLink(window.location.origin, ov.invite_code)).catch(() => {});
+                  await navigator.clipboard.writeText(inviteLink(siteUrl(), ov.invite_code)).catch(() => {});
                   setCopied(true);
                 }}
               >

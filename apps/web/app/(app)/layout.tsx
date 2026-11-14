@@ -30,8 +30,7 @@ function Guard({ children }: { children: ReactNode }) {
     if (!session) {
       // Remember a partner invite so it still opens after signing in or up.
       try {
-        if (/^\/(partner|circle)\/join/.test(window.location.pathname))
-          sessionStorage.setItem("sparrow:next", window.location.pathname + window.location.search);
+        if (/^\/(partner|circle)\/join/.test(path)) sessionStorage.setItem("sparrow:next", path + window.location.search);
       } catch {
         /* storage unavailable */
       }
