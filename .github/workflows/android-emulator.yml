@@ -1,0 +1,69 @@
+# Runs the Android blocking engine for the first time, on an emulator on GitHub's runners
+# (ROADMAP T0.5). Builds the debug APK, boots an API 34 emulator, writes a focus session into the
+# engine's local state, switches on the Accessibility service with `adb shell settings put secure`,
+# opens a listed app and asserts that Sparrow's blocked screen is on top; after the session ends the
+# app must open normally. Steps: apps/mobile/modules/sparrow-blocker/android/emulator-test.sh.
+#
+# No backend and no secrets: the engine keeps enforcing its last known state when it has no
+# server to ask (EngineStore.kt, SyncClient.kt). Screenshots, the top activity and logcat are uploaded.
+name: Android emulator test
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/android-emulator.yml"
+  pull_request:
+    paths:
+      - "apps/mobile/modules/sparrow-blocker/**"
+      - "apps/mobile/app.json"
+      - ".github/workflows/android-emulator.yml"
+
+concurrency:
+  group: android-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - name: Generate the native project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform android --no-install
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the debug APK (x86_64 only, for the emulator)
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:assembleDebug --no-daemon -PreactNativeArchitectures=x86_64
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run the engine on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: default
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          script: OUT_DIR=emulator-out bash apps/mobile/modules/sparrow-blocker/android/emulator-test.sh apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-out
+          path: emulator-out
+          retention-days: 14
+          if-no-files-found: ignore
