@@ -10,6 +10,9 @@ export interface Profile {
   onboarded: boolean;
   /** A day the user asked to keep light (at most two tasks, no stake). */
   light_day: string | null;
+  /** Reminder times in the person's own time zone ("HH:MM[:SS]"), null when off (T2.2). */
+  remind_morning?: string | null;
+  remind_evening?: string | null;
 }
 
 export interface Task {

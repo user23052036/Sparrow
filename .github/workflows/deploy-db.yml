@@ -121,4 +121,25 @@ jobs:
           fi
       - name: Deploy Edge Functions
         if: steps.secrets.outputs.ready == 'true'
-        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api
+        run: |
+          supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api
+          # remind is called by the database's own cron job (pg_net), which has no user token; its permission
+          # is the job's secret, checked by the database (migration 0029).
+          supabase functions deploy remind --project-ref "$SUPABASE_PROJECT_REF" --use-api --no-verify-jwt
+      # Reminders (T2.2): record the remind function's address and schedule the five-minute job. Uses the
+      # project's service key for this one call (masked); prints only what the database answered.
+      - name: Schedule reminders
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          # The legacy service_role key (a JWT) or a newer secret key (sb_secret_…, sent as apikey only).
+          key=$(supabase projects api-keys --project-ref "$SUPABASE_PROJECT_REF" --reveal -o json \
+            | jq -r '[.[] | select(.name == "service_role" or .type == "secret")][0].api_key // empty')
+          [ -n "$key" ] || { echo "::error::could not read the project's service key"; exit 1; }
+          echo "::add-mask::$key"
+          auth=()
+          [[ "$key" == ey* ]] && auth=(-H "Authorization: Bearer $key")
+          base="https://$SUPABASE_PROJECT_REF.supabase.co"
+          answer=$(curl -fsS -X POST "$base/rest/v1/rpc/configure_reminders" \
+            -H "apikey: $key" "${auth[@]}" -H "Content-Type: application/json" \
+            -d "{\"p_function_url\": \"$base/functions/v1/remind\"}")
+          echo "Reminders: $answer"

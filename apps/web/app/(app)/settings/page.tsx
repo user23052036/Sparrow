@@ -4,6 +4,7 @@ import { ProfileForm } from "../ProfileForm";
 import { DeleteAccount } from "@/components/DeleteAccount";
 import { ExportData } from "@/components/ExportData";
 import { PushSettings } from "@/components/PushSettings";
+import { ReminderSettings } from "@/components/ReminderSettings";
 
 export default function Settings() {
   return (
@@ -11,6 +12,7 @@ export default function Settings() {
       <h1>{copy.settings.title}</h1>
       <ProfileForm mode="settings" />
       <PushSettings />
+      <ReminderSettings />
       <div className="panel">
         <h3>{copy.settings.extensionTitle}</h3>
         <p className="quiet">{copy.settings.extensionBody}</p>
