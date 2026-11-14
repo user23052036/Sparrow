@@ -44,16 +44,20 @@ chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === TICK || a.name === END) void sync();
 });
 // The person allowed (or took back) the calm blocked page on some sites: rebuild the rules.
-chrome.permissions?.onAdded?.addListener(() => void reapply());
-chrome.permissions?.onRemoved?.addListener(() => void reapply());
+chrome.permissions?.onAdded?.addListener(() => void queue(reapply));
+chrome.permissions?.onRemoved?.addListener(() => void queue(reapply));
 void ensureAlarm();
 
 // ------------------------------------------------------------------ sync
 // Serialised so two overlapping syncs never refresh the same token twice.
+// Rule rebuilds go through the same queue, so two updateDynamicRules calls never overlap.
 let running = Promise.resolve();
-function sync() {
-  running = running.then(doSync, doSync);
+function queue(fn) {
+  running = running.then(fn, fn);
   return running;
+}
+function sync() {
+  return queue(doSync);
 }
 
 async function doSync() {
@@ -241,7 +245,7 @@ async function handle(msg, sender) {
       const { config, auth } = await get(["config", "auth"]);
       if (config && auth) await api.signOut(config, auth);
       await set({ auth: null, focus: { active: false } });
-      await applyBlocking({ active: false });
+      await queue(() => applyBlocking({ active: false }));
       return status();
     }
 

@@ -12,7 +12,7 @@ function accessNote(s) {
   if (!s.connected || !s.needAccess?.length) return "";
   const n = s.needAccess.length;
   return `
-      <p class="note small">${n} site${n === 1 ? "" : "s"} on your list will show the browser's own "blocked" page. Allow Sparrow on ${n === 1 ? "it" : "them"} to see the calm "This can wait" page instead.</p>
+      <p class="note small">${n} site${n === 1 ? "" : "s"} on your list will show the browser's own "blocked" page. Allow Sparrow on ${n === 1 ? "it" : "them"} to see the calm "This can wait" page instead, also in tabs that are already open.</p>
       <div class="row"><button id="access">Allow on ${n === 1 ? "this site" : `these ${n} sites`}</button></div>`;
 }
 
