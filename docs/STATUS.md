@@ -10,13 +10,22 @@ Repo: github.com/user23052036/Sparrow. **`main` is at 66cc94d: PR #9 (`brief-ext
 These files live in the repo under `docs/` (committed by T0.1) and are the source of truth.
 No `.claude/settings.json` exists.
 
-**Next task: T0.3.**
+**Next task: T1.1.**
 
 ## Roadmap progress
 - T0.1 done (PR #10): docs committed, D38 to D41 written.
 - T0.2 done: `.github/workflows/deploy-db.yml`. On pull requests it runs `supabase db push` (CLI 2.122.1)
   into a throwaway PostgreSQL 16 with the stub; on `main` it links, pushes and deploys functions, or
   ends green with a notice when the three secrets are missing (none are set as of 2026-11-15).
+  Merged as PR #12 (PR #11 was closed: its first commit had a throwaway CI password GitGuardian
+  flagged; that incident on the GitGuardian dashboard is a false positive). Skip path seen green on main.
+- T0.3: static export on GitHub Pages (`deploy-web.yml`, D41). `STATIC_EXPORT=1` and
+  `NEXT_PUBLIC_BASE_PATH=/Sparrow`; `apps/web/lib/site.ts` adds the base path to links people copy
+  (invites, focus links, the sign-in email link); the service worker and manifest use paths relative to
+  where they are served. Pages was switched on with build type "workflow" through the API.
+  Owner, once Supabase exists: set the two `NEXT_PUBLIC_SUPABASE_*` repository variables, set
+  Supabase's Site URL to `https://user23052036.github.io/Sparrow/` and add
+  `https://user23052036.github.io/Sparrow/auth/callback` to its allowed redirect URLs.
 
 ## Verified on 2026-11-15 (main, cloud workspace)
 - `npm ci`, lint, typecheck: clean. 163 shared tests, 25 extension tests, 7 function tests: pass.

@@ -81,6 +81,10 @@ export const copy = {
     linkSent: (email: string) => `We emailed a sign-in link to ${email}. Open it in this browser.`,
     confirmEmail: "Check your email to confirm your address, then sign in.",
     mismatch: "That email and password don't match. Try again, or create an account.",
+    signingIn: "Signing you in…",
+    callbackSlow:
+      "This is taking a while. If you opened the link in a different browser or device, go back to where you started and enter the code from the email instead.",
+    backToSignIn: "Back to sign in",
   },
   onboarding: { title: "Welcome to Sparrow", intro: "Three quick things, then you'll add the tasks you want help with." },
   settings: {

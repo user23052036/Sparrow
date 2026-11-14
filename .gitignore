@@ -13,3 +13,4 @@ apps/mobile/.env
 apps/mobile/google-services.json
 apps/mobile/android/
 apps/mobile/.expo/
+apps/web/out

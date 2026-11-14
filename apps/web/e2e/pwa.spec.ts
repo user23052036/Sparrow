@@ -13,7 +13,8 @@ test("the manifest is installable: name, standalone display, PNG icons including
   expect(sizes).toContain("192x192:image/png:any");
   expect(sizes).toContain("512x512:image/png:any");
   expect(sizes.some((s: string) => s.endsWith("maskable"))).toBe(true);
-  for (const i of m.icons) expect((await request.get(i.src)).ok()).toBe(true);
+  // Paths are relative to the manifest, so the same file works under a base path (D41).
+  for (const i of m.icons) expect((await request.get(new URL(i.src, res.url()).href)).ok()).toBe(true);
 });
 
 test("offline, a page load shows the calm offline page instead of a browser error", async ({ page, context }) => {
@@ -35,5 +36,5 @@ test("the service worker never caches pages or cross-origin data", async ({ requ
   const sw = await (await request.get("/sw.js")).text();
   expect(sw).toContain("url.origin !== self.location.origin");
   expect(sw.match(/cache\.put\(/g)).toHaveLength(1); // only the fingerprinted static assets are ever stored
-  expect(sw).toContain('url.pathname.startsWith("/_next/static/")');
+  expect(sw).toContain('url.pathname.startsWith(BASE + "_next/static/")');
 });

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { copy, parseFocusLinkKey, type FocusLinkResult } from "@sparrow/shared";
 import { isConfigured, supabase } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
+import { basePath } from "@/lib/site";
 
 type State = { kind: "starting" } | { kind: "ok"; result: FocusLinkResult } | { kind: "no-key" } | { kind: "invalid" } | { kind: "offline" };
 
@@ -39,7 +40,7 @@ export default function Go() {
   return (
     <main className="shell stack">
       <Link href="/" className="brand">
-        <img src="/icon.svg" alt="" width={28} height={28} /> Sparrow
+        <img src={`${basePath}/icon.svg`} alt="" width={28} height={28} /> Sparrow
       </Link>
       <h1>{copy.go.title}</h1>
       <div className="panel stack" role="status" aria-live="polite" data-go={state.kind === "ok" ? (state.result.started ? "started" : "running") : state.kind}>

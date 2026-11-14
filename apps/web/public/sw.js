@@ -2,7 +2,9 @@
  * It never caches pages or data (everything private stays out of the cache) and never touches
  * requests to other origins such as Supabase. Only static assets and the offline page are kept. */
 const VERSION = "sparrow-v1";
-const SHELL = ["/offline.html", "/icon.svg", "/icon-192.png", "/manifest.webmanifest"];
+// The folder this worker is served from: "/" locally, "/Sparrow/" on GitHub Pages (D41).
+const BASE = new URL("./", self.location).pathname;
+const SHELL = ["offline.html", "icon.svg", "icon-192.png", "manifest.webmanifest"].map((p) => BASE + p);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(VERSION).then((cache) => cache.addAll(SHELL)));
@@ -13,7 +15,8 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      // Only Sparrow's own old caches: on GitHub Pages the origin is shared with the owner's other sites.
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith("sparrow-") && k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -25,7 +28,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   // Built, fingerprinted assets never change: serve from cache once seen.
-  if (url.pathname.startsWith("/_next/static/")) {
+  if (url.pathname.startsWith(BASE + "_next/static/")) {
     event.respondWith(
       caches.open(VERSION).then(async (cache) => {
         const hit = await cache.match(req);
@@ -40,6 +43,6 @@ self.addEventListener("fetch", (event) => {
 
   // Pages: always the network. If it is down, show the offline page.
   if (req.mode === "navigate") {
-    event.respondWith(fetch(req).catch(() => caches.match("/offline.html")));
+    event.respondWith(fetch(req).catch(() => caches.match(BASE + "offline.html")));
   }
 });

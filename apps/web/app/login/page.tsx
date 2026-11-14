@@ -5,6 +5,7 @@ import Link from "next/link";
 import { copy } from "@sparrow/shared";
 import { isConfigured, supabase, errorText } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
+import { siteUrl } from "@/lib/site";
 
 type Mode = "signin" | "signup" | "link";
 
@@ -44,13 +45,13 @@ export default function Login() {
       if (mode === "link") {
         const { error } = await sb.auth.signInWithOtp({
           email: email.trim(),
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback`, shouldCreateUser: true },
+          options: { emailRedirectTo: `${siteUrl()}/auth/callback`, shouldCreateUser: true },
         });
         if (error) throw error;
         setInfo(copy.auth.linkSent(email.trim()));
       } else if (mode === "signup") {
         if (password.length < 8) throw new Error(copy.auth.shortPassword);
-        const { data, error } = await sb.auth.signUp({ email: email.trim(), password });
+        const { data, error } = await sb.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: `${siteUrl()}/auth/callback` } });
         if (error) throw error;
         if (data.session) router.replace("/today");
         else setInfo(copy.auth.confirmEmail);

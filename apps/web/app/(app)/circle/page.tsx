@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { circleDayLine, circleInviteLink, copy, normalizeCircleAlias, parseCircleCode, type CircleMember, type CircleOverview } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 import { CircleGoalPanel } from "@/components/CircleGoalPanel";
+import { siteUrl } from "@/lib/site";
 
 type Active = Extract<CircleOverview, { state: "active" }>;
 
@@ -69,7 +70,7 @@ function ActiveCircle({ ov, call, busy }: { ov: Active; call: (fn: string, args?
   const [copied, setCopied] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const left = ov.circle.max - ov.circle.size;
-  const link = circleInviteLink(typeof window === "undefined" ? "" : window.location.origin, ov.circle.invite_code);
+  const link = circleInviteLink(siteUrl(), ov.circle.invite_code);
   return (
     <>
       <div className="spread">

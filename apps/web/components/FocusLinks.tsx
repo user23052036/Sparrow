@@ -15,6 +15,7 @@ import {
   type NewFocusLink,
 } from "@sparrow/shared";
 import { errorText, supabase, SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabase";
+import { siteUrl } from "@/lib/site";
 
 function CopyField({ id, label, value, button }: { id: string; label: string; value: string; button: string }) {
   const [copied, setCopied] = useState(false);
@@ -87,7 +88,7 @@ export function FocusLinks() {
     await load();
   }
 
-  const origin = typeof window === "undefined" ? "" : window.location.origin;
+  const origin = siteUrl();
 
   return (
     <section className="panel stack" aria-label={copy.focusLinks.title}>

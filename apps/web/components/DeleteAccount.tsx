@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { copy } from "@sparrow/shared";
 import { supabase } from "@/lib/supabase";
+import { basePath } from "@/lib/site";
 
 /** Settings panel: deletes the account through the `delete-account` Edge Function (D20). */
 export function DeleteAccount() {
@@ -28,7 +29,7 @@ export function DeleteAccount() {
     } catch {
       /* storage unavailable: the login page just won't show the note */
     }
-    window.location.assign("/login");
+    window.location.assign(`${basePath}/login`);
   }
 
   return (
