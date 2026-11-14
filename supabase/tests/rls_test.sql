@@ -1210,3 +1210,108 @@ select set_config('request.jwt.claim.sub', '', false);
 select pg_temp.expect_error($q$select circle_goal()$q$, 'anonymous visitors see no goal');
 select pg_temp.expect_error($q$select start_circle_goal(5)$q$, 'anonymous visitors cannot start a goal');
 reset role;
+
+-- ------------------------------------------------------------ Web Push (0028, D38)
+insert into auth.users values
+  ('28282828-0000-0000-0000-000000000001', 'w1@test'), ('28282828-0000-0000-0000-000000000002', 'w2@test'),
+  ('28282828-0000-0000-0000-000000000003', 'w3@test');
+select pg_temp.as_user('28282828-0000-0000-0000-000000000001');
+select create_buddy_invite();
+reset role;
+select invite_code as wcode from buddy_links where requester_id = '28282828-0000-0000-0000-000000000001' \gset
+select pg_temp.as_user('28282828-0000-0000-0000-000000000002');
+select accept_buddy_invite(:'wcode');
+select save_push_subscription('https://fcm.googleapis.com/fcm/send/w2-phone', repeat('k', 87), repeat('a', 22));
+select save_push_subscription('https://fcm.googleapis.com/fcm/send/w2-laptop', repeat('k', 87), repeat('a', 22));
+select pg_temp.check((select count(*) from push_subscriptions) = 2, 'a person can switch on notifications in two browsers');
+select pg_temp.expect_error($q$insert into push_subscriptions (user_id, endpoint, p256dh, auth) values (auth.uid(), 'https://fcm.googleapis.com/fcm/send/x', repeat('k', 87), repeat('a', 22))$q$,
+  'subscriptions are written only through save_push_subscription');
+select pg_temp.expect_error($q$select save_push_subscription('http://fcm.googleapis.com/fcm/send/plain', repeat('k', 87), repeat('a', 22))$q$, 'a push address must be https');
+select pg_temp.expect_error($q$select save_push_subscription('https://evil.example.com/fcm.googleapis.com/', repeat('k', 87), repeat('a', 22))$q$,
+  'only the browsers'' own push services are accepted');
+select pg_temp.expect_error($q$select save_push_subscription('https://fcm.googleapis.com.evil.example/x', repeat('k', 87), repeat('a', 22))$q$,
+  'a look-alike host is refused');
+select save_push_subscription('https://web.push.apple.com/QGh0', repeat('k', 87), repeat('a', 22));
+select save_push_subscription('https://updates.push.services.mozilla.com/wpush/v2/gAAA', repeat('k', 87), repeat('a', 22));
+select pg_temp.check((select count(*) from push_subscriptions) = 4, 'Safari and Firefox push addresses are accepted');
+select remove_push_subscription('https://web.push.apple.com/QGh0');
+select remove_push_subscription('https://updates.push.services.mozilla.com/wpush/v2/gAAA');
+select pg_temp.expect_error($q$select * from push_sent$q$, 'nobody reads which notifications were sent');
+reset role;
+
+select pg_temp.as_user('28282828-0000-0000-0000-000000000003');
+select pg_temp.check((select count(*) from push_subscriptions) = 0, 'nobody sees someone else''s browsers');
+-- the same browser used by someone else afterwards moves to them
+select save_push_subscription('https://fcm.googleapis.com/fcm/send/w2-laptop', repeat('k', 87), repeat('a', 22));
+select pg_temp.check((select count(*) from push_subscriptions) = 1, 'a browser belongs to whoever switched notifications on last');
+select remove_push_subscription('https://fcm.googleapis.com/fcm/send/w2-laptop');
+select pg_temp.check((select count(*) from push_subscriptions) = 0, 'switching off removes the browser');
+reset role;
+select pg_temp.check((select count(*) from push_subscriptions where user_id = '28282828-0000-0000-0000-000000000002') = 1,
+  'the earlier owner keeps their other browser');
+
+select pg_temp.as_user('28282828-0000-0000-0000-000000000002');
+select save_push_subscription('https://fcm.googleapis.com/fcm/send/w2-' || g, repeat('k', 87), repeat('a', 22)) from generate_series(1, 12) g;
+select pg_temp.check((select count(*) from push_subscriptions) = 10, 'at most ten browsers per person');
+select pg_temp.check(not exists (select 1 from push_subscriptions where endpoint like '%w2-phone'), 'the oldest browser goes first');
+select remove_push_subscription('https://fcm.googleapis.com/fcm/send/w2-12');
+reset role;
+
+-- W1 locks a session and asks for the key
+select pg_temp.as_user('28282828-0000-0000-0000-000000000001');
+update blocklists set domains = '{youtube.com}';
+select start_focus_session(30, null, null, true);
+select request_end_session((select id from focus_sessions where ended_at is null), 'My train is early');
+reset role;
+select id as wreq from end_requests where user_id = '28282828-0000-0000-0000-000000000001' \gset
+select pg_temp.as_user('28282828-0000-0000-0000-000000000003');
+select pg_temp.check(claim_push('key_request', :'wreq') is null, 'a stranger cannot send a notification for someone else''s request');
+reset role;
+select pg_temp.as_user('28282828-0000-0000-0000-000000000002');
+select pg_temp.check(claim_push('key_request', :'wreq') is null, 'the partner cannot send the request''s notification to themselves');
+reset role;
+select pg_temp.as_user('28282828-0000-0000-0000-000000000001');
+select pg_temp.check(claim_push('key_request', :'wreq') = '28282828-0000-0000-0000-000000000002', 'asking for the key notifies the partner');
+select pg_temp.check(claim_push('key_request', :'wreq') is null, 'the same request is never notified twice');
+select pg_temp.check(claim_push('key_answer', :'wreq') is null, 'the asker cannot send the answer''s notification');
+select pg_temp.expect_error(format('select claim_push(%L, %L)', 'anything', :'wreq'), 'unknown kinds are refused');
+reset role;
+select pg_temp.as_user('28282828-0000-0000-0000-000000000002');
+select pg_temp.check(claim_push('key_answer', :'wreq') is null, 'no answer notification before the partner answers');
+select decide_end_request(:'wreq', true);
+select pg_temp.check(claim_push('key_answer', :'wreq') = '28282828-0000-0000-0000-000000000001', 'answering notifies the asker');
+reset role;
+
+-- W1 shares a proof
+select pg_temp.as_user('28282828-0000-0000-0000-000000000001');
+insert into tasks (title) values ('W1 walk');
+select commit_day(array(select id from tasks where title = 'W1 walk'), 3, 0);
+insert into proofs (plan_item_id, kind, text_body) values ((select id from plan_items limit 1), 'text', 'private note');
+insert into proofs (plan_item_id, kind, text_body, visibility) values ((select id from plan_items limit 1), 'text', 'shared note', 'buddy');
+select pg_temp.check(claim_push('proof_shared', (select id from proofs where visibility = 'private')) is null, 'a private proof notifies nobody');
+select pg_temp.check(claim_push('proof_shared', (select id from proofs where visibility = 'buddy')) = '28282828-0000-0000-0000-000000000002',
+  'sharing a proof notifies the partner');
+insert into proofs (plan_item_id, kind, text_body, visibility) values ((select id from plan_items limit 1), 'text', 'second shared note', 'buddy');
+select pg_temp.check(claim_push('proof_shared', (select id from proofs where text_body = 'second shared note')) is null,
+  'a burst of shared proofs is one notification (ten minutes apart at most)');
+reset role;
+update push_sent set created_at = now() - interval '11 minutes' where kind = 'proof_shared';
+select pg_temp.as_user('28282828-0000-0000-0000-000000000001');
+insert into proofs (plan_item_id, kind, text_body, visibility) values ((select id from plan_items limit 1), 'text', 'later note', 'buddy');
+select pg_temp.check(claim_push('proof_shared', (select id from proofs where text_body = 'later note')) = '28282828-0000-0000-0000-000000000002',
+  'after ten minutes a shared proof notifies again');
+reset role;
+select pg_temp.as_user('28282828-0000-0000-0000-000000000002');
+select end_buddy_link((select id from buddy_links where status = 'active' and partner_id = auth.uid()));
+reset role;
+select pg_temp.as_user('28282828-0000-0000-0000-000000000001');
+insert into proofs (plan_item_id, kind, text_body, visibility) values ((select id from plan_items limit 1), 'text', 'after the split', 'buddy');
+select pg_temp.check(claim_push('proof_shared', (select id from proofs where text_body = 'after the split')) is null,
+  'after the partnership ends, nobody is notified');
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error(format('select claim_push(%L, %L)', 'key_request', :'wreq'), 'anonymous visitors cannot claim notifications');
+select pg_temp.expect_error($q$select save_push_subscription('https://fcm.googleapis.com/fcm/send/a', repeat('k', 87), repeat('a', 22))$q$,
+  'anonymous visitors cannot save a push address');
+reset role;

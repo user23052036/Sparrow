@@ -4,6 +4,7 @@ import { copy, PHOTO_OLDER_AFTER_HOURS, storageType, voiceExtension, voiceSecond
 import { supabase, errorText } from "@/lib/supabase";
 import { compressImage, imageDHash, photoAge } from "@/lib/image";
 import { VoiceRecorder, type Recording } from "@/components/VoiceRecorder";
+import { notifyPartner } from "@/lib/push";
 
 export function ProofCapture({
   itemId,
@@ -35,9 +36,10 @@ export function ProofCapture({
       const { data, error } = await sb
         .from("proofs")
         .insert({ plan_item_id: itemId, kind: "photo", storage_path: path, image_phash: hash, visibility, ...(age === null ? {} : { photo_age_hours: age }) })
-        .select("flagged_similar")
+        .select("id, flagged_similar")
         .single();
       if (error) throw error;
+      if (visibility === "buddy") notifyPartner("proof_shared", data?.id);
       const older = age !== null && age > PHOTO_OLDER_AFTER_HOURS;
       const note = data?.flagged_similar ? copy.duplicatePhoto : older ? copy.proof.olderPhoto : copy.proof.photoSaved;
       setMsg(note);
@@ -60,8 +62,13 @@ export function ProofCapture({
       const sb = supabase();
       const up = await sb.storage.from("proofs").upload(path, r.blob, { contentType: type });
       if (up.error) throw up.error;
-      const { error } = await sb.from("proofs").insert({ plan_item_id: itemId, kind: "voice", storage_path: path, duration_s: voiceSeconds(r.ms), visibility });
+      const { data, error } = await sb
+        .from("proofs")
+        .insert({ plan_item_id: itemId, kind: "voice", storage_path: path, duration_s: voiceSeconds(r.ms), visibility })
+        .select("id")
+        .single();
       if (error) throw error;
+      if (visibility === "buddy") notifyPartner("proof_shared", data?.id);
       setMsg(copy.proof.voiceSaved);
       setMode("closed");
       onSaved(copy.proof.voiceSaved);
@@ -76,12 +83,17 @@ export function ProofCapture({
     if (!text.trim()) return;
     setBusy(true);
     setMsg(null);
-    const { error } = await supabase().from("proofs").insert({ plan_item_id: itemId, kind: "text", text_body: text.trim(), visibility });
+    const { data, error } = await supabase()
+      .from("proofs")
+      .insert({ plan_item_id: itemId, kind: "text", text_body: text.trim(), visibility })
+      .select("id")
+      .single();
     setBusy(false);
     if (error) {
       setMsg(errorText(error));
       return;
     }
+    if (visibility === "buddy") notifyPartner("proof_shared", data?.id);
     setText("");
     setMode("closed");
     setMsg(copy.proof.noteSaved);
