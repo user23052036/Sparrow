@@ -59,6 +59,8 @@ export class FakeSupabase {
     focus_links: [],
     focus_sessions: [],
     tamper_events: [],
+    push_subscriptions: [],
+    end_requests: [],
   };
   /** Focus links (D35): the keys handed out, and the sessions they started. The real rules are in rls_test.sql. */
   linkKeys: Record<string, string> = {};
@@ -83,6 +85,11 @@ export class FakeSupabase {
   }
   uploads: { path: string; bytes: number; type: string }[] = [];
   deleteCalls: unknown[] = [];
+  /** Web Push (D38): what the app asked the notify function to send, and the VAPID key it hands out (null: not set up). */
+  notifyCalls: { kind: string; ref: string }[] = [];
+  vapidPublicKey: string | null = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U";
+  /** Key requests the signed-in person answered as someone's partner. */
+  decided: Row[] = [];
   /** What partner_overview() answers (defaults to "no partner"). */
   partnerOverview: Record<string, unknown> = { state: "none" };
   /** A partner for tests that need one. */
@@ -245,11 +252,20 @@ export class FakeSupabase {
       if (url.pathname.startsWith("/rest/v1/")) return await this.table(route, url);
       if (url.pathname.startsWith("/storage/v1/object/")) return await this.storage(route, url);
       if (url.pathname === "/functions/v1/delete-account") return this.deleteAccount(route);
+      if (url.pathname === "/functions/v1/notify") return this.notify(route);
       return this.send(route, 404, { message: "not found" });
     } catch (e) {
       if (e instanceof RpcError) return this.send(route, 400, { code: "P0001", message: e.message, details: null, hint: null });
       throw e;
     }
+  }
+
+  // ------------------------------------------------------------------ Edge Function: notify (claim_push is in rls_test.sql)
+  private notify(route: Route) {
+    if (route.request().method() === "GET") return this.send(route, 200, { publicKey: this.vapidPublicKey });
+    if (!this.signedIn) return this.send(route, 401, { error: "Please sign in again, then try once more." });
+    this.notifyCalls.push(route.request().postDataJSON() as { kind: string; ref: string });
+    return this.send(route, 200, { sent: 0, removed: 0, failed: 0 });
   }
 
   // ------------------------------------------------------------------ Edge Function: delete-account
@@ -455,6 +471,43 @@ export class FakeSupabase {
         const domains = (this.db.blocklists[0]?.domains as string[] | undefined) ?? [];
         return ok({ server_now: new Date().toISOString(), active: !!s, session_id: s?.id ?? null, ends_at: s?.ends_at ?? null, domains, locked: !!s?.locked });
       }
+      case "request_end_session": {
+        // As 0005: only a locked, running session of mine; asking twice keeps one pending request.
+        const s = this.runningSession();
+        if (!s || s.id !== args.p_session_id) throw new RpcError("session not found");
+        if (!s.locked) throw new RpcError("this session isn't locked");
+        if (String(args.p_reason ?? "").trim().length < 3) throw new RpcError("tell your partner why you want to stop");
+        const open = this.db.end_requests.find((r) => r.session_id === s.id && r.status === "pending");
+        if (open) return ok(open);
+        const r = {
+          id: uid(),
+          session_id: s.id,
+          user_id: USER_ID,
+          reason: String(args.p_reason).trim(),
+          status: "pending",
+          created_at: new Date().toISOString(),
+        };
+        this.db.end_requests.push(r);
+        return ok(r);
+      }
+      case "decide_end_request": {
+        // The partner side: the request lives in partner_overview().pending_end_requests.
+        const ov = this.partnerOverview as { pending_end_requests?: Row[] };
+        const r = ov.pending_end_requests?.find((x) => x.id === args.p_request_id);
+        if (!r) throw new RpcError("request not found");
+        ov.pending_end_requests = ov.pending_end_requests!.filter((x) => x !== r);
+        const decided = { ...r, status: args.p_approve ? "approved" : "denied" };
+        this.decided.push(decided);
+        return ok(decided);
+      }
+      case "save_push_subscription": {
+        this.db.push_subscriptions = this.db.push_subscriptions.filter((x) => x.endpoint !== args.p_endpoint);
+        this.db.push_subscriptions.push({ id: uid(), user_id: USER_ID, endpoint: args.p_endpoint, p256dh: args.p_p256dh, auth: args.p_auth });
+        return ok(null);
+      }
+      case "remove_push_subscription":
+        this.db.push_subscriptions = this.db.push_subscriptions.filter((x) => x.endpoint !== args.p_endpoint);
+        return ok(null);
       case "start_focus_session": {
         if (this.runningSession()) throw new RpcError("a focus session is already running");
         const minutes = Number(args.p_minutes);

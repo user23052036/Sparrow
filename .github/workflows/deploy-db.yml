@@ -1,7 +1,8 @@
 # Deploys the database and Edge Functions to the real Supabase project (ROADMAP T0.2).
 #
 # - On a push to main that touches supabase/: `supabase db push` applies any new migrations, then
-#   `supabase functions deploy` deploys every function in supabase/functions.
+#   `supabase functions deploy` deploys every function in supabase/functions. The first deploy also creates
+#   the Web Push (VAPID) keys as function secrets.
 # - On a pull request that touches supabase/: the same CLI pushes all migrations into a throwaway
 #   PostgreSQL 16 (with supabase/tests/supabase_stub.sql standing in for Supabase's own schemas),
 #   so a migration the CLI cannot apply is caught before it reaches main. Nothing real is touched.
@@ -99,6 +100,23 @@ jobs:
       - name: Apply new migrations
         if: steps.secrets.outputs.ready == 'true'
         run: supabase db push --password "$SUPABASE_DB_PASSWORD" --yes
+      # Web Push (D38): a VAPID key pair is made once and kept in the project's function secrets. The
+      # private key is masked and never printed; the public key is served by the notify function.
+      - name: Create the Web Push keys (first deploy only)
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          VAPID_SUBJECT: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: |
+          if supabase secrets list --project-ref "$SUPABASE_PROJECT_REF" | grep -q VAPID_PUBLIC_KEY; then
+            echo "Web Push keys already exist; leaving them as they are."
+          else
+            keys=$(npx --yes web-push@3.6.7 generate-vapid-keys --json)
+            pub=$(echo "$keys" | jq -r .publicKey)
+            priv=$(echo "$keys" | jq -r .privateKey)
+            echo "::add-mask::$priv"
+            supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" VAPID_PUBLIC_KEY="$pub" VAPID_PRIVATE_KEY="$priv" VAPID_SUBJECT="$VAPID_SUBJECT" >/dev/null
+            echo "Created the Web Push keys."
+          fi
       - name: Deploy Edge Functions
         if: steps.secrets.outputs.ready == 'true'
         run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api

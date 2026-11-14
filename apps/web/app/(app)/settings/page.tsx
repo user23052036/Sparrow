@@ -3,12 +3,14 @@ import { copy } from "@sparrow/shared";
 import { ProfileForm } from "../ProfileForm";
 import { DeleteAccount } from "@/components/DeleteAccount";
 import { ExportData } from "@/components/ExportData";
+import { PushSettings } from "@/components/PushSettings";
 
 export default function Settings() {
   return (
     <>
       <h1>{copy.settings.title}</h1>
       <ProfileForm mode="settings" />
+      <PushSettings />
       <div className="panel">
         <h3>{copy.settings.extensionTitle}</h3>
         <p className="quiet">{copy.settings.extensionBody}</p>

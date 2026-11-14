@@ -8,6 +8,7 @@ import { PartnerPenalty } from "@/components/PartnerPenalty";
 import { SupportNudge } from "@/components/SupportNudge";
 import { PartnerRating } from "@/components/PartnerRating";
 import { siteUrl } from "@/lib/site";
+import { notifyPartner } from "@/lib/push";
 
 type Active = Extract<PartnerOverview, { state: "active" }>;
 
@@ -116,7 +117,17 @@ function ProofCard({ proof, reload }: { proof: PartnerProof; reload: () => void 
   );
 }
 
-function ActiveView({ ov, call, busy }: { ov: Active; call: (fn: string, args?: Record<string, unknown>) => Promise<void>; busy: boolean }) {
+function ActiveView({ ov, call, busy }: { ov: Active; call: (fn: string, args?: Record<string, unknown>) => Promise<boolean>; busy: boolean }) {
+  // Arriving from a notification's button (sw.js adds ?request=…&answer=…): point at that answer, but a tap still confirms it.
+  const [fromPush] = useState(() => {
+    if (typeof window === "undefined") return null;
+    const q = new URLSearchParams(window.location.search);
+    const answer = q.get("answer");
+    return answer === "let-out" || answer === "keep-going" ? { request: q.get("request"), answer } : null;
+  });
+  async function decide(id: string, approve: boolean) {
+    if (await call("decide_end_request", { p_request_id: id, p_approve: approve })) notifyPartner("key_answer", id);
+  }
   const [confirmEnd, setConfirmEnd] = useState(false);
   const name = ov.partner.name;
   const act = ov.activity;
@@ -132,20 +143,28 @@ function ActiveView({ ov, call, busy }: { ov: Active; call: (fn: string, args?: 
       {attention && (
         <div className="panel stack" role="alert">
           <h3>{copy.partnerUi.askingKey(name)}</h3>
-          {ov.pending_end_requests.map((r) => (
-            <div key={r.id} className="stack">
-              <p>{copy.partnerUi.theyWant(r.reason)}</p>
-              <p className="small quiet">{copy.partnerDecideHint}</p>
-              <div className="row">
-                <button className="primary" disabled={busy} onClick={() => call("decide_end_request", { p_request_id: r.id, p_approve: false })}>
-                  {copy.partnerUi.encourage}
-                </button>
-                <button disabled={busy} onClick={() => call("decide_end_request", { p_request_id: r.id, p_approve: true })}>
-                  {copy.partnerUi.okayStop}
-                </button>
+          {ov.pending_end_requests.map((r) => {
+            const hint = fromPush?.request === r.id ? fromPush.answer : null;
+            return (
+              <div key={r.id} className="stack">
+                <p>{copy.partnerUi.theyWant(r.reason)}</p>
+                <p className="small quiet">{copy.partnerDecideHint}</p>
+                {hint && (
+                  <p className="note small" role="status">
+                    {hint === "let-out" ? copy.push.confirmLetOut : copy.push.confirmKeepGoing}
+                  </p>
+                )}
+                <div className="row">
+                  <button className="primary" disabled={busy} autoFocus={hint === "keep-going"} onClick={() => decide(r.id, false)}>
+                    {copy.partnerUi.encourage}
+                  </button>
+                  <button disabled={busy} autoFocus={hint === "let-out"} onClick={() => decide(r.id, true)}>
+                    {copy.partnerUi.okayStop}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -277,10 +296,11 @@ export default function PartnerPage() {
         setBusy(false);
         if (error) {
           setErr(errorText(error));
-          return;
+          return false;
         }
       }
       await load();
+      return true;
     },
     [load],
   );

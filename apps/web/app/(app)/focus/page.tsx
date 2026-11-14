@@ -7,6 +7,7 @@ import { supabase, errorText } from "@/lib/supabase";
 import { clock, timeAgo } from "@/lib/format";
 import { extSyncNow } from "@/lib/extension";
 import { FocusLinks } from "@/components/FocusLinks";
+import { notifyPartner } from "@/lib/push";
 
 interface FocusState {
   active: boolean;
@@ -84,9 +85,10 @@ function LockedExit({ sessionId, name, req, onChanged }: { sessionId: string; na
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
   async function ask() {
-    const { error } = await supabase().rpc("request_end_session", { p_session_id: sessionId, p_reason: reason });
+    const { data, error } = await supabase().rpc("request_end_session", { p_session_id: sessionId, p_reason: reason });
     if (error) setErr(errorText(error));
     else {
+      notifyPartner("key_request", (data as { id?: string } | null)?.id);
       setOpen(false);
       setReason("");
       setErr(null);

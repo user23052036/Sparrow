@@ -127,6 +127,29 @@ export const copy = {
     keyInvite: "Invite someone",
     keySkip: "Maybe later",
   },
+  /** Web Push (D38, T2.1). `notification` is mirrored in supabase/functions/notify/logic.ts (pinned by its test). */
+  push: {
+    notification: {
+      key_request: {
+        title: "Your partner is asking for the key",
+        body: "They'd like to end a locked focus session early. Open Sparrow to answer.",
+      },
+      key_answer: { title: "Your partner answered", body: "Open Sparrow to see their answer." },
+      proof_shared: { title: "Your partner shared a proof", body: "Open Sparrow to have a look." },
+      letOut: "Let them out",
+      keepGoing: "Keep going",
+    },
+    title: "Notifications",
+    body: "Hear about it when your partner asks for your key, answers you, or shares a proof. A notification only says what happened, never what anyone wrote.",
+    on: "Notifications are on in this browser.",
+    turnOn: "Turn on notifications",
+    turnOff: "Turn off in this browser",
+    denied: "This browser is set to block notifications from Sparrow. Allow them in the site settings, then try again.",
+    unsupported: "This browser can't show notifications from Sparrow. On an iPhone, add Sparrow to the home screen first.",
+    notReady: "Notifications aren't set up on this server yet.",
+    confirmLetOut: "You chose “Let them out” in the notification. Tap the button once more to confirm.",
+    confirmKeepGoing: "You chose “Keep going” in the notification. Tap the button once more to confirm.",
+  },
   settings: {
     title: "Settings",
     name: "What should Sparrow call you?",
@@ -536,6 +559,7 @@ export const copy = {
       "Which of your devices are blocking sites, and when they last checked in.",
       "If you make focus links: their names, lengths and when they were last used. The key itself is not kept, only a fingerprint of it.",
       "Badges you crafted, and any circle goal you started.",
+      "If you turn on notifications: the push address your browser gives Sparrow for this, one per browser, until you turn them off there. A notification only says what happened (for example that your partner answered), never what anyone wrote. It travels through your browser maker's push service (Google, Mozilla or Apple).",
       "Feedback you choose to send.",
     ],
     seeTitle: "Who can see it",
