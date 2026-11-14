@@ -51,7 +51,7 @@ export default function Login() {
         setInfo(copy.auth.linkSent(email.trim()));
       } else if (mode === "signup") {
         if (password.length < 8) throw new Error(copy.auth.shortPassword);
-        const { data, error } = await sb.auth.signUp({ email: email.trim(), password });
+        const { data, error } = await sb.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: `${siteUrl()}/auth/callback` } });
         if (error) throw error;
         if (data.session) router.replace("/today");
         else setInfo(copy.auth.confirmEmail);

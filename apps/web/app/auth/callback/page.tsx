@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { copy } from "@sparrow/shared";
 import { supabase } from "@/lib/supabase";
 
 /** Magic-link landing page. supabase-js exchanges the ?code= automatically (same browser only). */
@@ -23,11 +25,10 @@ export default function Callback() {
   }, [router]);
   return (
     <main className="shell">
-      <p>Signing you in…</p>
+      <p>{copy.auth.signingIn}</p>
       {stuck && (
         <p className="note">
-          This is taking a while. If you opened the link in a different browser or device, go back to where you started and enter the code from the email
-          instead. <a href="/login">Back to sign in</a>
+          {copy.auth.callbackSlow} <Link href="/login">{copy.auth.backToSignIn}</Link>
         </p>
       )}
     </main>

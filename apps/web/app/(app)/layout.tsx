@@ -8,6 +8,7 @@ import { isConfigured, supabase } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
 import { InstallBanner } from "@/components/InstallBanner";
 import { FeedbackButton } from "@/components/FeedbackButton";
+import { basePath } from "@/lib/site";
 
 const NAV = [
   { href: "/today", label: copy.nav.today },
@@ -82,7 +83,7 @@ function Guard({ children }: { children: ReactNode }) {
     <>
       <header className="topbar">
         <Link href="/today" className="brand">
-          <img src="/icon.svg" alt="" width={28} height={28} /> Sparrow
+          <img src={`${basePath}/icon.svg`} alt="" width={28} height={28} /> Sparrow
         </Link>
         {profile.onboarded && (
           <nav className="nav" aria-label="Main">

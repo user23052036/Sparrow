@@ -24,8 +24,9 @@ on:
       - ".github/workflows/deploy-web.yml"
   pull_request:
     paths:
-      - "apps/web/next.config.ts"
-      - "apps/web/public/**"
+      - "apps/web/**"
+      - "packages/shared/**"
+      - "package-lock.json"
       - ".github/workflows/deploy-web.yml"
 
 permissions:
@@ -33,8 +34,9 @@ permissions:
   pages: write
   id-token: write
 
+# Deploys queue one after another; each pull request has its own group.
 concurrency:
-  group: pages-${{ github.event_name }}
+  group: ${{ github.event_name == 'pull_request' && format('pages-pr-{0}', github.ref) || 'pages' }}
   cancel-in-progress: false
 
 jobs:

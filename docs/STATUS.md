@@ -23,8 +23,9 @@ No `.claude/settings.json` exists.
   `NEXT_PUBLIC_BASE_PATH=/Sparrow`; `apps/web/lib/site.ts` adds the base path to links people copy
   (invites, focus links, the sign-in email link); the service worker and manifest use paths relative to
   where they are served. Pages was switched on with build type "workflow" through the API.
-  Owner, once Supabase exists: set the two `NEXT_PUBLIC_SUPABASE_*` repository variables and add
-  `https://user23052036.github.io/Sparrow/auth/callback` to Supabase's allowed redirect URLs.
+  Owner, once Supabase exists: set the two `NEXT_PUBLIC_SUPABASE_*` repository variables, set
+  Supabase's Site URL to `https://user23052036.github.io/Sparrow/` and add
+  `https://user23052036.github.io/Sparrow/auth/callback` to its allowed redirect URLs.
 
 ## Verified on 2026-11-15 (main, cloud workspace)
 - `npm ci`, lint, typecheck: clean. 163 shared tests, 25 extension tests, 7 function tests: pass.
