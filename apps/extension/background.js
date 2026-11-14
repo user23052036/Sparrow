@@ -1,5 +1,6 @@
 import { normalizeDomainList, hostMatches } from "./lib/domains.js";
-import { buildRules, endsAtLocal, isActive, minutesLeft, isAllowedSupabaseUrl } from "./lib/state.js";
+import { appUrlFrom, buildRules, endsAtLocal, isActive, minutesLeft, isAllowedSupabaseUrl, originPatterns } from "./lib/state.js";
+import { DEFAULT_SITE } from "./lib/site.js";
 import * as api from "./lib/api.js";
 
 const TICK = "sparrow-tick";
@@ -42,14 +43,21 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === TICK || a.name === END) void sync();
 });
+// The person allowed (or took back) the calm blocked page on some sites: rebuild the rules.
+chrome.permissions?.onAdded?.addListener(() => void queue(reapply));
+chrome.permissions?.onRemoved?.addListener(() => void queue(reapply));
 void ensureAlarm();
 
 // ------------------------------------------------------------------ sync
 // Serialised so two overlapping syncs never refresh the same token twice.
+// Rule rebuilds go through the same queue, so two updateDynamicRules calls never overlap.
 let running = Promise.resolve();
-function sync() {
-  running = running.then(doSync, doSync);
+function queue(fn) {
+  running = running.then(fn, fn);
   return running;
+}
+function sync() {
+  return queue(doSync);
 }
 
 async function doSync() {
@@ -89,21 +97,41 @@ async function doSync() {
 }
 
 // -------------------------------------------------------------- blocking
+async function reapply() {
+  const { focus } = await get("focus");
+  await applyBlocking(focus ?? { active: false });
+}
+
+/** Listed sites the person has let the extension show its blocked page on. */
+async function grantedDomains(domains) {
+  const out = [];
+  for (const d of domains) {
+    try {
+      if (await chrome.permissions.contains({ origins: originPatterns(d) })) out.push(d);
+    } catch {
+      /* not a pattern Chrome accepts: treat as not allowed */
+    }
+  }
+  return out;
+}
+
 async function applyBlocking(focus) {
   const now = Date.now();
   const active = isActive(focus, now);
   const domains = active ? focus.domains : [];
-  const signature = JSON.stringify(domains);
+  const granted = await grantedDomains(domains);
+  const signature = JSON.stringify([domains, granted]);
   const { ruleSignature } = await get("ruleSignature");
 
   if (signature !== ruleSignature) {
     const existing = await chrome.declarativeNetRequest.getDynamicRules();
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: existing.map((r) => r.id),
-      addRules: buildRules(domains, BLOCKED_PAGE),
+      addRules: buildRules(domains, BLOCKED_PAGE, granted),
     });
     await set({ ruleSignature: signature });
-    if (active) await closeOutOpenTabs(domains);
+    // Tab addresses are only visible on sites the extension has access to.
+    if (active) await closeOutOpenTabs(granted);
   }
 
   if (active) {
@@ -132,9 +160,17 @@ async function closeOutOpenTabs(domains) {
 }
 
 // -------------------------------------------------------------- messages
+/** Where Sparrow lives: the site the person connected from, else the one this copy was built for. */
+async function appUrl() {
+  const { appUrl: saved, appOrigin } = await get(["appUrl", "appOrigin"]);
+  return saved ?? (appOrigin ? `${appOrigin}/` : DEFAULT_SITE); // appOrigin: saved by versions before 0.2.0
+}
+
 async function status() {
-  const { config, auth, focus, lastSyncAt, lastError, appOrigin } = await get(["config", "auth", "focus", "lastSyncAt", "lastError", "appOrigin"]);
+  const { config, auth, focus, lastSyncAt, lastError } = await get(["config", "auth", "focus", "lastSyncAt", "lastError"]);
   const now = Date.now();
+  const domains = focus?.domains ?? [];
+  const granted = await grantedDomains(domains);
   return {
     ok: true,
     version: chrome.runtime.getManifest().version,
@@ -144,10 +180,11 @@ async function status() {
     deviceId: await deviceId(),
     focusActive: isActive(focus, now),
     minutesLeft: minutesLeft(focus, now),
-    domains: focus?.domains ?? [],
+    domains,
+    needAccess: domains.filter((d) => !granted.includes(d)),
     lastSyncAt: lastSyncAt ?? null,
     lastError: lastError ?? null,
-    appOrigin: appOrigin ?? null,
+    appUrl: await appUrl(),
   };
 }
 
@@ -172,7 +209,7 @@ async function handle(msg, sender) {
       } catch (e) {
         return { ok: false, error: `Couldn't send the code: ${e.message}` };
       }
-      await set({ pending: { config, email }, appOrigin: new URL(sender.url).origin });
+      await set({ pending: { config, email }, appUrl: appUrlFrom(sender.url, msg.site) });
       return { ok: true };
     }
 
@@ -183,7 +220,7 @@ async function handle(msg, sender) {
       const config = { url: supabaseUrl.replace(/\/$/, ""), anonKey };
       try {
         const auth = await api.signInWithPassword(config, email, password);
-        await set({ config, auth, pending: null, lastError: null, appOrigin: new URL(sender.url).origin });
+        await set({ config, auth, pending: null, lastError: null, appUrl: appUrlFrom(sender.url, msg.site) });
       } catch (e) {
         return { ok: false, error: `Couldn't connect: ${e.message}` };
       }
@@ -208,13 +245,12 @@ async function handle(msg, sender) {
       const { config, auth } = await get(["config", "auth"]);
       if (config && auth) await api.signOut(config, auth);
       await set({ auth: null, focus: { active: false } });
-      await applyBlocking({ active: false });
+      await queue(() => applyBlocking({ active: false }));
       return status();
     }
 
     case "OPEN_APP": {
-      const { appOrigin } = await get("appOrigin");
-      await chrome.tabs.create({ url: `${appOrigin ?? "http://localhost:3000"}/${msg.path ?? "today"}` });
+      await chrome.tabs.create({ url: new URL(msg.path ?? "today", await appUrl()).href });
       return { ok: true };
     }
 

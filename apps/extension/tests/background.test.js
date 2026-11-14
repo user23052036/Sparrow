@@ -9,6 +9,10 @@ const badge = { text: "" };
 const tabsUpdated = [];
 let openTabs = [];
 let onMessage;
+const tabsCreated = [];
+// Sites the person has allowed the calm page on (chrome.permissions). youtube.com is allowed.
+const grantedOrigins = new Set(["*://youtube.com/*", "*://*.youtube.com/*"]);
+const permissionListeners = [];
 
 globalThis.chrome = {
   storage: {
@@ -63,7 +67,16 @@ globalThis.chrome = {
     async update(id, props) {
       tabsUpdated.push({ id, ...props });
     },
-    async create() {},
+    async create(props) {
+      tabsCreated.push(props);
+    },
+  },
+  permissions: {
+    async contains({ origins }) {
+      return origins.every((o) => grantedOrigins.has(o));
+    },
+    onAdded: { addListener: (fn) => permissionListeners.push(fn) },
+    onRemoved: { addListener: (fn) => permissionListeners.push(fn) },
   },
 };
 
@@ -177,8 +190,29 @@ test("session ends on the server: blocking is removed on next sync", async () =>
 test("new session with more sites: rules grow", async () => {
   server.active = true;
   server.domains = ["youtube.com", "reddit.com"];
-  await send({ type: "SPARROW_SYNC_NOW" });
+  const s = await send({ type: "SPARROW_SYNC_NOW" });
   assert.equal(rules.length, 4);
+  // reddit.com was never allowed: blocked by the browser, and the popup offers to allow it.
+  const reddit = rules.find((r) => r.condition.requestDomains[0] === "reddit.com" && r.condition.resourceTypes[0] === "main_frame");
+  assert.deepEqual(reddit.action, { type: "block" });
+  assert.deepEqual(s.needAccess, ["reddit.com"]);
+});
+
+test("allowing a site switches it to the calm blocked page straight away", async () => {
+  grantedOrigins.add("*://reddit.com/*");
+  grantedOrigins.add("*://*.reddit.com/*");
+  for (const fn of permissionListeners) fn({ origins: ["*://reddit.com/*"] });
+  await new Promise((r) => setTimeout(r, 20));
+  const reddit = rules.find((r) => r.condition.requestDomains[0] === "reddit.com" && r.condition.resourceTypes[0] === "main_frame");
+  assert.equal(reddit.action.type, "redirect");
+  assert.deepEqual((await send({ type: "SPARROW_STATUS" })).needAccess, []);
+});
+
+test("opens Sparrow under the base path the site reported when connecting", async () => {
+  await send(connectMsg({ site: "https://owner.github.io/Sparrow" }), { tab: { id: 2 }, url: "https://owner.github.io/Sparrow/extension" });
+  await send({ type: "OPEN_APP", path: "focus" });
+  assert.equal(tabsCreated.at(-1).url, "https://owner.github.io/Sparrow/focus");
+  assert.equal((await send({ type: "SPARROW_STATUS" })).appUrl, "https://owner.github.io/Sparrow/");
 });
 
 test("signed out elsewhere: extension stops enforcing and asks to reconnect", async () => {

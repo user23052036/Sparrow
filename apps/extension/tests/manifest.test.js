@@ -11,7 +11,12 @@ const exists = (p) => existsSync(join(root, p));
 test("manifest is MV3 with the permissions blocking needs", () => {
   assert.equal(manifest.manifest_version, 3);
   for (const p of ["storage", "alarms", "declarativeNetRequest"]) assert.ok(manifest.permissions.includes(p), p);
-  assert.ok(manifest.host_permissions.includes("<all_urls>"));
+});
+
+test("no site access at install: listed sites are asked for one by one (optional_host_permissions)", () => {
+  assert.equal(manifest.host_permissions, undefined);
+  assert.deepEqual(manifest.optional_host_permissions, ["*://*/*"]);
+  assert.ok(!JSON.stringify(manifest.permissions).includes("<all_urls>"));
 });
 
 test("every file the manifest points at exists", () => {
