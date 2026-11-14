@@ -165,3 +165,22 @@ test("sharing a proof notifies the partner; a private one does not", async ({ pa
   await expect(walk.getByText(copy.today.proofsSaved(1))).toBeVisible();
   expect(fake.notifyCalls).toHaveLength(1);
 });
+
+test("reminder times are off by default, and saved in the person's own time zone", async ({ page, fake }) => {
+  fake.seedUser();
+  await signIn(page, fake);
+  await page.getByRole("link", { name: copy.nav.settings }).click();
+  const form = page.getByRole("form", { name: copy.push.remindTitle });
+  await expect(form.getByLabel(copy.push.remindAt(copy.push.remindMorning))).toBeDisabled();
+  await form.getByRole("checkbox", { name: copy.push.remindMorning }).check();
+  await form.getByLabel(copy.push.remindAt(copy.push.remindMorning)).fill("07:15");
+  await form.getByRole("checkbox", { name: copy.push.remindEvening }).check();
+  await form.getByRole("button", { name: copy.push.remindSave }).click();
+  await expect(form.getByText(copy.push.remindSaved)).toBeVisible();
+  expect(fake.db.profiles[0].remind_morning).toBe("07:15");
+  expect(fake.db.profiles[0].remind_evening).toBe("20:30");
+
+  await form.getByRole("checkbox", { name: copy.push.remindMorning }).uncheck();
+  await form.getByRole("button", { name: copy.push.remindSave }).click();
+  await expect.poll(() => fake.db.profiles[0].remind_morning).toBeNull();
+});

@@ -1315,3 +1315,72 @@ select pg_temp.expect_error(format('select claim_push(%L, %L)', 'key_request', :
 select pg_temp.expect_error($q$select save_push_subscription('https://fcm.googleapis.com/fcm/send/a', repeat('k', 87), repeat('a', 22))$q$,
   'anonymous visitors cannot save a push address');
 reset role;
+
+-- ------------------------------------------------------------ reminders (0029)
+insert into auth.users values
+  ('29292929-0000-0000-0000-000000000001', 'r1@test'), ('29292929-0000-0000-0000-000000000002', 'r2@test'),
+  ('29292929-0000-0000-0000-000000000003', 'r3@test');
+select pg_temp.as_user('29292929-0000-0000-0000-000000000001');
+update profiles set timezone = 'Asia/Kolkata', remind_morning = '08:00', remind_evening = '21:00';
+select pg_temp.check((select remind_morning from profiles) = '08:00', 'a person sets their own reminder times');
+select pg_temp.expect_error($q$select claim_due_reminders()$q$, 'people cannot run the reminder job themselves');
+select pg_temp.expect_error($q$select * from reminder_sent$q$, 'nobody reads the reminder log');
+select pg_temp.expect_error($q$select * from reminder_job$q$, 'nobody reads the reminder job''s secret');
+select pg_temp.expect_error($q$select configure_reminders('https://example.com/functions/v1/remind')$q$, 'people cannot reschedule reminders');
+reset role;
+select pg_temp.as_user('29292929-0000-0000-0000-000000000002');
+update profiles set timezone = 'America/New_York', remind_morning = '07:30', remind_evening = '23:00';
+reset role;
+select pg_temp.as_user('29292929-0000-0000-0000-000000000003');
+update profiles set timezone = 'UTC'; -- reminders stay off by default
+reset role;
+select pg_temp.check((select remind_morning is null and remind_evening is null from profiles where id = '29292929-0000-0000-0000-000000000003'),
+  'reminders are off by default');
+
+update profiles set timezone = 'Not/A_Zone', remind_morning = '08:00' where id = '29292929-0000-0000-0000-000000000003';
+-- 02:45 UTC on 15 Nov = 08:15 in Kolkata, 21:45 on 14 Nov in New York
+create temp table rem as select * from claim_due_reminders('2026-11-15 02:45+00') where user_id::text like '29292929%';
+select pg_temp.check(not exists (select 1 from rem where user_id = '29292929-0000-0000-0000-000000000003'), 'a profile with an unknown time zone is skipped, not an error for everyone');
+select pg_temp.check((select count(*) from rem) = 1 and exists (select 1 from rem where user_id = '29292929-0000-0000-0000-000000000001' and slot = 'morning'),
+  'the morning reminder follows the person''s own time zone');
+select pg_temp.check(not exists (select 1 from claim_due_reminders('2026-11-15 02:50+00') where user_id::text like '29292929%'),
+  'a reminder is sent once, however often the job runs');
+select pg_temp.check((select local_date from reminder_sent where user_id = '29292929-0000-0000-0000-000000000001') = '2026-11-15',
+  'the reminder belongs to the person''s local day');
+-- 04:10 UTC = 23:10 the day before in New York
+select pg_temp.check(exists (select 1 from claim_due_reminders('2026-11-15 04:10+00') where user_id = '29292929-0000-0000-0000-000000000002' and slot = 'evening'),
+  'a late-evening reminder is not lost at midnight');
+-- 15:31 UTC = 21:01 in Kolkata, but R1 already reviewed that day
+insert into daily_plans (user_id, date, committed_at, reviewed_at) values ('29292929-0000-0000-0000-000000000001', '2026-11-15', now(), now());
+select pg_temp.check(not exists (select 1 from claim_due_reminders('2026-11-15 15:31+00') where user_id = '29292929-0000-0000-0000-000000000001'),
+  'no reminder on a day already reviewed');
+-- 16 Nov, 02:40 UTC = 08:10 in Kolkata, but the day is already planned
+insert into daily_plans (user_id, date, committed_at) values ('29292929-0000-0000-0000-000000000001', '2026-11-16', now());
+select pg_temp.check(not exists (select 1 from claim_due_reminders('2026-11-16 02:40+00') where user_id = '29292929-0000-0000-0000-000000000001'),
+  'no morning reminder once the day is planned');
+select pg_temp.check(exists (select 1 from claim_due_reminders('2026-11-16 15:40+00') where user_id = '29292929-0000-0000-0000-000000000001' and slot = 'evening'),
+  'a planned day still gets its evening reminder');
+-- 17 Nov: the job was down until 11:00 in Kolkata (more than two hours late)
+select pg_temp.check(not exists (select 1 from claim_due_reminders('2026-11-17 05:30+00') where user_id = '29292929-0000-0000-0000-000000000001'),
+  'a reminder more than two hours late is skipped');
+-- 18 Nov: both slots sent, then the person moves the morning time later; still at most two that day
+select pg_temp.check((select count(*) from claim_due_reminders('2026-11-18 02:35+00') where user_id = '29292929-0000-0000-0000-000000000001') = 1, 'morning on the 18th');
+select pg_temp.check((select count(*) from claim_due_reminders('2026-11-18 15:35+00') where user_id = '29292929-0000-0000-0000-000000000001') = 1, 'evening on the 18th');
+update profiles set remind_morning = '22:00' where id = '29292929-0000-0000-0000-000000000001';
+select pg_temp.check(not exists (select 1 from claim_due_reminders('2026-11-18 16:35+00') where user_id = '29292929-0000-0000-0000-000000000001'),
+  'at most two reminders a day, even after changing the times');
+select pg_temp.check((select count(*) from reminder_sent where user_id = '29292929-0000-0000-0000-000000000001' and local_date = '2026-11-18') = 2,
+  'two reminders logged for that day');
+-- a 23:57 reminder in New York, caught by the run at 00:00 (05:00 UTC), still counts for its own day
+update profiles set remind_evening = '23:57' where id = '29292929-0000-0000-0000-000000000002';
+select pg_temp.check(not exists (select 1 from claim_due_reminders('2026-11-21 04:55+00') where user_id = '29292929-0000-0000-0000-000000000002'), 'not before 23:57');
+select pg_temp.check(exists (select 1 from claim_due_reminders('2026-11-21 05:00+00') where user_id = '29292929-0000-0000-0000-000000000002' and slot = 'evening'),
+  'a reminder just before midnight is sent by the first run after it');
+select pg_temp.check((select local_date from reminder_sent where user_id = '29292929-0000-0000-0000-000000000002' order by sent_at desc limit 1) = '2026-11-20',
+  'and it belongs to the day it was set for');
+-- the job's secret
+select pg_temp.check(configure_reminders('https://abc.supabase.co/functions/v1/remind') like 'pg_cron or pg_net is not available%',
+  'without pg_cron the job is recorded but not scheduled');
+select pg_temp.check(reminder_secret_ok((select secret::text from reminder_job)) and not reminder_secret_ok('guess'), 'only the job''s own secret is accepted');
+select pg_temp.check(configure_reminders('https://abc.supabase.co/functions/v1/remind') is not null and (select count(*) from reminder_job) = 1,
+  'configuring twice keeps one job');

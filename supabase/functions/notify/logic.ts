@@ -1,5 +1,7 @@
 // Pure logic for the notify Edge Function (D38, ROADMAP T2.1), with sending and the database injected
 // so it can be unit-tested with `node --test` (no Deno needed).
+import { deliver, type Delivery, type Tally } from "../_shared/push.ts";
+export { PUSH_ENDPOINT, type Subscription } from "../_shared/push.ts";
 
 export const PUSH_KINDS = ["key_request", "key_answer", "proof_shared"] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
@@ -29,10 +31,6 @@ export interface PushPayload {
   actions?: { action: string; title: string }[];
 }
 
-/** The browsers' own push services. Mirrors the check on push_subscriptions.endpoint (0028; pinned by logic.test.ts). */
-export const PUSH_ENDPOINT =
-  /^https:\/\/(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|([a-z0-9-]+\.)*push\.apple\.com|([a-z0-9-]+\.)+notify\.windows\.com)\//;
-
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function parseRequest(body: unknown): { kind: PushKind; ref: string } | null {
@@ -58,45 +56,14 @@ export function buildPayload(kind: PushKind, ref: string): PushPayload {
   return { ...t, url: "partner", tag: `proof-${ref}` };
 }
 
-export interface Subscription {
-  id: string;
-  endpoint: string;
-  p256dh: string;
-  auth: string;
-}
-export interface Deps {
+export interface Deps extends Delivery {
   /** Asks the database, as the caller, who should hear about this event (claim_push); null means nobody. */
   claim(kind: PushKind, ref: string): Promise<string | null>;
-  subscriptionsOf(userId: string): Promise<Subscription[]>;
-  /** Sends one encrypted push; rejects with an error that has `statusCode` when the push service says no. */
-  send(sub: Subscription, payload: string): Promise<void>;
-  remove(subscriptionId: string): Promise<void>;
 }
 
-/** Claims the event, then sends to every browser of the recipient. Gone browsers (404/410) are forgotten. */
-export async function notify(kind: PushKind, ref: string, deps: Deps): Promise<{ sent: number; removed: number; failed: number }> {
+/** Claims the event, then sends to every browser of the recipient. */
+export async function notify(kind: PushKind, ref: string, deps: Deps): Promise<Tally> {
   const target = await deps.claim(kind, ref);
   if (!target) return { sent: 0, removed: 0, failed: 0 };
-  const payload = JSON.stringify(buildPayload(kind, ref));
-  let sent = 0,
-    removed = 0,
-    failed = 0;
-  for (const sub of await deps.subscriptionsOf(target)) {
-    // Never send anywhere but a push service, whatever is in the table.
-    if (!PUSH_ENDPOINT.test(sub.endpoint)) {
-      failed++;
-      continue;
-    }
-    try {
-      await deps.send(sub, payload);
-      sent++;
-    } catch (e) {
-      const code = (e as { statusCode?: number }).statusCode;
-      if (code === 404 || code === 410) {
-        await deps.remove(sub.id);
-        removed++;
-      } else failed++;
-    }
-  }
-  return { sent, removed, failed };
+  return deliver(target, JSON.stringify(buildPayload(kind, ref)), deps);
 }

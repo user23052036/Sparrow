@@ -149,6 +149,19 @@ export const copy = {
     notReady: "Notifications aren't set up on this server yet.",
     confirmLetOut: "You chose “Let them out” in the notification. Tap the button once more to confirm.",
     confirmKeepGoing: "You chose “Keep going” in the notification. Tap the button once more to confirm.",
+    /** Mirrored in supabase/functions/remind/logic.ts (pinned by its test). */
+    reminders: {
+      morning: { title: "Good morning", body: "What's one small thing for today? Open Sparrow to plan it." },
+      evening: { title: "How did today go?", body: "Close the day in Sparrow when you're ready. Partly done counts." },
+    },
+    remindTitle: "Reminders",
+    remindBody:
+      "A gentle nudge to plan your day and to close it. At most two a day, never once the day is closed. They arrive as notifications, so turn those on above too.",
+    remindMorning: "Morning reminder",
+    remindEvening: "Evening reminder",
+    remindAt: (which: string) => `${which} time`,
+    remindSave: "Save reminders",
+    remindSaved: "Saved.",
   },
   settings: {
     title: "Settings",
@@ -552,7 +565,7 @@ export const copy = {
     intro: "Sparrow is built for people who may be having a hard time, so it keeps what it knows about you small and private.",
     keepTitle: "What Sparrow keeps",
     keep: [
-      "Your account (email), name and time zone.",
+      "Your account (email), name and time zone, and your reminder times if you set any.",
       "Your tasks and steps (with any if-then plans and calendar notes), daily plans, moods, points, kind acts and focus sessions.",
       "Proof photos, voice notes and written notes. These are private unless you share one with your partner. For a photo, also how many hours passed between the photo's own date and adding it (read on your device; the rest of the photo's hidden details are removed before upload).",
       "If you join a circle: its name and who is in it, the cheers you send, and the made-up name you chose for it, if any.",
