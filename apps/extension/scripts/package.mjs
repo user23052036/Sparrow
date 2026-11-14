@@ -1,15 +1,15 @@
-// Usage: SPARROW_ORIGIN=https://your-app.example.com npm run package -w apps/extension
+// Usage: SPARROW_SITE=https://owner.github.io/Sparrow/ npm run package -w apps/extension
 // Writes dist/sparrow-focus-<version>.zip ready for the Chrome Web Store dashboard.
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { STORE_FILES, storeManifest } from "./store-manifest.mjs";
+import { STORE_FILES, storeManifest, storeSiteModule } from "./store-manifest.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const origin = process.env.SPARROW_ORIGIN;
+const origin = process.env.SPARROW_SITE ?? process.env.SPARROW_ORIGIN; // SPARROW_ORIGIN: the older name
 if (!origin) {
-  console.error("Set SPARROW_ORIGIN to the https origin of your deployed Sparrow site, e.g. SPARROW_ORIGIN=https://sparrow.example.com");
+  console.error("Set SPARROW_SITE to the https address of your deployed Sparrow site, e.g. SPARROW_SITE=https://owner.github.io/Sparrow/");
   process.exit(1);
 }
 
@@ -20,6 +20,7 @@ rmSync(join(root, "dist"), { recursive: true, force: true });
 mkdirSync(stage, { recursive: true });
 for (const f of STORE_FILES) cpSync(join(root, f), join(stage, f), { recursive: true });
 writeFileSync(join(stage, "manifest.json"), JSON.stringify(store, null, 2) + "\n");
+writeFileSync(join(stage, "lib", "site.js"), storeSiteModule(origin));
 
 const zip = join(root, "dist", `sparrow-focus-${manifest.version}.zip`);
 execFileSync("zip", ["-qr", zip, "."], { cwd: stage });

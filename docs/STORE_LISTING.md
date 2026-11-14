@@ -1,6 +1,6 @@
 # Chrome Web Store listing (draft)
 
-Build the upload with `SPARROW_ORIGIN=https://your-site.example npm run package --prefix apps/extension`. The packager (`scripts/store-manifest.mjs`) points the content script at your deployed https site instead of localhost and ships only the runtime files. `npm run test:extension` covers it. It does **not** change `permissions` or `host_permissions`.
+Build the upload with `SPARROW_SITE=https://user23052036.github.io/Sparrow/ npm run package --prefix apps/extension` (any https address works, with or without a folder). The packager (`scripts/store-manifest.mjs`) points the content script at that site instead of localhost, makes the extension open that site before the person connects (`lib/site.js`), and ships only the runtime files. `npm run test:extension` covers it. It does not change `permissions`.
 
 ## Name and summary
 
@@ -26,7 +26,7 @@ Block the websites a signed-in user chose, only while that user has an active fo
 | `declarativeNetRequest` | Applies the block rules for the sites the user chose, without reading page content. |
 | `storage` | Keeps the user's own sign-in tokens and the current block list on this device. |
 | `alarms` | Wakes the extension to start and end sessions on time and send a heartbeat. |
-| `host_permissions: <all_urls>` | Needed so block rules can redirect any site the user chooses to the "This can wait" page, and to reach the user's own Sparrow backend. The extension does not read or modify other sites' page content; its only content script runs on the Sparrow site itself. |
+| `optional_host_permissions: *://*/*` | Nothing is granted at install. When the user's block list has a site the extension may not touch yet, the popup offers to allow it, and Chrome asks for that site only (and its subdomains). With it, a blocked page is replaced by the calm "This can wait" page; without it, the site is still blocked, with the browser's own page. The extension does not read or modify page content; its only content script runs on the Sparrow site itself. |
 
 ## Data disclosures
 
@@ -44,5 +44,5 @@ Block the websites a signed-in user chose, only while that user has an active fo
 
 ## Review risks to expect
 
-- `<all_urls>` is the biggest review risk: reviewers question broad host access. Before submitting, test whether the extension still works with narrower host permissions (for example only the Sparrow backend plus `declarativeNetRequest` rules that block rather than redirect). If it does, narrow it; if not, keep the justification above accurate.
+- Broad host access was the biggest review risk; since D42 there is none at install, only per-site optional access the user grants from the popup. The flow has unit tests but has not been tried in a real Chrome yet: check that the popup's "Allow" button opens Chrome's prompt and that a granted site then shows the calm page.
 - The single-purpose statement above must match the store description and the actual behavior.

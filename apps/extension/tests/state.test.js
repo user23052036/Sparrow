@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildRules, endsAtLocal, isActive, minutesLeft, isAllowedSupabaseUrl } from "../lib/state.js";
+import { appUrlFrom, buildRules, endsAtLocal, isActive, minutesLeft, isAllowedSupabaseUrl, originPatterns } from "../lib/state.js";
 import { normalizeDomain, normalizeDomainList, hostMatches } from "../lib/domains.js";
 
 test("endsAtLocal corrects for a fast local clock", () => {
@@ -51,4 +51,25 @@ test("domain helpers match the web app's rules", () => {
   assert.equal(hostMatches("m.youtube.com", ["youtube.com"]), true);
   assert.equal(hostMatches("notyoutube.com", ["youtube.com"]), false);
   assert.equal(hostMatches("www.reddit.com", ["reddit.com"]), true);
+});
+
+test("buildRules redirects only sites the person allowed; the rest are still blocked", () => {
+  const rules = buildRules(["a.com", "b.com"], "/blocked.html", ["b.com"]);
+  assert.deepEqual(rules[0].action, { type: "block" });
+  assert.deepEqual(rules[0].condition.resourceTypes, ["main_frame"]);
+  assert.equal(rules[2].action.type, "redirect");
+  assert.deepEqual(rules[1].action, { type: "block" });
+  assert.deepEqual(rules[3].action, { type: "block" });
+});
+
+test("originPatterns covers the site and its subdomains", () => {
+  assert.deepEqual(originPatterns("youtube.com"), ["*://youtube.com/*", "*://*.youtube.com/*"]);
+});
+
+test("appUrlFrom keeps the base path the page reports, but only on the sender's own origin", () => {
+  assert.equal(appUrlFrom("https://owner.github.io/Sparrow/extension", "https://owner.github.io/Sparrow"), "https://owner.github.io/Sparrow/");
+  assert.equal(appUrlFrom("https://owner.github.io/Sparrow/extension", "https://owner.github.io/Sparrow/"), "https://owner.github.io/Sparrow/");
+  assert.equal(appUrlFrom("http://localhost:3000/extension", "http://localhost:3000"), "http://localhost:3000/");
+  assert.equal(appUrlFrom("https://owner.github.io/Sparrow/extension", "https://evil.example.com/"), "https://owner.github.io/");
+  assert.equal(appUrlFrom("http://localhost:3000/extension", undefined), "http://localhost:3000/");
 });

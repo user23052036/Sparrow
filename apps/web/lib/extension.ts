@@ -1,4 +1,5 @@
 "use client";
+import { siteUrl } from "./site";
 /**
  * Talks to the Sparrow browser extension through window.postMessage. The
  * extension's content script (apps/extension/content.js) relays messages to its
@@ -30,7 +31,7 @@ export function extRequest<T = Record<string, unknown>>(type: string, payload: R
       else resolve(d);
     }
     window.addEventListener("message", onMsg);
-    window.postMessage({ source: "sparrow-web", id, type, ...payload }, window.location.origin);
+    window.postMessage({ source: "sparrow-web", id, type, site: siteUrl(), ...payload }, window.location.origin);
   });
 }
 

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { STORE_FILES, storeManifest } from "../scripts/store-manifest.mjs";
+import { STORE_FILES, storeManifest, storeSite, storeSiteModule } from "../scripts/store-manifest.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
@@ -15,9 +15,24 @@ test("store manifest points the content script at the deployed site only", () =>
   assert.ok(JSON.stringify(manifest).includes("localhost"), "the source manifest is left untouched");
 });
 
-test("store manifest refuses unsafe origins", () => {
-  for (const bad of ["http://sparrow.example.com", "sparrow.example.com", "https://sparrow.example.com/app", "https://x.com/?a=1", ""]) {
+test("store manifest works for a site served from a folder, like GitHub Pages", () => {
+  for (const site of ["https://owner.github.io/Sparrow", "https://owner.github.io/Sparrow/"]) {
+    assert.deepEqual(storeManifest(manifest, site).content_scripts[0].matches, ["https://owner.github.io/Sparrow/*"]);
+  }
+  assert.equal(storeSite("https://sparrow.example.com"), "https://sparrow.example.com/");
+});
+
+test("the store package opens the deployed site, never localhost", () => {
+  const mod = storeSiteModule("https://owner.github.io/Sparrow");
+  assert.match(mod, /export const DEFAULT_SITE = "https:\/\/owner\.github\.io\/Sparrow\/";/);
+  assert.ok(!mod.includes("localhost"));
+  assert.match(readFileSync(join(root, "lib/site.js"), "utf8"), /DEFAULT_SITE = "http:\/\/localhost:3000\/"/, "the unpacked copy stays on the dev server");
+});
+
+test("store manifest refuses unsafe sites", () => {
+  for (const bad of ["http://sparrow.example.com", "sparrow.example.com", "https://x.com/?a=1", "https://x.com/#top", "https://u:p@x.com/", ""]) {
     assert.throws(() => storeManifest(manifest, bad), bad);
+    assert.throws(() => storeSiteModule(bad), bad);
   }
 });
 
