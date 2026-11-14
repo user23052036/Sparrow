@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { copy } from "@sparrow/shared";
 import { useAuth } from "@/lib/auth";
 import { supabase, errorText } from "@/lib/supabase";
+import { turnOffPush } from "@/lib/push";
 
 const zones = (): string[] => {
   try {
@@ -74,6 +75,8 @@ export function ProfileForm({ mode }: { mode: "onboarding" | "settings" }) {
             type="button"
             className="ghost"
             onClick={async () => {
+              // This browser stops getting this person's notifications (best effort; it works the same without).
+              await turnOffPush().catch(() => {});
               await supabase().auth.signOut();
               router.replace("/");
             }}

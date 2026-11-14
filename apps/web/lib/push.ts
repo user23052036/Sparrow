@@ -36,6 +36,14 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
   return reg ? reg.pushManager.getSubscription() : null;
 }
 
+/** On for the signed-in person: this browser is subscribed and the saved row is theirs (RLS shows only own rows). */
+export async function pushIsOnForMe(): Promise<boolean> {
+  const sub = await currentSubscription();
+  if (!sub) return false;
+  const { data } = await supabase().from("push_subscriptions").select("id").eq("endpoint", sub.endpoint);
+  return (data ?? []).length > 0;
+}
+
 export type TurnOnResult = "on" | "denied" | "unsupported" | "not-ready";
 
 export async function turnOnPush(): Promise<TurnOnResult> {

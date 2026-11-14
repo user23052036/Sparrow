@@ -107,7 +107,9 @@ jobs:
         env:
           VAPID_SUBJECT: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
         run: |
-          if supabase secrets list --project-ref "$SUPABASE_PROJECT_REF" | grep -q VAPID_PUBLIC_KEY; then
+          # Listed on its own first: if listing fails, the step stops instead of replacing the live keys.
+          list=$(supabase secrets list --project-ref "$SUPABASE_PROJECT_REF")
+          if grep -q VAPID_PUBLIC_KEY <<<"$list"; then
             echo "Web Push keys already exist; leaving them as they are."
           else
             keys=$(npx --yes web-push@3.6.7 generate-vapid-keys --json)

@@ -29,6 +29,10 @@ export interface PushPayload {
   actions?: { action: string; title: string }[];
 }
 
+/** The browsers' own push services. Mirrors the check on push_subscriptions.endpoint (0028; pinned by logic.test.ts). */
+export const PUSH_ENDPOINT =
+  /^https:\/\/(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|([a-z0-9-]+\.)*push\.apple\.com|([a-z0-9-]+\.)+notify\.windows\.com)\//;
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function parseRequest(body: unknown): { kind: PushKind; ref: string } | null {
@@ -78,6 +82,11 @@ export async function notify(kind: PushKind, ref: string, deps: Deps): Promise<{
     removed = 0,
     failed = 0;
   for (const sub of await deps.subscriptionsOf(target)) {
+    // Never send anywhere but a push service, whatever is in the table.
+    if (!PUSH_ENDPOINT.test(sub.endpoint)) {
+      failed++;
+      continue;
+    }
     try {
       await deps.send(sub, payload);
       sent++;

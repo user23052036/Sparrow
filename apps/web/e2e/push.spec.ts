@@ -16,8 +16,8 @@ async function mockPush(page: Page, opts: { deny?: boolean } = {}) {
         async subscribe(o: { userVisibleOnly: boolean; applicationServerKey: Uint8Array }) {
           w.__subscribed = { userVisibleOnly: o.userVisibleOnly, keyBytes: o.applicationServerKey.byteLength };
           current = {
-            endpoint: "https://push.example.com/send/this-browser",
-            toJSON: () => ({ endpoint: "https://push.example.com/send/this-browser", keys: { p256dh: "B".repeat(87), auth: "a".repeat(22) } }),
+            endpoint: "https://fcm.googleapis.com/fcm/send/this-browser",
+            toJSON: () => ({ endpoint: "https://fcm.googleapis.com/fcm/send/this-browser", keys: { p256dh: "B".repeat(87), auth: "a".repeat(22) } }),
             async unsubscribe() {
               current = null;
               w.__unsubscribed = true;
@@ -59,12 +59,30 @@ test("turning notifications on saves this browser with the server's key; turning
   await expect(panel.getByText(copy.push.on)).toBeVisible();
   expect(await page.evaluate(() => (window as unknown as { __subscribed: unknown }).__subscribed)).toEqual({ userVisibleOnly: true, keyBytes: 65 });
   expect(fake.db.push_subscriptions).toHaveLength(1);
-  expect(fake.db.push_subscriptions[0].endpoint).toBe("https://push.example.com/send/this-browser");
+  expect(fake.db.push_subscriptions[0].endpoint).toBe("https://fcm.googleapis.com/fcm/send/this-browser");
 
   await panel.getByRole("button", { name: copy.push.turnOff }).click();
   await expect(panel.getByRole("button", { name: copy.push.turnOn })).toBeVisible();
   expect(fake.db.push_subscriptions).toHaveLength(0);
   expect(await page.evaluate(() => (window as unknown as { __unsubscribed: boolean }).__unsubscribed)).toBe(true);
+});
+
+test("a browser someone else switched on shows as off, and signing out stops this person's notifications", async ({ page, fake }) => {
+  await mockPush(page);
+  fake.seedUser();
+  await signIn(page, fake);
+  await page.getByRole("link", { name: copy.nav.settings }).click();
+  await page.getByRole("button", { name: copy.push.turnOn }).click();
+  await expect(page.getByText(copy.push.on)).toBeVisible();
+  // Another account's row for this browser: RLS would hide it, so the switch must read as off.
+  fake.db.push_subscriptions = [];
+  await page.reload();
+  await expect(page.getByRole("button", { name: copy.push.turnOn })).toBeVisible();
+  await page.getByRole("button", { name: copy.push.turnOn }).click();
+  await expect(page.getByText(copy.push.on)).toBeVisible();
+  await page.getByRole("button", { name: copy.settings.signOut }).click();
+  await expect.poll(() => fake.db.push_subscriptions.length).toBe(0);
+  await page.waitForURL((u) => u.pathname !== "/settings");
 });
 
 test("a blocked permission or a server without keys gets a kind explanation and saves nothing", async ({ page, fake }) => {

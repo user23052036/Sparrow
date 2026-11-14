@@ -6,7 +6,11 @@
 create table public.push_subscriptions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
-  endpoint text not null unique check (endpoint ~ '^https://' and char_length(endpoint) <= 1000),
+  -- Only the browsers' own push services (Chrome/Edge/Samsung via FCM, Firefox, Safari, Windows), so the
+  -- notify function can never be pointed at any other address. Mirrored in supabase/functions/_shared/push.ts.
+  endpoint text not null unique check (
+    endpoint ~ '^https://(fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|([a-z0-9-]+\.)*push\.apple\.com|([a-z0-9-]+\.)+notify\.windows\.com)/'
+    and char_length(endpoint) <= 1000),
   p256dh text not null check (char_length(p256dh) between 20 and 200),
   auth text not null check (char_length(auth) between 8 and 100),
   created_at timestamptz not null default now()
@@ -55,7 +59,8 @@ $$;
 --   key_answer    the caller answered such a request (end_requests id)
 --   proof_shared  the caller shared a proof with their partner (proofs id)
 -- Returns the recipient once per event; a second call, someone else's event, or an event the
--- recipient may not see returns null. The Edge Function sends only to that person's browsers.
+-- recipient may not see returns null. Shared proofs notify at most once per ten minutes per sender, so a
+-- burst of proofs is one notification. The Edge Function sends only to that person's browsers.
 create function public.claim_push(p_kind text, p_ref uuid) returns uuid
 language plpgsql security definer set search_path = '' as $$
 declare uid uuid := public.require_user(); target uuid;
@@ -71,6 +76,10 @@ begin
     select public._partner_of(p.user_id) into target
       from public.proofs p where p.id = p_ref and p.user_id = uid and p.visibility = 'buddy';
     if target is not null and not public.is_buddy_of(uid, target) then target := null; end if;
+    if exists (select 1 from public.push_sent ps join public.proofs p on p.id = ps.ref
+                where ps.kind = 'proof_shared' and p.user_id = uid and ps.created_at > now() - interval '10 minutes') then
+      target := null;
+    end if;
   else
     raise exception 'unknown kind of notification';
   end if;

@@ -79,7 +79,12 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const c of list) {
-        if (c.url.startsWith(self.location.origin + BASE) && "navigate" in c) return c.focus().then(() => c.navigate(target.href));
+        // navigate() refuses a window this worker doesn't control; open a new one then.
+        if (c.url.startsWith(self.location.origin + BASE) && "navigate" in c)
+          return c
+            .focus()
+            .then(() => c.navigate(target.href))
+            .catch(() => self.clients.openWindow(target.href));
       }
       return self.clients.openWindow(target.href);
     }),

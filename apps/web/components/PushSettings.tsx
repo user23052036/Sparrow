@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { copy } from "@sparrow/shared";
 import { errorText } from "@/lib/supabase";
-import { currentSubscription, pushSupported, turnOffPush, turnOnPush } from "@/lib/push";
+import { pushIsOnForMe, pushSupported, turnOffPush, turnOnPush } from "@/lib/push";
 
 /** Settings switch for Web Push (D38). Off by default; on is per browser. */
 export function PushSettings() {
@@ -15,7 +15,8 @@ export function PushSettings() {
       setState("unsupported");
       return;
     }
-    void currentSubscription().then((s) => setState(s ? "on" : "off"));
+    // Another account may have switched this browser on; it shows as off here until this person does.
+    void pushIsOnForMe().then((on) => setState(on ? "on" : "off"));
   }, []);
 
   async function on() {

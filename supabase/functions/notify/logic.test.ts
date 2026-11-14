@@ -1,11 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildPayload, notify, parseRequest, PUSH_TEXT, type Deps, type Subscription } from "./logic.ts";
+import { readFileSync } from "node:fs";
+import { buildPayload, notify, parseRequest, PUSH_ENDPOINT, PUSH_TEXT, type Deps, type Subscription } from "./logic.ts";
 import { copy } from "../../../packages/shared/src/copy.ts";
 
 const REF = "11111111-1111-4111-8111-111111111111";
 const PARTNER = "22222222-2222-4222-8222-222222222222";
-const sub = (id: string): Subscription => ({ id, endpoint: `https://push.example.com/${id}`, p256dh: "k".repeat(87), auth: "a".repeat(22) });
+const sub = (id: string, endpoint = `https://fcm.googleapis.com/fcm/send/${id}`): Subscription => ({
+  id,
+  endpoint,
+  p256dh: "k".repeat(87),
+  auth: "a".repeat(22),
+});
 
 function deps(over: Partial<Deps> & { failures?: Record<string, number> } = {}) {
   const sentTo: string[] = [];
@@ -54,6 +60,29 @@ describe("notify", () => {
     assert.deepEqual(removed, ["old"]);
   });
 
+  it("never sends to an address that isn't a browser push service", async () => {
+    const { d, sentTo } = deps({ subscriptionsOf: async () => [sub("phone"), sub("odd", "https://internal.example.com/hook")] });
+    assert.deepEqual(await notify("key_answer", REF, d), { sent: 1, removed: 0, failed: 1 });
+    assert.deepEqual(sentTo, ["phone"]);
+  });
+
+  it("knows the real push services and refuses look-alikes", () => {
+    for (const ok of [
+      "https://fcm.googleapis.com/fcm/send/x",
+      "https://updates.push.services.mozilla.com/wpush/v2/x",
+      "https://web.push.apple.com/x",
+      "https://wns2-par02p.notify.windows.com/w/?token=x",
+    ])
+      assert.ok(PUSH_ENDPOINT.test(ok), ok);
+    for (const bad of [
+      "http://fcm.googleapis.com/x",
+      "https://fcm.googleapis.com.evil.example/x",
+      "https://evil.example.com/fcm.googleapis.com/",
+      "https://push.apple.com.evil/x",
+    ])
+      assert.ok(!PUSH_ENDPOINT.test(bad), bad);
+  });
+
   it("puts nothing a person wrote into the message", async () => {
     const { d, payloads } = deps();
     await notify("key_request", REF, d);
@@ -82,6 +111,13 @@ describe("payloads", () => {
     for (const bad of [null, {}, { kind: "key_answer" }, { kind: "everything", ref: REF }, { kind: "key_answer", ref: "1; drop table" }]) {
       assert.equal(parseRequest(bad), null);
     }
+  });
+});
+
+describe("the push-service check matches migration 0028", () => {
+  it("the table and the function accept the same addresses", () => {
+    const sql = readFileSync(new URL("../../migrations/0028_web_push.sql", import.meta.url), "utf8");
+    assert.ok(sql.includes(PUSH_ENDPOINT.source.replace(/\\\//g, "/")), "the regex in 0028 differs from PUSH_ENDPOINT");
   });
 });
 
