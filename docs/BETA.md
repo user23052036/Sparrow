@@ -41,7 +41,7 @@ Read them as signals, not grades. With 20 to 50 people a single person moves a r
 
 ## Needs a human (cannot be done from the repo)
 
-0. Deploy the account-deletion function once: `supabase functions deploy delete-account` (keep JWT verification on). Without it the "Delete my account" button in Settings shows an error and nothing is deleted. Try it with a throwaway account first (see D20).
+0. Add the three Supabase secrets listed at the top of `.github/workflows/deploy-db.yml` to the GitHub repository. From then on every push to `main` that touches `supabase/` applies new migrations and deploys the Edge Functions, including `delete-account` (JWT verification stays on); run the "Deploy database" workflow by hand once to do the first deploy. Without the function the "Delete my account" button in Settings shows an error and nothing is deleted. Try it with a throwaway account first (see D20).
 1. Deploy the web app over HTTPS (installability requires it) and put the real address into the privacy page and store listing.
 2. Connect SMTP and turn "Confirm email" back on in Supabase (see D14). Until then, anyone can sign up with an address they do not own.
 3. Enable `pg_cron` in the Supabase project (Database, Extensions). Without it, migration `0008` only prints a notice and heartbeats are checked when a page asks.

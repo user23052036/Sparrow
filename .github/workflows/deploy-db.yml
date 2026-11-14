@@ -1,0 +1,104 @@
+# Deploys the database and Edge Functions to the real Supabase project (ROADMAP T0.2).
+#
+# - On a push to main that touches supabase/: `supabase db push` applies any new migrations, then
+#   `supabase functions deploy` deploys every function in supabase/functions.
+# - On a pull request that touches supabase/: the same CLI pushes all migrations into a throwaway
+#   PostgreSQL 16 (with supabase/tests/supabase_stub.sql standing in for Supabase's own schemas),
+#   so a migration the CLI cannot apply is caught before it reaches main. Nothing real is touched.
+#
+# Needs three repository secrets (Settings > Secrets and variables > Actions):
+#   SUPABASE_ACCESS_TOKEN  a personal access token from supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF   the project's reference id (the part before .supabase.co)
+#   SUPABASE_DB_PASSWORD   the database password chosen when the project was created
+# Without all three the deploy job ends green with a notice and does nothing.
+#
+# Migrations are applied once and never edited (CLAUDE.md), so a push only ever adds new ones.
+name: Deploy database
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/**"
+      - ".github/workflows/deploy-db.yml"
+  pull_request:
+    paths:
+      - "supabase/**"
+      - ".github/workflows/deploy-db.yml"
+
+# One deploy at a time, and never cancel one half way through.
+concurrency:
+  group: deploy-db-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SUPABASE_CLI_VERSION: 2.122.1
+
+jobs:
+  # Pull requests: prove the CLI can apply every migration in order.
+  push-check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust # a throwaway container, so no password at all
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - run: |
+          createdb pushcheck
+          psql -q -v ON_ERROR_STOP=1 -d pushcheck -f supabase/tests/supabase_stub.sql
+      - name: supabase db push (throwaway database)
+        run: supabase db push --db-url "postgresql://postgres@localhost:5432/pushcheck?sslmode=disable" --yes
+      - name: A second push finds nothing to do
+        run: |
+          out=$(supabase db push --db-url "postgresql://postgres@localhost:5432/pushcheck?sslmode=disable" --dry-run --yes 2>&1)
+          echo "$out"
+          echo "$out" | grep -qi 'up to date' || { echo "::error::a second push still had migrations to apply"; exit 1; }
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - name: Check the secrets are set
+        id: secrets
+        run: |
+          missing=""
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_REF SUPABASE_DB_PASSWORD; do
+            [ -n "${!name}" ] || missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::notice title=Database not deployed::Missing repository secrets:$missing. Add them to deploy to Supabase (see the comment at the top of deploy-db.yml)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: actions/checkout@v4
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - name: Link the project
+        if: steps.secrets.outputs.ready == 'true'
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+      - name: Apply new migrations
+        if: steps.secrets.outputs.ready == 'true'
+        run: supabase db push --password "$SUPABASE_DB_PASSWORD" --yes
+      - name: Deploy Edge Functions
+        if: steps.secrets.outputs.ready == 'true'
+        run: supabase functions deploy --project-ref "$SUPABASE_PROJECT_REF" --use-api
