@@ -57,6 +57,8 @@ export class FakeSupabase {
     makeup_steps: [],
     circles: [],
     focus_links: [],
+    focus_sessions: [],
+    tamper_events: [],
   };
   /** Focus links (D35): the keys handed out, and the sessions they started. The real rules are in rls_test.sql. */
   linkKeys: Record<string, string> = {};
@@ -260,6 +262,9 @@ export class FakeSupabase {
     for (const k of Object.keys(this.db)) this.db[k] = [];
     this.uploads = [];
     this.signedIn = false;
+    // The auth user goes too, so the old email and password no longer sign in.
+    this.email = "";
+    this.password = "";
     return this.send(route, 200, { deleted: true });
   }
 
@@ -382,6 +387,10 @@ export class FakeSupabase {
   }
 
   // ------------------------------------------------------------------ RPCs
+  private runningSession(): Row | undefined {
+    const now = new Date().toISOString();
+    return this.db.focus_sessions.filter((x) => !x.ended_at && String(x.ends_at) > now).at(-1);
+  }
   private completion(planId: unknown): number {
     const items = this.db.plan_items.filter((i) => i.daily_plan_id === planId);
     return scoreDay(items.map((i) => i.status as ItemStatus)).completion;
@@ -440,8 +449,37 @@ export class FakeSupabase {
         return ok(0);
       case "check_my_heartbeats":
         return ok(0);
-      case "get_focus_state":
-        return ok({ server_now: new Date().toISOString(), active: false, session_id: null, ends_at: null, domains: [], locked: false });
+      case "get_focus_state": {
+        // As 0005: the newest running session, and the person's own site list.
+        const s = this.runningSession();
+        const domains = (this.db.blocklists[0]?.domains as string[] | undefined) ?? [];
+        return ok({ server_now: new Date().toISOString(), active: !!s, session_id: s?.id ?? null, ends_at: s?.ends_at ?? null, domains, locked: !!s?.locked });
+      }
+      case "start_focus_session": {
+        if (this.runningSession()) throw new RpcError("a focus session is already running");
+        const minutes = Number(args.p_minutes);
+        const row = {
+          id: uid(),
+          user_id: USER_ID,
+          plan_item_id: args.p_item_id ?? null,
+          started_at: new Date().toISOString(),
+          ends_at: new Date(Date.now() + minutes * 60000).toISOString(),
+          ended_at: null,
+          ended_early: false,
+          end_reason: null,
+          locked: !!args.p_locked,
+        };
+        this.db.focus_sessions.push(row);
+        return ok(row);
+      }
+      case "end_focus_session": {
+        const s = this.db.focus_sessions.find((x) => x.id === args.p_session_id && !x.ended_at);
+        if (!s) throw new RpcError("session not found");
+        s.ended_early = String(s.ends_at) > new Date().toISOString();
+        s.ended_at = new Date().toISOString();
+        s.end_reason = args.p_reason ?? null;
+        return ok(s);
+      }
       case "commit_day": {
         const plan = this.planFor(this.today)!;
         const ids = (args.p_task_ids as string[]) ?? [];
