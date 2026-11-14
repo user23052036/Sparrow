@@ -11,11 +11,10 @@ DECISIONS.md are not reversed without a new entry. If a task would contradict on
 `docs/STATUS.md` ("Parked for the owner") and take the next task; do not stop to ask.
 
 ## Where things stand
-- `main` is at 66cc94d: PR #9 (`brief-extras`) is merged, so `main` has everything through D37 and migration `0027`.
-  A local checkout may sit on the old `brief-extras` branch with a stale `main`: run `git fetch origin` and branch from `origin/main`.
-- Start at the task ID that `docs/STATUS.md` names as next (T0.1 on 2026-11-15).
-- Android blocking engine (D29) and phone website blocking (D30) build with Gradle in the `Android build` workflow but have never run on a phone or emulator.
-- Never run against a real Supabase project; not deployed. Tasks T0.2 to T0.5 build the path to that.
+- `main` has the roadmap through T2.2: decisions D1 to D42, migrations to `0029`. Always `git fetch origin` and branch from `origin/main`.
+- Start at the task ID that `docs/STATUS.md` names as next (T2.3 after 2026-11-15).
+- The web app is deployed as a static export on GitHub Pages (https://user23052036.github.io/Sparrow/), with no Supabase project behind it yet; deploy, live-smoke and reminder workflows skip green until the owner adds the secrets.
+- The Android app-blocking engine has run on an emulator in CI (`Android emulator test`); never on a phone. Phone website blocking (D30) has never run.
 
 ## Layout
 `apps/web` Next.js PWA · `apps/extension` MV3 extension, plain JS · `apps/mobile` Expo + Kotlin module
@@ -23,7 +22,7 @@ DECISIONS.md are not reversed without a new entry. If a task would contradict on
 
 ## Rules of the repo
 - New migration file for every DB change; never edit an applied one. Roadmap migration numbers are pre-assigned (`0028` onward): use the number the task names. Every new public function: `revoke ... from public, anon; grant ... to authenticated` (internal `_helpers`: revoke from all).
-- Business rules live in Postgres (D13). Change `supabase/tests/rls_test.sql` together with the migration; use a fresh user-id prefix (used: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1, f1f1f1f1, 24242424, 25252525, 26262626).
+- Business rules live in Postgres (D13). Change `supabase/tests/rls_test.sql` together with the migration; use a fresh user-id prefix (used: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1, f1f1f1f1, 24242424, 25252525, 26262626, 28282828, 29292929). Server-only functions are granted to `service_role` (present in the test stub).
 - All user-facing sentences go in `packages/shared/src/copy.ts` (a test fails on inline JSX sentences and on banned words like "failed", "lazy", "broken").
 - Playwright e2e runs against an in-memory fake (`apps/web/e2e/fake-supabase.ts`, D19): add any new table/RPC there.
 - Shared constants mirrored in SQL or Kotlin have a test pinning them (scoring, light day, pledge, ALWAYS_ALLOWED_PACKAGES vs `BlockRules.kt`, focus-link limits vs `0024`, craft recipes vs `0025`, circle-goal limits vs `0026`, the circle-name pattern and the one-day photo line vs migrations `0022`/`0023`).
@@ -33,7 +32,7 @@ DECISIONS.md are not reversed without a new entry. If a task would contradict on
 - Never: force-push, rewrite `main`, edit an applied migration, weaken or delete a test to get green, or switch off a CI job.
 
 ## Working locally on the owner's Mac (preferred)
-Use the Mac's own git and network: branch from `origin/main`, build the task, run the check list, commit, `git push -u origin <branch>`, then `gh pr create`, `gh pr checks --watch` and `gh pr merge --squash` when `gh` is signed in (`gh auth status`). **The owner has authorized pushing straight to `main`** when `gh` is missing, a merge is refused or CI cannot be read: after the full check list passes, `git fetch && git rebase origin/main`, then `git switch main && git merge --ff-only <branch> && git push origin main`, and say in STATUS what was not run. Never `--force`. If `main` rejects the push (branch protection), keep a pull request open and stack the next task on it instead of working around it. A migration reaches `main` only after `bash supabase/tests/run.sh` has passed (once T0.2 exists, a push to `main` that touches `supabase/` deploys to the real database). Full loop and agent roles: `docs/AUTONOMY.md` sections 1b, 3 and 5. Update `docs/STATUS.md` at the end of every session.
+Use the Mac's own git and network. Run the checks with Node 24 (`fnm exec --using=24 …`; the default Node 20 is too old) and the SQL suite in Docker (`colima start`, then a `postgres:16` container with the repo mounted: see `docs/STATUS.md`). Branch from `origin/main`, build the task, run the check list, commit, `git push -u origin <branch>`, then `gh pr create`, `gh pr checks --watch` and `gh pr merge --squash` when `gh` is signed in (`gh auth status`). **The owner has authorized pushing straight to `main`** when `gh` is missing, a merge is refused or CI cannot be read: after the full check list passes, `git fetch && git rebase origin/main`, then `git switch main && git merge --ff-only <branch> && git push origin main`, and say in STATUS what was not run. Never `--force`. If `main` rejects the push (branch protection), keep a pull request open and stack the next task on it instead of working around it. A migration reaches `main` only after `bash supabase/tests/run.sh` has passed (once T0.2 exists, a push to `main` that touches `supabase/` deploys to the real database). Full loop and agent roles: `docs/AUTONOMY.md` sections 1b, 3 and 5. Update `docs/STATUS.md` at the end of every session.
 
 ## Cloud sandbox only (a Claude session on claude.ai, not a local run)
 ```bash
