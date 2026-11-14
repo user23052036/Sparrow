@@ -16,6 +16,7 @@ export async function smokeFlow(page: Page, { email, password }: { email: string
     await expect(page.getByRole("heading", { name: copy.onboarding.title })).toBeVisible({ timeout: 20_000 });
     await page.getByLabel(copy.settings.name).fill("Smoke");
     await page.getByRole("button", { name: copy.settings.continue }).click();
+    await page.getByRole("link", { name: copy.start.skipTour }).click();
   });
 
   await test.step("commit a day", async () => {
