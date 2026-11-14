@@ -388,3 +388,35 @@ label {
 input[type="number"] {
   max-width: 9rem;
 }
+
+/* Landing page (T1.3): the position, then the three steps. */
+.landing .lead {
+  font-size: 1.15rem;
+  margin: 0;
+}
+.how {
+  list-style: none;
+  counter-reset: how;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.how li {
+  counter-increment: how;
+}
+.how h3 {
+  margin: 0 0 0.25rem;
+}
+.how h3::before {
+  content: counter(how) ". ";
+  color: var(--sky);
+}
+.how p {
+  margin: 0;
+}
+@media (min-width: 700px) {
+  .how {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

@@ -59,10 +59,23 @@ export const copy = {
     loading: "Loading…",
   },
   landing: {
-    title: "Small steps, kept gently.",
-    body: "Pick a few things each morning, focus with distractions blocked on your laptop, and look back each evening. Partial days count. Nothing here is built to shame you.",
+    // The position (ROADMAP section 3).
+    title: "A friend holds the key.",
+    body: "One focus session locks your phone and your laptop together, and only someone you trust can let you out early. No money, no shame, nothing tracked.",
+    stepsTitle: "How it works",
+    steps: [
+      { title: "Plan", body: "Each morning, pick a few small things you could do today. Partly done still counts." },
+      { title: "Lock", body: "Start a focus session. The sites and apps you chose stay away on your laptop and your Android phone until it ends." },
+      {
+        title: "A friend holds the key",
+        body: "Lock the session with someone you trust. Only they can let you out early. They never see your tasks unless you share a proof with them.",
+      },
+    ],
+    sample: "A day on Sparrow",
     start: "Get started",
+    notOpen: "Sign-up isn't open on this site yet.",
     support: "Need support right now?",
+    help: "Help",
   },
   auth: {
     accountDeleted: "Your account and everything in it has been deleted. Take care of yourself.",
