@@ -1,0 +1,61 @@
+# Live smoke test against the REAL Supabase project (ROADMAP T0.4). One throwaway account signs up,
+# commits a day, starts and ends a focus session, then deletes itself (apps/web/e2e-live).
+#
+# Needs the repository variables NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY (the
+# same public values deploy-web.yml uses), "Confirm email" off in Supabase (D14) and the
+# delete-account function deployed (deploy-db.yml). Without the variables it ends green with a notice.
+# Optional variable SMOKE_EMAIL_DOMAIN: the domain for the throwaway address (default example.com).
+name: Live smoke test
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * *" # daily, so a broken deploy is noticed within a day
+  workflow_run:
+    workflows: ["Deploy database"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: smoke-live
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SMOKE_EMAIL_DOMAIN: ${{ vars.SMOKE_EMAIL_DOMAIN }}
+      NEXT_TELEMETRY_DISABLED: 1
+      CI: "true"
+    steps:
+      - name: Check the Supabase variables
+        id: vars
+        run: |
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ] || [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "::notice title=Live smoke test skipped::Repository variables NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are not set, so there is no real project to test."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.vars.outputs.ready == 'true'
+        uses: actions/checkout@v4
+      - if: steps.vars.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.vars.outputs.ready == 'true'
+        run: npm ci
+      - if: steps.vars.outputs.ready == 'true'
+        run: npx playwright install --with-deps chromium
+      - if: steps.vars.outputs.ready == 'true'
+        run: npm run test:live -w apps/web
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: live-smoke-report
+          path: apps/web/playwright-report
+          retention-days: 7
