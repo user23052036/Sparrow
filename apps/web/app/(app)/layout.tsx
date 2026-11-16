@@ -47,7 +47,8 @@ function Guard({ children }: { children: ReactNode }) {
         const next = sessionStorage.getItem("sparrow:next");
         if (next) {
           sessionStorage.removeItem("sparrow:next");
-          if (/^\/(partner|circle)\/join/.test(next) && next !== path) router.replace(next);
+          // A guest partner's key page (D39) asks to come back after signing up, to finish turning into a partner.
+          if ((/^\/(partner|circle)\/join/.test(next) || next === "/key") && next !== path) router.replace(next);
         }
       } catch {
         /* storage unavailable */

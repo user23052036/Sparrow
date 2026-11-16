@@ -1,7 +1,17 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { copy, eventLabel, inviteLink, parseInviteCode, proofContextLines, type PartnerOverview, type PartnerProof, type ProofContext } from "@sparrow/shared";
+import {
+  copy,
+  eventLabel,
+  inviteLink,
+  parseInviteCode,
+  proofContextLines,
+  type NewGuestKey,
+  type PartnerOverview,
+  type PartnerProof,
+  type ProofContext,
+} from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 import { timeAgo } from "@/lib/format";
 import { PartnerPenalty } from "@/components/PartnerPenalty";
@@ -9,6 +19,7 @@ import { SupportNudge } from "@/components/SupportNudge";
 import { PartnerRating } from "@/components/PartnerRating";
 import { siteUrl } from "@/lib/site";
 import { notifyPartner } from "@/lib/push";
+import { GuestKeyCreate, GuestKeyHeld, GuestKeyShown } from "@/components/GuestKey";
 
 type Active = Extract<PartnerOverview, { state: "active" }>;
 
@@ -272,6 +283,12 @@ export default function PartnerPage() {
   const [busy, setBusy] = useState(false);
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState(false);
+  // A new key link for a guest partner (D39): shown once, until dismissed.
+  const [newGuest, setNewGuest] = useState<NewGuestKey | null>(null);
+  const gotGuest = (k: NewGuestKey) => {
+    setNewGuest(k);
+    void load();
+  };
 
   const load = useCallback(async () => {
     const { data, error } = await supabase().rpc("partner_overview");
@@ -337,6 +354,15 @@ export default function PartnerPage() {
               <button disabled={!code.trim()}>{copy.partnerUi.continue}</button>
             </div>
           </form>
+          <GuestKeyCreate onCreated={gotGuest} />
+        </>
+      )}
+
+      {ov.state === "guest" && (
+        <>
+          <h1>{copy.partnerUi.title}</h1>
+          {newGuest && <GuestKeyShown guest={newGuest} onDone={() => setNewGuest(null)} />}
+          <GuestKeyHeld guest={ov.guest} onNewKey={gotGuest} onRemoved={() => void load()} />
         </>
       )}
 
@@ -367,6 +393,7 @@ export default function PartnerPage() {
             </div>
             <p className="small quiet">{copy.partnerUi.waiting}</p>
           </div>
+          <GuestKeyCreate onCreated={gotGuest} />
         </>
       )}
 

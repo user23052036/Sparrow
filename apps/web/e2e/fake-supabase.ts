@@ -86,10 +86,14 @@ export class FakeSupabase {
   uploads: { path: string; bytes: number; type: string }[] = [];
   deleteCalls: unknown[] = [];
   /** Web Push (D38): what the app asked the notify function to send, and the VAPID key it hands out (null: not set up). */
-  notifyCalls: { kind: string; ref: string }[] = [];
+  notifyCalls: { kind: string; ref: string; key?: string }[] = [];
   vapidPublicKey: string | null = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U";
   /** Key requests the signed-in person answered as someone's partner. */
   decided: Row[] = [];
+  /** A guest partner (D39): the key link the owner made, as create_guest_key() keeps it. Real rules: rls_test.sql. */
+  guestKey: { id: string; name: string; key: string; last_seen_at: string | null } | null = null;
+  /** The owner's name as the guest sees it (defaults to the profile's name). */
+  guestOwnerName: string | null = null;
   /** What partner_overview() answers (defaults to "no partner"). */
   partnerOverview: Record<string, unknown> = { state: "none" };
   /** A partner for tests that need one. */
@@ -263,8 +267,10 @@ export class FakeSupabase {
   // ------------------------------------------------------------------ Edge Function: notify (claim_push is in rls_test.sql)
   private notify(route: Route) {
     if (route.request().method() === "GET") return this.send(route, 200, { publicKey: this.vapidPublicKey });
-    if (!this.signedIn) return this.send(route, 401, { error: "Please sign in again, then try once more." });
-    this.notifyCalls.push(route.request().postDataJSON() as { kind: string; ref: string });
+    const body = route.request().postDataJSON() as { kind: string; ref: string; key?: string };
+    // A guest partner (D39) has no session: their key is checked by claim_guest_push instead.
+    if (!this.signedIn && !body.key) return this.send(route, 401, { error: "Please sign in again, then try once more." });
+    this.notifyCalls.push(body);
     return this.send(route, 200, { sent: 0, removed: 0, failed: 0 });
   }
 
@@ -407,6 +413,63 @@ export class FakeSupabase {
     const now = new Date().toISOString();
     return this.db.focus_sessions.filter((x) => !x.ended_at && String(x.ends_at) > now).at(-1);
   }
+  /** The guest partner's calls (0030); anything but the current key is refused like the database does. */
+  private guestRpc(route: Route, name: string, args: Row) {
+    const g = this.guestKey;
+    if (!g || args.p_key !== g.key) return this.send(route, 400, { code: "28000", message: "this key link isn't valid anymore", details: null, hint: null });
+    const ok = (v: unknown) => this.send(route, 200, v ?? null);
+    const now = new Date().toISOString();
+    switch (name) {
+      case "guest_overview": {
+        g.last_seen_at = now;
+        const running = new Set(this.db.focus_sessions.filter((x) => !x.ended_at && String(x.ends_at) > now).map((x) => x.id));
+        const titleOf = (itemId: unknown) => {
+          const item = this.db.plan_items.find((i) => i.id === itemId);
+          return String(this.db.tasks.find((t) => t.id === item?.task_id)?.title ?? "");
+        };
+        return ok({
+          name: this.guestOwnerName ?? String(this.db.profiles[0]?.display_name ?? "Your friend"),
+          guest: g.name,
+          pending_end_requests: this.db.end_requests
+            .filter((r) => r.status === "pending" && running.has(r.session_id))
+            .map((r) => ({
+              id: r.id,
+              reason: r.reason,
+              created_at: r.created_at,
+              session_ends_at: this.db.focus_sessions.find((x) => x.id === r.session_id)?.ends_at,
+            })),
+          proofs: this.db.proofs
+            .filter((p) => p.visibility === "buddy")
+            .map((p) => ({
+              id: p.id,
+              kind: p.kind,
+              text: p.kind === "text" ? p.text_body : null,
+              task: titleOf(p.plan_item_id),
+              created_at: p.server_created_at ?? now,
+            })),
+        });
+      }
+      case "guest_decide": {
+        const r = this.db.end_requests.find((x) => x.id === args.p_request_id && x.status === "pending");
+        if (!r) return this.send(route, 400, { code: "P0001", message: "request not found", details: null, hint: null });
+        r.status = args.p_approve ? "approved" : "denied";
+        if (args.p_approve) {
+          const s = this.db.focus_sessions.find((x) => x.id === r.session_id && !x.ended_at);
+          if (s) Object.assign(s, { ended_at: now, ended_early: true, locked: false });
+        }
+        return ok({ id: r.id, status: r.status });
+      }
+      case "guest_push_is_on":
+        return ok(this.db.push_subscriptions.some((x) => x.guest_key_id === g.id && x.endpoint === args.p_endpoint));
+      case "save_guest_push":
+        this.db.push_subscriptions = this.db.push_subscriptions.filter((x) => x.endpoint !== args.p_endpoint);
+        this.db.push_subscriptions.push({ id: uid(), user_id: null, guest_key_id: g.id, endpoint: args.p_endpoint, p256dh: args.p_p256dh, auth: args.p_auth });
+        return ok(null);
+      default:
+        this.db.push_subscriptions = this.db.push_subscriptions.filter((x) => !(x.endpoint === args.p_endpoint && x.guest_key_id === g.id));
+        return ok(null);
+    }
+  }
   private completion(planId: unknown): number {
     const items = this.db.plan_items.filter((i) => i.daily_plan_id === planId);
     return scoreDay(items.map((i) => i.status as ItemStatus)).completion;
@@ -426,9 +489,39 @@ export class FakeSupabase {
       link.last_used_at = new Date().toISOString();
       return ok({ started: true, running: true, ...this.linkSession });
     }
+    // a guest partner's calls (0030): the key is the permission, as with focus links
+    if (["guest_overview", "guest_decide", "save_guest_push", "remove_guest_push", "guest_push_is_on"].includes(name)) return this.guestRpc(route, name, args);
     if (!this.signedIn) return this.send(route, 401, { message: "JWT expired" });
 
     switch (name) {
+      case "create_guest_key": {
+        const nm = String(args.p_name ?? "")
+          .trim()
+          .replace(/\s+/g, " ");
+        if (!nm || nm.length > 40) throw new RpcError("give your friend a short name (up to 40 letters)");
+        if (this.partnerOverview.state === "active") throw new RpcError("you already have an accountability partner");
+        if (this.partnerOverview.state === "pending") this.partnerOverview = { state: "none" }; // a guest replaces a waiting invite
+        const hex = Array.from({ length: 64 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
+        this.guestKey = { id: this.guestKey?.id ?? uid(), name: nm, key: `spg_${hex}`, last_seen_at: null };
+        this.db.push_subscriptions = this.db.push_subscriptions.filter((x) => !x.guest_key_id);
+        return ok({ id: this.guestKey.id, name: nm, key: this.guestKey.key });
+      }
+      case "remove_guest_key": {
+        const had = !!this.guestKey;
+        this.guestKey = null;
+        const s = this.runningSession();
+        if (s) s.locked = false;
+        return ok(had);
+      }
+      case "convert_guest_key": {
+        if (!this.guestKey || this.guestKey.key !== args.p_key) throw new RpcError("this key link isn't valid anymore");
+        const owner = this.guestOwnerName ?? String(this.db.profiles[0]?.display_name ?? "Your friend");
+        for (const sub of this.db.push_subscriptions.filter((x) => x.guest_key_id === this.guestKey!.id))
+          Object.assign(sub, { user_id: USER_ID, guest_key_id: null });
+        this.guestKey = null;
+        this.givePartner(owner);
+        return ok({ status: "active" });
+      }
       case "get_today": {
         let plan = this.planFor(this.today);
         if (!plan) {
@@ -460,6 +553,8 @@ export class FakeSupabase {
         return ok(days.map((p) => ({ date: p.date, completion: this.completion(p.id) })));
       }
       case "partner_overview":
+        if (this.guestKey && this.partnerOverview.state === "none")
+          return ok({ state: "guest", guest: { name: this.guestKey.name, created_at: new Date().toISOString(), last_seen_at: this.guestKey.last_seen_at } });
         return ok(this.partnerOverview);
       case "partner_badge":
         return ok(0);

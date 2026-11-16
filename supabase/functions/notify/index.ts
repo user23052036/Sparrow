@@ -1,11 +1,13 @@
 // Edge Function: Web Push for partner requests (D38, ROADMAP T2.1).
 // GET  → { publicKey } so a browser can subscribe.
-// POST { kind, ref } → the database (claim_push, migration 0028) decides, as the caller, who should hear about
-//      that event; this function then sends to that person's browsers with VAPID. JWT verification stays on.
+// POST { kind, ref } → the database (claim_push, migrations 0028 and 0030) decides, as the caller, who should hear
+//      about that event; this function then sends to that person's (or guest's) browsers with VAPID.
+// POST { kind: "key_answer", ref, key } → a guest partner (D39) answered; claim_guest_push checks their key.
+// JWT verification stays on (a guest's page sends the public anon key).
 // Secrets (set by .github/workflows/deploy-db.yml on first deploy): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
-import { notify, parseRequest } from "./logic.ts";
+import { notify, parseRequest, type Recipient } from "./logic.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -27,24 +29,31 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
     auth: { persistSession: false },
   });
-  const { data: who, error: authError } = await asUser.auth.getUser();
-  if (authError || !who.user) return json(401, { error: "Please sign in again, then try once more." });
   const parsed = parseRequest(await req.json().catch(() => null));
   if (!parsed) return json(400, { error: "Unknown notification." });
+  if (!parsed.guestKey) {
+    const { data: who, error: authError } = await asUser.auth.getUser();
+    if (authError || !who.user) return json(401, { error: "Please sign in again, then try once more." });
+  }
 
   webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") ?? "mailto:sparrow@example.com", publicKey, privateKey);
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  const subscriptions = async (column: "user_id" | "guest_key_id", id: string) => {
+    const { data, error } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq(column, id);
+    if (error) throw error;
+    return data ?? [];
+  };
   const result = await notify(parsed.kind, parsed.ref, {
     async claim(kind, ref) {
-      const { data, error } = await asUser.rpc("claim_push", { p_kind: kind, p_ref: ref });
+      // A guest's claim is server-only (0030), so the owner's account id never reaches the guest's browser.
+      const { data, error } = parsed.guestKey
+        ? await admin.rpc("claim_guest_push", { p_key: parsed.guestKey, p_kind: kind, p_ref: ref })
+        : await asUser.rpc("claim_push", { p_kind: kind, p_ref: ref });
       if (error) throw error;
-      return (data as string | null) ?? null;
+      return (data as Recipient | null) ?? null;
     },
-    async subscriptionsOf(userId) {
-      const { data, error } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", userId);
-      if (error) throw error;
-      return data ?? [];
-    },
+    subscriptionsOf: (userId) => subscriptions("user_id", userId),
+    guestSubscriptionsOf: (guestId) => subscriptions("guest_key_id", guestId),
     async send(sub, payload) {
       await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: "high" });
     },

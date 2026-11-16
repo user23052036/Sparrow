@@ -1,5 +1,5 @@
 import { copy } from "./copy";
-import type { PartnerEventKind } from "./types";
+import type { PartnerEventKind, PartnerOverview } from "./types";
 
 const CODE = /^[0-9a-f]{16}$/;
 
@@ -28,4 +28,11 @@ export function eventLabel(kind: PartnerEventKind, detail?: string | null): stri
   if (kind === "early_exit") return detail?.startsWith("partner approved") ? copy.eventApproved : copy.eventEarlyExit;
   if (kind === "heartbeat_lost") return copy.eventQuiet;
   return copy.eventDisabled;
+}
+
+/** Who holds my key: the account partner, or the friend with a key link (D39). Null when nobody does. */
+export function keyHolderName(ov: PartnerOverview | null | undefined): string | null {
+  if (ov?.state === "active") return ov.partner.name;
+  if (ov?.state === "guest") return ov.guest.name;
+  return null;
 }

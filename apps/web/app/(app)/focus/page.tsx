@@ -2,7 +2,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { copy, normalizeDomainList, type Device } from "@sparrow/shared";
+import { copy, keyHolderName, normalizeDomainList, type Device, type PartnerOverview } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 import { clock, timeAgo } from "@/lib/format";
 import { extSyncNow } from "@/lib/extension";
@@ -168,8 +168,8 @@ function FocusInner() {
     stateRef.current = s;
     setState(s);
     const po = await sb.rpc("partner_overview");
-    const ov = po.data as { state?: string; partner?: { name: string } } | null;
-    const pname = ov?.state === "active" ? (ov.partner?.name ?? null) : null;
+    const ov = po.data as PartnerOverview | null;
+    const pname = keyHolderName(ov);
     setPartnerName(pname);
     if (s.locked && s.session_id) {
       const er = await sb.from("end_requests").select("status").eq("session_id", s.session_id).order("created_at", { ascending: false }).limit(1);
