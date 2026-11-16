@@ -39,9 +39,15 @@ describe("What Sparrow stores", () => {
     expect(guest.columns.filter((c) => c.hidden).map((c) => c.name)).toEqual(["quiet_from", "quiet_to", "quiet_tz"]);
     expect(guest.columns.find((c) => c.name === "name")!.hidden).toBe(false);
   });
-  it("every server function people can call has been checked against the who sentences", () => {
-    for (const f of snapshot.functions) expect(REVIEWED_FUNCTIONS, `${f} is new: check what it shows, update stored.ts, then add it`).toContain(f);
-    for (const f of REVIEWED_FUNCTIONS) expect(snapshot.functions, `${f} no longer exists`).toContain(f);
+  it("every server function people can call has been checked against the who sentences, as it is now", () => {
+    const now = Object.fromEntries(snapshot.functions.map((f) => [f.signature, { hash: f.hash, anon: f.anon }]));
+    for (const [sig, f] of Object.entries(now)) {
+      const seen = REVIEWED_FUNCTIONS[sig];
+      expect(seen, `${sig} is new: check what it shows against stored.ts, then add it to REVIEWED_FUNCTIONS`).toBeDefined();
+      expect(seen.hash, `${sig} changed: check what it shows against stored.ts, then update its hash`).toBe(f.hash);
+      expect(seen.anon, `${sig} is now ${f.anon ? "" : "no longer "}callable without signing in: check stored.ts`).toBe(f.anon);
+    }
+    for (const sig of Object.keys(REVIEWED_FUNCTIONS)) expect(now[sig], `${sig} no longer exists: remove it`).toBeDefined();
   });
   it("its words follow the same gentle-language rules as copy.ts", () => {
     const text = JSON.stringify(STORED).toLowerCase();
