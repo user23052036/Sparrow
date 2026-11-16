@@ -34,6 +34,7 @@ Deno.serve(async (req) => {
       await admin.from("push_subscriptions").delete().eq("id", id);
     },
   };
+  // Each part runs even when the other one fails, so a reminder problem never holds key requests back.
   const reminders = await runReminders({
     ...delivery,
     async claimDue() {
@@ -41,7 +42,7 @@ Deno.serve(async (req) => {
       if (error) throw error;
       return data ?? [];
     },
-  });
+  }).catch((e) => ({ error: String(e) }));
   const keyRequests = await runWaitingKeyRequests({
     ...delivery,
     guestSubscriptionsOf: (guestId) => subscriptions("guest_key_id", guestId),
@@ -50,6 +51,6 @@ Deno.serve(async (req) => {
       if (error) throw error;
       return data ?? [];
     },
-  });
+  }).catch((e) => ({ error: String(e) }));
   return json(200, { reminders, key_requests: keyRequests });
 });

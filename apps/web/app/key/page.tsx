@@ -293,7 +293,8 @@ export default function KeyPage() {
               // A guest has no profile: their quiet hours follow this browser's time zone.
               const tz = from ? Intl.DateTimeFormat().resolvedOptions().timeZone : null;
               const { error } = await supabase().rpc("guest_set_quiet", { p_key: key, p_from: from, p_to: to, p_tz: tz });
-              return error ? errorText(error) : null;
+              if (!error) return null;
+              return /unknown time zone/i.test(error.message) ? copy.fatigue.unknownZone : errorText(error);
             }}
           />
 

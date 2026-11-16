@@ -81,6 +81,8 @@ function EarlyExit({ sessionId, onEnded, onCancel }: { sessionId: string; onEnde
 
 /** Locked sessions: only the partner can end them early. */
 const hourMinute = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+/** Quiet hours that are still on: a note fetched a while ago never outlives them. */
+const stillQuiet = (until: string | null | undefined): until is string => !!until && new Date(until).getTime() > Date.now();
 
 function LockedExit({ sessionId, name, req, onChanged }: { sessionId: string; name: string; req: EndReq | null; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
@@ -89,13 +91,18 @@ function LockedExit({ sessionId, name, req, onChanged }: { sessionId: string; na
   // Asks left and the key holder's quiet hours (D43), refreshed whenever the request changes.
   const [status, setStatus] = useState<KeyRequestStatus | null>(null);
   useEffect(() => {
-    void supabase()
-      .rpc("key_request_status", { p_session_id: sessionId })
-      .then(({ data }) => setStatus((data as KeyRequestStatus | null) ?? null));
+    const fetchStatus = () =>
+      supabase()
+        .rpc("key_request_status", { p_session_id: sessionId })
+        .then(({ data }) => setStatus((data as KeyRequestStatus | null) ?? null));
+    void fetchStatus();
+    // quiet hours begin and end while a session runs
+    const t = setInterval(fetchStatus, 60_000);
+    return () => clearInterval(t);
   }, [sessionId, req?.status]);
-  const quiet = status?.quiet_until ? (
+  const quiet = stillQuiet(status?.quiet_until) ? (
     <p className="note small" role="status">
-      {copy.fatigue.quietNow(name, hourMinute(status.quiet_until))}
+      {copy.fatigue.quietNow(name, hourMinute(status!.quiet_until!))}
     </p>
   ) : null;
   async function ask() {
@@ -139,7 +146,11 @@ function LockedExit({ sessionId, name, req, onChanged }: { sessionId: string; na
         <>
           {quiet}
           {status && status.session_asked > 0 && (
-            <p className="small quiet">{copy.fatigue.asksLeft(Math.min(status.session_max - status.session_asked, status.day_max - status.day_asked))}</p>
+            <p className="small quiet">
+              {status.day_max - status.day_asked < status.session_max - status.session_asked
+                ? copy.fatigue.asksLeftToday(status.day_max - status.day_asked)
+                : copy.fatigue.asksLeft(status.session_max - status.session_asked)}
+            </p>
           )}
         </>
       )}
@@ -378,11 +389,24 @@ function FocusInner() {
           </div>
           {partnerName && (
             <label className="check">
-              <input type="checkbox" checked={lockIt} onChange={(e) => setLockIt(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={lockIt}
+                onChange={(e) => {
+                  setLockIt(e.target.checked);
+                  // fresh when it matters: the page may have been open for hours
+                  if (e.target.checked)
+                    void supabase()
+                      .rpc("key_request_status")
+                      .then(({ data }) => setHolderQuietUntil((data as KeyRequestStatus | null)?.quiet_until ?? null));
+                }}
+              />
               {copy.focus.lockIt(partnerName)}
             </label>
           )}
-          {partnerName && lockIt && holderQuietUntil && <p className="note small">{copy.fatigue.lockQuiet(partnerName, hourMinute(holderQuietUntil))}</p>}
+          {partnerName && lockIt && stillQuiet(holderQuietUntil) && (
+            <p className="note small">{copy.fatigue.lockQuiet(partnerName, hourMinute(holderQuietUntil))}</p>
+          )}
           {blockers.length === 0 && (
             <p className="note small">
               {copy.focus.noBlocker} <Link href="/extension">{copy.focus.connectExt}</Link>

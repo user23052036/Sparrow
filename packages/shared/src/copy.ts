@@ -740,6 +740,8 @@ export const copy = {
       `${name} has quiet hours until ${until}, so they won't get a notification before then. Your request waits for them, and the session still ends on its own.`,
     lockQuiet: (name: string, until: string) => `${name} has quiet hours until ${until}. If you ask for the key before then, they'll see it afterwards.`,
     asksLeft: (n: number) => (n === 1 ? "You can ask once more in this session." : `You can ask ${n} more times in this session.`),
+    asksLeftToday: (n: number) => (n === 1 ? "You can ask once more today." : `You can ask ${n} more times today.`),
+    unknownZone: "This browser's time zone isn't one Sparrow knows, so quiet hours can't be set from here.",
     sessionLimit: (name: string, n: number) =>
       `You've asked ${name} ${n} times in this session, which is the most. This stretch is yours to finish, and the session ends on its own.`,
     dayLimit: (name: string, n: number) =>

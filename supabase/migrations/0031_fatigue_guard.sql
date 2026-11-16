@@ -12,14 +12,21 @@ create function public._key_requests_per_day() returns int language sql immutabl
 alter table public.profiles
   add column quiet_from time,
   add column quiet_to time,
-  add constraint profiles_quiet_hours check ((quiet_from is null) = (quiet_to is null) and (quiet_from is null or quiet_from <> quiet_to));
+  add constraint profiles_quiet_hours check ((quiet_from is null) = (quiet_to is null) and (quiet_from is null or quiet_from <> quiet_to)
+                                             and extract(second from quiet_from) = 0 and extract(second from quiet_to) = 0);
 -- A guest has no profile, so the guest keeps their own, with the time zone their browser reported.
 alter table public.guest_keys
   add column quiet_from time,
   add column quiet_to time,
   add column quiet_tz text,
   add constraint guest_keys_quiet_hours check ((quiet_from is null) = (quiet_to is null) and (quiet_from is null) = (quiet_tz is null)
-                                               and (quiet_from is null or quiet_from <> quiet_to));
+                                               and (quiet_from is null or quiet_from <> quiet_to)
+                                               and extract(second from quiet_from) = 0 and extract(second from quiet_to) = 0);
+-- A guest's quiet hours and time zone are theirs: the owner sees the name and dates of their guest, not these.
+revoke select on public.guest_keys from anon, authenticated;
+grant select (id, owner_id, name, key_hash, created_at, last_seen_at) on public.guest_keys to authenticated;
+-- The day count below reads a person's requests on every ask.
+create index on public.end_requests (user_id, created_at);
 
 -- ------------------------------------------------------------ helpers (internal)
 -- When quiet hours that are on at p_now end, or null when they aren't on (or the time zone is unknown).
@@ -69,12 +76,19 @@ begin
 end;
 $$;
 
--- How many key requests this person made today (their local day) and in a session.
+-- A moment's date on a person's own calendar; UTC when their time zone is one Postgres doesn't know.
+create function public._local_date(p_at timestamptz, p_tz text) returns date
+language sql stable set search_path = '' as $$
+  select coalesce(public._local_time(p_at, p_tz), p_at at time zone 'UTC')::date;
+$$;
+
+-- How many key requests this person made today (their local day).
 create function public._key_requests_today(uid uuid) returns int
 language sql stable security definer set search_path = '' as $$
   select count(*)::int from public.end_requests e, public.profiles p
    where e.user_id = uid and p.id = uid
-     and (public._local_time(e.created_at, coalesce(p.timezone, 'UTC')))::date = (public._local_time(now(), coalesce(p.timezone, 'UTC')))::date;
+     and e.created_at > now() - interval '2 days'
+     and public._local_date(e.created_at, p.timezone) = public._local_date(now(), p.timezone);
 $$;
 
 -- ------------------------------------------------------------ the asker's side
@@ -175,6 +189,99 @@ begin
 end;
 $$;
 
+-- As in 0030, except that a new link (for the same or another friend) starts without quiet hours.
+create or replace function public.create_guest_key(p_name text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare uid uuid := public.require_user(); secret text; g public.guest_keys;
+        nm text := nullif(trim(regexp_replace(coalesce(p_name, ''), '\s+', ' ', 'g')), '');
+begin
+  if nm is null or char_length(nm) > 40 then raise exception 'give your friend a short name (up to 40 letters)'; end if;
+  -- serialise per person so an invite and a guest can't both slip in
+  perform 1 from public.profiles where id = uid for update;
+  if public._partner_of(uid) is not null then raise exception 'you already have an accountability partner'; end if;
+  -- the guest takes the place of an invite that was still waiting
+  update public.buddy_links set status = 'ended' where requester_id = uid and status = 'pending';
+  secret := 'spg_' || replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
+  insert into public.guest_keys (owner_id, name, key_hash)
+    values (uid, nm, encode(sha256(convert_to(secret, 'UTF8')), 'hex'))
+  on conflict (owner_id) do update
+    set name = excluded.name, key_hash = excluded.key_hash, created_at = now(), last_seen_at = null,
+        quiet_from = null, quiet_to = null, quiet_tz = null
+  returning * into g;
+  -- a new link replaces the old one, so browsers that opened the old one stop hearing anything
+  delete from public.push_subscriptions where guest_key_id = g.id;
+  -- the key is returned once and never stored in clear
+  return jsonb_build_object('id', g.id, 'name', g.name, 'key', secret);
+end;
+$$;
+
+-- As in 0030, and the friend's quiet hours move to their new account.
+create or replace function public.convert_guest_key(p_key text) returns public.buddy_links
+language plpgsql security definer set search_path = '' as $$
+declare uid uuid := public.require_user(); g public.guest_keys := public._guest_by_secret(p_key); l public.buddy_links;
+begin
+  perform public._lock_profiles(uid, g.owner_id);
+  select * into g from public.guest_keys where id = g.id for update;
+  if g.id is null then raise exception 'this key link isn''t valid anymore' using errcode = '28000'; end if;
+  if g.owner_id = uid then raise exception 'this is your own key link: send it to the friend who holds your key'; end if;
+  if public._partner_of(uid) is not null then raise exception 'you already have an accountability partner'; end if;
+  if public._guest_key_of(uid) is not null then raise exception 'a friend already holds your key through a link: take it back first'; end if;
+  if public._partner_of(g.owner_id) is not null then raise exception 'they already have an accountability partner'; end if;
+  update public.buddy_links set status = 'ended' where requester_id in (uid, g.owner_id) and status = 'pending';
+  insert into public.buddy_links (requester_id, partner_id, status, mutual)
+    values (g.owner_id, uid, 'active', true) returning * into l;
+  update public.push_subscriptions set user_id = uid, guest_key_id = null where guest_key_id = g.id;
+  delete from public.push_subscriptions
+   where user_id = uid
+     and id not in (select id from public.push_subscriptions where user_id = uid order by created_at desc limit public._push_limit());
+  -- quiet hours the friend set as a guest stay, unless their account already has its own
+  update public.profiles set quiet_from = g.quiet_from, quiet_to = g.quiet_to
+   where id = uid and quiet_from is null and g.quiet_from is not null;
+  delete from public.guest_keys where id = g.id;
+  return l;
+end;
+$$;
+
+-- As in 0030, except that the guest is listed by name and dates only: their quiet hours and time zone are theirs.
+create or replace function public.export_my_data() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare uid uuid := public.require_user();
+begin
+  return jsonb_build_object(
+    'exported_at', now(),
+    'profile', (select to_jsonb(p) from public.profiles p where p.id = uid),
+    'tasks', (select coalesce(jsonb_agg(to_jsonb(t) order by t.created_at), '[]') from public.tasks t where t.user_id = uid),
+    'task_steps', (select coalesce(jsonb_agg(to_jsonb(s) order by s.task_id, s.position), '[]') from public.task_steps s where s.user_id = uid),
+    'daily_plans', (select coalesce(jsonb_agg(to_jsonb(d) order by d.date), '[]') from public.daily_plans d where d.user_id = uid),
+    'plan_items', (select coalesce(jsonb_agg(to_jsonb(i)), '[]') from public.plan_items i where i.user_id = uid),
+    'proofs', (select coalesce(jsonb_agg(to_jsonb(p) - 'storage_path' order by p.server_created_at), '[]') from public.proofs p where p.user_id = uid),
+    'points_ledger', (select coalesce(jsonb_agg(to_jsonb(l) order by l.id), '[]') from public.points_ledger l where l.user_id = uid),
+    'focus_sessions', (select coalesce(jsonb_agg(to_jsonb(f) order by f.started_at), '[]') from public.focus_sessions f where f.user_id = uid),
+    'tamper_events', (select coalesce(jsonb_agg(to_jsonb(e) order by e.created_at), '[]') from public.tamper_events e where e.user_id = uid),
+    'blocklist', (select to_jsonb(b) from public.blocklists b where b.user_id = uid),
+    'devices', (select coalesce(jsonb_agg(to_jsonb(v) - 'push_token' - 'secret_hash'), '[]') from public.devices v where v.user_id = uid),
+    'kind_acts', (select coalesce(jsonb_agg(to_jsonb(k) order by k.created_at), '[]') from public.kind_acts k where k.user_id = uid),
+    'pledges', (select coalesce(jsonb_agg(to_jsonb(p) order by p.created_at), '[]') from public.pledges p where p.user_id = uid),
+    'partner_pledges_paid', (select coalesce(jsonb_agg(to_jsonb(p) order by p.created_at), '[]') from public.partner_pledges p where p.payer_id = uid),
+    'makeup_steps', (select coalesce(jsonb_agg(to_jsonb(m) order by m.created_at), '[]') from public.makeup_steps m where m.user_id = uid),
+    'circle', (select jsonb_build_object('name', c.name, 'joined_at', m.joined_at, 'shares', m.shares, 'alias', m.alias)
+                 from public.circle_members m join public.circles c on c.id = m.circle_id where m.user_id = uid),
+    'cheers_sent', (select coalesce(jsonb_agg(jsonb_build_object('day', ch.day, 'created_at', ch.created_at) order by ch.created_at), '[]')
+                      from public.circle_cheers ch where ch.from_id = uid),
+    'circle_goals_started', (select coalesce(jsonb_agg(jsonb_build_object('target', g.target, 'started_at', g.started_at) order by g.started_at), '[]')
+                               from public.circle_goals g where g.started_by = uid),
+    'focus_links', (select coalesce(jsonb_agg(to_jsonb(l) - 'key_hash' order by l.created_at), '[]') from public.focus_links l where l.user_id = uid),
+    'crafted_badges', (select coalesce(jsonb_agg(to_jsonb(b) - 'user_id' order by b.crafted_at), '[]') from public.crafted_badges b where b.user_id = uid),
+    'feedback', (select coalesce(jsonb_agg(to_jsonb(f) order by f.id), '[]') from public.feedback f where f.user_id = uid),
+    'verifications_given', (select coalesce(jsonb_agg(to_jsonb(v) order by v.created_at), '[]') from public.verifications v where v.verifier_id = uid),
+    'partnership', (select to_jsonb(b) - 'invite_code' from public.buddy_links b
+                     where b.status in ('pending', 'active') and (b.requester_id = uid or b.partner_id = uid) limit 1),
+    'guest_key_holder', (select jsonb_build_object('name', g.name, 'created_at', g.created_at, 'last_seen_at', g.last_seen_at)
+                           from public.guest_keys g where g.owner_id = uid)
+  );
+end;
+$$;
+
 -- ------------------------------------------------------------ notifications respect quiet hours
 -- As in 0030, except that nothing is sent to a key holder in quiet hours. A key request is then left
 -- unclaimed, so claim_waiting_key_requests() can deliver it once quiet hours end.
@@ -239,7 +346,7 @@ $$;
 -- ------------------------------------------------------------ permissions
 revoke execute on function public._key_requests_per_session(), public._key_requests_per_day(),
   public._quiet_until(time, time, text, timestamptz), public._key_holder(uuid), public._holder_quiet_until(uuid, timestamptz),
-  public._key_requests_today(uuid)
+  public._key_requests_today(uuid), public._local_date(timestamptz, text)
   from public, anon, authenticated;
 revoke execute on function public.key_request_status(uuid), public.set_quiet_hours(time, time) from public, anon;
 grant execute on function public.key_request_status(uuid), public.set_quiet_hours(time, time) to authenticated;
