@@ -15,4 +15,6 @@ test("the privacy page leads to every table Sparrow stores, with who can read it
   await guest.getByText(copy.stored.columns(Object.keys(STORED.guest_keys.columns).length)).click();
   await expect(guest.getByText(copy.stored.hidden)).toHaveCount(3);
   await expect(page.getByRole("heading", { name: copy.stored.filesTitle, exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: copy.stored.signInTitle, exact: true })).toBeVisible();
+  await expect(page.getByText(copy.stored.operators)).toBeVisible();
 });

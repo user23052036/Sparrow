@@ -22,7 +22,7 @@ DECISIONS.md are not reversed without a new entry. If a task would contradict on
 
 ## Rules of the repo
 - New migration file for every DB change; never edit an applied one. Roadmap migration numbers are pre-assigned (`0028` onward): use the number the task names. Every new public function: `revoke ... from public, anon; grant ... to authenticated` (internal `_helpers`: revoke from all).
-- After any schema change run `bash supabase/tests/snapshot.sh` (same setup as `run.sh`) and describe each new table and column in `packages/shared/src/stored.ts` (D47); CI fails otherwise.
+- After any schema change run `bash supabase/tests/snapshot.sh` (same setup as `run.sh`) and describe each new table and column in `packages/shared/src/stored.ts` (D47). A new or changed server function that people can call shows a new fingerprint: check what it shows against the who sentences, then update `REVIEWED_FUNCTIONS`. CI fails otherwise.
 - Business rules live in Postgres (D13). Change `supabase/tests/rls_test.sql` together with the migration; use a fresh user-id prefix (used: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1, f1f1f1f1, 24242424, 25252525, 26262626, 28282828, 29292929, 30303030, 31313131, 32323232, 34343434, 35353535; `33333333` is taken). Server-only functions are granted to `service_role` (present in the test stub).
 - All user-facing sentences go in `packages/shared/src/copy.ts` (a test fails on inline JSX sentences and on banned words like "failed", "lazy", "broken").
 - Playwright e2e runs against an in-memory fake (`apps/web/e2e/fake-supabase.ts`, D19): add any new table/RPC there.
