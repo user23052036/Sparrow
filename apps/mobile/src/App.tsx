@@ -74,7 +74,7 @@ export default function App() {
     <SafeAreaView style={s.screen}>
       <StatusBar style="dark" />
       <View style={{ flex: 1 }}>
-        {tab === "today" && <Today name={profile?.display_name ?? null} />}
+        {tab === "today" && <Today name={profile?.display_name ?? null} userId={session.user.id} />}
         {tab === "focus" && <Focus />}
         {tab === "apps" && <Apps userId={session.user.id} />}
         {tab === "protect" && <Protect />}

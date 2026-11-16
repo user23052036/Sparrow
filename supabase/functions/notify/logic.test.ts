@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import {
   buildPayload,
   GUEST_KEY as GUEST_KEY_SHAPE,
+  isRefusal,
   notify,
   parseRequest,
   PUSH_ENDPOINT,
@@ -208,6 +209,18 @@ describe("the push-service check matches migration 0028", () => {
   it("the table and the function accept the same addresses", () => {
     const sql = readFileSync(new URL("../../migrations/0028_web_push.sql", import.meta.url), "utf8");
     assert.ok(sql.includes(PUSH_ENDPOINT.source.replace(/\\\//g, "/")), "the regex in 0028 differs from PUSH_ENDPOINT");
+  });
+});
+
+describe("a refused guest key is a 403, not a server error", () => {
+  it("knows the database's refusal and nothing else", () => {
+    assert.equal(isRefusal({ code: "28000", message: "this key link isn't valid anymore" }), true);
+    for (const other of [null, undefined, new Error("boom"), { code: "42501" }, { code: 28000 }]) assert.equal(isRefusal(other), false);
+  });
+  it("0030 refuses keys with that code, and notify answers 403 for it", () => {
+    const sql = readFileSync(new URL("../../migrations/0030_guest_partner.sql", import.meta.url), "utf8");
+    assert.match(sql, /errcode = '28000'/);
+    assert.match(readFileSync(new URL("./index.ts", import.meta.url), "utf8"), /if \(isRefusal\(e\)\) return json\(403/);
   });
 });
 

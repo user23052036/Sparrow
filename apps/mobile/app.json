@@ -7,7 +7,18 @@
     "userInterfaceStyle": "automatic",
     "platforms": ["android"],
     "android": {
-      "package": "com.sparrow.app"
-    }
+      "package": "com.sparrow.app",
+      "blockedPermissions": ["android.permission.READ_EXTERNAL_STORAGE", "android.permission.RECORD_AUDIO"]
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Sparrow uses the camera only when you take a photo as proof.",
+          "microphonePermission": false,
+          "photosPermission": false
+        }
+      ]
+    ]
   }
 }

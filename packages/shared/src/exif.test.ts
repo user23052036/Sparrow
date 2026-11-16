@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { exifDate, photoAgeHours, PHOTO_OLDER_AFTER_HOURS } from "./exif";
+import { exifDate, exifTextAgeHours, photoAgeHours, PHOTO_OLDER_AFTER_HOURS } from "./exif";
 
 /** A tiny JPEG with an EXIF block, built the way cameras lay it out. */
 export function jpegWithExif(opts: { original?: string; digitized?: string; dateTime?: string; little?: boolean } = {}): Uint8Array {
@@ -91,5 +91,17 @@ describe("photoAgeHours", () => {
   it("uses the same one-day line as proof_context() in the database", () => {
     const sql = readFileSync(resolve(__dirname, "../../../supabase/migrations/0023_proof_context.sql"), "utf8");
     expect(sql).toContain(`p.photo_age_hours > ${PHOTO_OLDER_AFTER_HOURS} then 'older'`);
+  });
+});
+
+describe("exifTextAgeHours (a date the phone's camera already read)", () => {
+  const now = new Date(2026, 10, 16, 20, 0, 0);
+  it("counts whole hours from the photo's own date, in local time", () => {
+    expect(exifTextAgeHours("2026:11:16 08:30:00", now)).toBe(11);
+    expect(exifTextAgeHours("2026:11:14 20:00:00", now)).toBe(48);
+  });
+  it("a date a little in the future is not anything", () => expect(exifTextAgeHours("2026:11:16 20:05:00", now)).toBe(0));
+  it("anything that isn't a readable date is unknown", () => {
+    for (const bad of [undefined, null, 12, "", "yesterday", "2026:13:01 00:00:00"]) expect(exifTextAgeHours(bad, now)).toBeNull();
   });
 });

@@ -1,7 +1,17 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { copy, isHeavyStretch, type DailyPlan, type ItemStatus, type PlanItem, type Task } from "@sparrow/shared";
+import {
+  copy,
+  isHeavyStretch,
+  reviewMessage,
+  reviewStartStatuses,
+  type DailyPlan,
+  type ItemStatus,
+  type PlanItem,
+  type ReviewResult,
+  type Task,
+} from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 import { MoodPicker } from "@/components/MoodPicker";
 
@@ -18,9 +28,7 @@ export function Review({
   isToday: boolean;
   onDone: (msg: string, offerTomorrow: boolean) => void;
 }) {
-  const [statuses, setStatuses] = useState<Record<string, ItemStatus>>(() =>
-    Object.fromEntries(items.map((i) => [i.id, i.status === "pending" ? "missed" : i.status])),
-  );
+  const [statuses, setStatuses] = useState<Record<string, ItemStatus>>(() => reviewStartStatuses(items));
   const [mood, setMood] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -35,20 +43,13 @@ export function Review({
       setErr(errorText(error));
       return;
     }
-    const r = data as { total: number; done: number; countable: number; full_day_bonus: number };
-    const line =
-      r.full_day_bonus > 0
-        ? copy.fullDay
-        : r.done < r.countable
-          ? `${copy.partialWin(r.done, r.countable)} ${isToday ? copy.oneSmallWin : ""}`
-          : copy.partialWin(r.done, r.countable);
     // After today's review, check whether this was the third heavy day in a row.
     let offer = false;
     if (isToday) {
       const recent = await supabase().rpc("recent_completion", { p_days: 3 });
       offer = !recent.error && isHeavyStretch((recent.data ?? []) as { date: string; completion: number }[]);
     }
-    onDone(`${line} (+${r.total} points)`, offer);
+    onDone(reviewMessage(data as ReviewResult, isToday), offer);
   }
 
   return (
