@@ -164,7 +164,7 @@ the repo's `CLAUDE.md`.
   `0032`, scheduled after WS2); the native service posts a local notification with the two actions.
   *Done (D46).*
 - **T3.3 "Check my setup" screen:** runs the BETA.md device checklist on the phone and shows pass or
-  not yet for each line, so the owner's one phone test takes five minutes.
+  not yet for each line, so the owner's one phone test takes five minutes. *Done (Protect → Check my setup).*
 - *Done when (all three):* JVM tests, API type-check, Gradle build and the T0.5 emulator job are green.
 
 ### WS4: trust you can check (lane: web+db, after WS2)

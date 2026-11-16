@@ -1,6 +1,6 @@
 # Sparrow: current status (2026-11-16, second local run, backend live)
 
-Repo: github.com/user23052036/Sparrow. `main` has everything through T3.2 (partner requests on Android):
+Repo: github.com/user23052036/Sparrow. `main` has everything through T3.3 ("Check my setup" on the phone):
 D1 to D46 and migrations to `0032` plus `0036` (T2.5 had no number; see D44). Live site:
 https://user23052036.github.io/Sparrow/, backed since 2026-11-16 by the owner's Supabase project (Tokyo, free plan;
 the ref is in the repo secrets).
@@ -10,7 +10,7 @@ the ref is in the repo secrets).
 2. `docs/ROADMAP.md`: audit, position, tasks T0.1 to T5.4 with pre-assigned migration numbers.
 3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D46).
 
-**Next task: T3.3 ("Check my setup" screen on the phone).** Then WS4 (`0033`, `0034`), WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not touch `claim_push`,
+**Next task: T4.1 ("What Sparrow stores" page).** Then T4.2 (`0033`), T4.3 (`0034`), T4.4, WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not touch `claim_push`,
 `save_push_subscription`, `save_extension_push`, `convert_guest_key` or the `silent` column (a test checks); such a change goes in a
 migration after `0036`.
 
@@ -35,8 +35,9 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
 | T2.4 | #26 | Partner fatigue guard (D43, `0031`): 3 asks per session, 5 per local day; quiet hours for account partners (profile) and guests (key page); requests wait and the reminder job delivers them when quiet hours end; `key_request_status` for kind notes on Focus. |
 | T2.3 | #24 | Guest partner (D39, `0030`): key link `/key#spg_…`, anonymous guest functions, one key holder at a time, `claim_push` answers `{to, id}`, guest push, `convert_guest_key`. Run 2026-11-16; two review rounds (a race between invites and guests, push state, key memory on the page), all fixed before merging. |
 | T2.5 | #27 | Instant start on the laptop (D44, `0036`): Chrome allows silent push in extensions since 121, so the extension subscribes (`userVisibleOnly: false`), saves a silent address, and syncs on each push; `session_started`/`session_ended` from the web and phone apps and `key_answer` wake it; 30 s polling stays. Deploy pushes with `--include-all` (remove it once `0035` lands). Two review rounds (a sign-out race, per-kind address limits, migration-order pin), all fixed before merging. |
-| T3.1 | see git log | Evening review and proofs on Android (D45): photo through the system camera (`expo-image-picker`), re-encoded on the phone (`expo-image-manipulator`, which drops its hidden details), its own date read for the D32 note; written notes; share with the partner; the evening review with `review_day`. Review helpers moved to shared. Also: `notify` answers 403 instead of 500 for a guest key that is no longer valid. |
+| T3.1 | #29 | Evening review and proofs on Android (D45): photo through the system camera (`expo-image-picker`), re-encoded on the phone (`expo-image-manipulator`, which drops its hidden details), its own date read for the D32 note; written notes; share with the partner; the evening review with `review_day`. Review helpers moved to shared. Also: `notify` answers 403 instead of 500 for a guest key that is no longer valid. |
 | T3.2 | see git log | Partner requests on Android (D46, `0032`): `device_sync` lists waiting key requests (ids only, quiet hours respected); the engine posts a notification with "Keep going" and a two-step "Let them out"; `device_decide_end_request` and `notify`'s device path (`claim_device_push`) answer with the phone's own credential; Protect asks for the notification permission. `0032` also requires every proof file to be in its author's folder. |
+| T3.3 | see git log | "Check my setup" (Protect): the BETA.md phone checklist as lines that are done, not yet, check by hand or optional (`setupcheck.ts` in shared, tested); a live test starts a 5-minute session and confirms it reached the phone and that a listed app was covered (the engine now records when it last covered one). |
 
 ## Checks run in this run
 - Locally, per task, with Node 24 (`fnm exec --using=24`; the Mac's default Node 20 is below the repo's
@@ -76,7 +77,9 @@ secrets, Deploy web, Live smoke test).
 
 ## Parked for the owner (nothing here blocks the next tasks)
 - Done 2026-11-16: Supabase project, secrets and variables, URL configuration.
-- One phone test (now including a photo proof and the evening review, T3.1), store developer accounts, testers.
+- One phone test: install the APK, follow Protect, then **Check my setup** (T3.3) shows what is left; by hand,
+  also a photo proof and the evening review (T3.1) and a key request from a friend's phone (T3.2). Then store
+  developer accounts, testers.
 - The free plan pauses a project after about a week without use; the five-minute reminder job should keep it awake.
 
 ## Working notes
