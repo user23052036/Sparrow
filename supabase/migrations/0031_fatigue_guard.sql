@@ -234,8 +234,12 @@ begin
   delete from public.push_subscriptions
    where user_id = uid
      and id not in (select id from public.push_subscriptions where user_id = uid order by created_at desc limit public._push_limit());
-  -- quiet hours the friend set as a guest stay, unless their account already has its own
-  update public.profiles set quiet_from = g.quiet_from, quiet_to = g.quiet_to
+  -- quiet hours the friend set as a guest stay, unless their account already has its own. A brand-new
+  -- account (not through onboarding yet, so still on the default time zone) takes the guest's time zone too,
+  -- so the hours keep meaning the same moments.
+  update public.profiles
+     set quiet_from = g.quiet_from, quiet_to = g.quiet_to,
+         timezone = case when onboarded then timezone else g.quiet_tz end
    where id = uid and quiet_from is null and g.quiet_from is not null;
   delete from public.guest_keys where id = g.id;
   return l;

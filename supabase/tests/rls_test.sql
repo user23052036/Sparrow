@@ -1792,7 +1792,9 @@ select pg_temp.check(guest_overview(current_setting('test.qg_key2')) -> 'quiet' 
 select guest_set_quiet(current_setting('test.qg_key2'), '23:00', '06:30', 'Europe/Berlin');
 reset role;
 -- Ben signs up: his quiet hours come with him
+update profiles set onboarded = false, timezone = 'UTC' where id = '31313131-0000-0000-0000-000000000004'; -- just signed up
 select pg_temp.as_user('31313131-0000-0000-0000-000000000004');
 select convert_guest_key(current_setting('test.qg_key2'));
 select pg_temp.check((select quiet_from = '23:00' and quiet_to = '06:30' from profiles), 'a guest who signs up keeps the quiet hours they set');
+select pg_temp.check((select timezone from profiles) = 'Europe/Berlin', 'and a brand-new account takes their time zone, so the hours mean the same moments');
 reset role;
