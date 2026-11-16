@@ -20,8 +20,9 @@ Deno.serve(async (req) => {
   if (ok !== true) return json(401, { error: "Not the reminder job." });
 
   webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") ?? "mailto:sparrow@example.com", publicKey, privateKey);
+  // Never the extensions' silent addresses (0036): they only wake up, they show nothing.
   const subscriptions = async (column: "user_id" | "guest_key_id", id: string) => {
-    const { data, error } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq(column, id);
+    const { data, error } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq(column, id).eq("silent", false);
     if (error) throw error;
     return data ?? [];
   };

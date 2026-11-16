@@ -1,6 +1,7 @@
 import { normalizeDomainList, hostMatches } from "./lib/domains.js";
 import { appUrlFrom, buildRules, endsAtLocal, isActive, minutesLeft, isAllowedSupabaseUrl, originPatterns } from "./lib/state.js";
 import { DEFAULT_SITE } from "./lib/site.js";
+import { base64UrlToBytes, pushNeedsSaving, pushOwner, sameKey } from "./lib/push.js";
 import * as api from "./lib/api.js";
 
 const TICK = "sparrow-tick";
@@ -10,6 +11,8 @@ const BLOCKED_PAGE = "/blocked.html";
 // ---------------------------------------------------------------- storage
 const get = (keys) => chrome.storage.local.get(keys);
 const set = (obj) => chrome.storage.local.set(obj);
+const getAuth = async () => (await get("auth")).auth;
+const saveAuth = (a) => set({ auth: a });
 
 async function deviceId() {
   const { deviceId } = await get("deviceId");
@@ -43,6 +46,10 @@ chrome.runtime.onStartup.addListener(() => {
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === TICK || a.name === END) void sync();
 });
+// A session started or ended on another device (D44): Sparrow sends an empty, silent push and the extension
+// checks at once. The 30-second alarm stays as the fallback (D10).
+self.addEventListener("push", (e) => e.waitUntil(sync()));
+self.addEventListener("pushsubscriptionchange", (e) => e.waitUntil(set({ push: null }).then(sync)));
 // The person allowed (or took back) the calm blocked page on some sites: rebuild the rules.
 chrome.permissions?.onAdded?.addListener(() => void queue(reapply));
 chrome.permissions?.onRemoved?.addListener(() => void queue(reapply));
@@ -67,8 +74,7 @@ async function doSync() {
     await applyBlocking({ active: false });
     return;
   }
-  const getAuth = async () => (await get("auth")).auth;
-  const saveAuth = (a) => set({ auth: a });
+  let synced = false;
   try {
     const fs = await api.rpc(config, getAuth, saveAuth, "get_focus_state");
     const now = Date.now();
@@ -82,18 +88,56 @@ async function doSync() {
       p_label: await deviceLabel(),
       p_protection: true,
     });
+    synced = true;
   } catch (e) {
     if (e instanceof api.AuthError) {
       // Session is gone (signed out elsewhere or expired). Stop enforcing a
       // session we can no longer confirm, and ask the user to reconnect.
       await set({ auth: null, focus: { active: false }, lastError: "Signed out. Reconnect from the Sparrow website." });
       focus = { active: false };
+      await dropPush(null);
     } else {
       // Offline or server error: keep enforcing the last known session until it ends.
       await set({ lastError: String(e.message || e) });
     }
   }
   await applyBlocking(focus);
+  if (synced) await ensurePush(config);
+}
+
+// ------------------------------------------------------------------ push
+/** Subscribes this extension to silent Web Push and saves the address for the signed-in person (D44); checked again daily. */
+async function ensurePush(config) {
+  const pm = self.registration?.pushManager;
+  const { auth, push } = await get(["auth", "push"]);
+  const owner = pushOwner(auth);
+  if (!pm || !pushNeedsSaving(push, owner, Date.now())) return;
+  try {
+    const { publicKey } = (await api.invoke(config, getAuth, saveAuth, "notify")) ?? {};
+    if (!publicKey) throw new Error("notifications aren't set up on this server yet");
+    const key = base64UrlToBytes(publicKey);
+    let sub = await pm.getSubscription();
+    if (sub && !sameKey(sub.options?.applicationServerKey, key)) {
+      await sub.unsubscribe();
+      sub = null;
+    }
+    sub ??= await pm.subscribe({ userVisibleOnly: false, applicationServerKey: key });
+    const { endpoint, keys } = sub.toJSON();
+    await api.rpc(config, getAuth, saveAuth, "save_extension_push", { p_endpoint: endpoint, p_p256dh: keys.p256dh, p_auth: keys.auth });
+    await set({ push: { owner, endpoint, savedAt: Date.now() } });
+  } catch {
+    // Polling still works; try again later.
+    await set({ push: { owner, triedAt: Date.now() } });
+  }
+}
+
+/** Forgets this extension's push address: on the server when still signed in, and in the browser. */
+async function dropPush(config) {
+  const { push } = await get("push");
+  await set({ push: null });
+  if (config && push?.endpoint) await api.rpc(config, getAuth, saveAuth, "remove_push_subscription", { p_endpoint: push.endpoint }).catch(() => {});
+  const sub = await self.registration?.pushManager?.getSubscription().catch(() => null);
+  await sub?.unsubscribe().catch(() => false);
 }
 
 // -------------------------------------------------------------- blocking
@@ -167,7 +211,7 @@ async function appUrl() {
 }
 
 async function status() {
-  const { config, auth, focus, lastSyncAt, lastError } = await get(["config", "auth", "focus", "lastSyncAt", "lastError"]);
+  const { config, auth, focus, lastSyncAt, lastError, push } = await get(["config", "auth", "focus", "lastSyncAt", "lastError", "push"]);
   const now = Date.now();
   const domains = focus?.domains ?? [];
   const granted = await grantedDomains(domains);
@@ -184,6 +228,7 @@ async function status() {
     needAccess: domains.filter((d) => !granted.includes(d)),
     lastSyncAt: lastSyncAt ?? null,
     lastError: lastError ?? null,
+    instantStart: Boolean(auth && push?.endpoint && push.owner === pushOwner(auth)),
     appUrl: await appUrl(),
   };
 }
@@ -243,7 +288,10 @@ async function handle(msg, sender) {
 
     case "SPARROW_SIGN_OUT": {
       const { config, auth } = await get(["config", "auth"]);
-      if (config && auth) await api.signOut(config, auth);
+      if (config && auth) {
+        await queue(() => dropPush(config));
+        await api.signOut(config, auth);
+      }
       await set({ auth: null, focus: { active: false } });
       await queue(() => applyBlocking({ active: false }));
       return status();

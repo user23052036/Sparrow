@@ -1,15 +1,16 @@
 # Sparrow: current status (2026-11-16, second local run)
 
-Repo: github.com/user23052036/Sparrow. `main` has everything through T2.4 (partner fatigue guard): D1 to D43 and
-migrations to `0031`. Live site (static export, no backend yet): https://user23052036.github.io/Sparrow/
+Repo: github.com/user23052036/Sparrow. `main` has everything through T2.5 (instant start on the laptop): D1 to D44
+and migrations to `0031` plus `0036` (T2.5 had no number; see D44). Live site (static export, no backend yet): https://user23052036.github.io/Sparrow/
 
 ## Start here
 1. `docs/AUTONOMY.md`: how to run without the owner (preflight, modes A/B/C, agents, credentials).
 2. `docs/ROADMAP.md`: audit, position, tasks T0.1 to T5.4 with pre-assigned migration numbers.
-3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D42).
+3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D44).
 
-**Next task: T2.5 (instant start on the laptop: Web Push in the extension; read Chrome's docs first).** Then
-WS3 (android lane, T3.2 uses `0032`), WS4 (`0033`, `0034`), WS5 (`0035`).
+**Next task: T3.1 (evening review and proofs on Android).** Then T3.2 (`0032`), T3.3, WS4 (`0033`, `0034`),
+WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not replace `claim_push` or
+`save_extension_push`; a change to either goes in a migration after `0036`.
 
 ## Done in this run (Mode C: Claude Code on the owner's Mac, `gh` signed in, PR loop)
 Each task: own branch from `origin/main`, full local check list, PR, CI green, squash merge. T0.3, T1.2,
@@ -29,8 +30,9 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
 | T1.5 | #20 | CSP, no framing, referrer policy: real headers under `next start`, `<meta>` plus frame guard in the export. |
 | T2.1 | #21 | Web Push (D38, `0028`): `push_subscriptions`, `claim_push`, `notify` function, service worker handlers, Settings switch, push-service allow-list. |
 | T2.2 | #22 | Reminders (`0029`): morning/evening times, `claim_due_reminders`, `remind` function, pg_cron + pg_net job scheduled by the deploy workflow. |
-| T2.4 | see git log | Partner fatigue guard (D43, `0031`): 3 asks per session, 5 per local day; quiet hours for account partners (profile) and guests (key page); requests wait and the reminder job delivers them when quiet hours end; `key_request_status` for kind notes on Focus. |
+| T2.4 | #26 | Partner fatigue guard (D43, `0031`): 3 asks per session, 5 per local day; quiet hours for account partners (profile) and guests (key page); requests wait and the reminder job delivers them when quiet hours end; `key_request_status` for kind notes on Focus. |
 | T2.3 | #24 | Guest partner (D39, `0030`): key link `/key#spg_…`, anonymous guest functions, one key holder at a time, `claim_push` answers `{to, id}`, guest push, `convert_guest_key`. Run 2026-11-16; two review rounds (a race between invites and guests, push state, key memory on the page), all fixed before merging. |
+| T2.5 | see git log | Instant start on the laptop (D44, `0036`): Chrome allows silent push in extensions since 121, so the extension subscribes (`userVisibleOnly: false`), saves a silent address, and syncs on each push; `session_started`/`session_ended` from the web and phone apps and `key_answer` wake it; 30 s polling stays. Deploy pushes with `--include-all`. |
 
 ## Checks run in this run
 - Locally, per task, with Node 24 (`fnm exec --using=24`; the Mac's default Node 20 is below the repo's
@@ -52,6 +54,8 @@ secrets, Deploy web, Live smoke test).
 - The extension in a real Chrome (optional site access prompt and redirect after granting).
 - The Android engine on a real phone (the emulator run covers app blocking only, not the VPN filter).
 - The reminder job delivering key requests that waited through quiet hours (T2.4) on a real project.
+- Instant start (T2.5): a real silent push through FCM reaching the installed extension, and the
+  extension asking for nothing visible (needs the project and the extension loaded in Chrome 121+).
 - Guest partner (T2.3) against a real project: a guest's browser getting a push, and two real accounts
   converting (the e2e fake has one user; the SQL suite covers it).
 
@@ -67,7 +71,10 @@ secrets, Deploy web, Live smoke test).
 ## Working notes
 - SQL test user prefixes used so far: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1,
   f1f1f1f1, 24242424, 25252525, 26262626, 28282828 (push), 29292929 (reminders), 30303030 (guest partner),
-  31313131 (fatigue guard). Next: 32323232.
+  31313131 (fatigue guard), 32323232 (extension push). Next: 33333333.
+- Extension push (D44): `push_subscriptions.silent` rows are extensions; `notify` and `remind` read only
+  `silent = false` rows for notifications. The extension's push logic is in `apps/extension/lib/push.js`
+  and `ensurePush`/`dropPush` in `background.js`; its tests fake `self.registration.pushManager`.
 - The test stub now has Supabase's `service_role` role (bypass RLS); grant server-only functions to it.
 - The e2e fake answers `use_focus_link` and the four guest RPCs (`guest_overview`, `guest_decide`,
   `save_guest_push`, `remove_guest_push`) before its signed-in check; they are the anonymous RPCs.

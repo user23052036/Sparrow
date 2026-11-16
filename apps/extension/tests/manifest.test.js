@@ -13,6 +13,11 @@ test("manifest is MV3 with the permissions blocking needs", () => {
   for (const p of ["storage", "alarms", "declarativeNetRequest"]) assert.ok(manifest.permissions.includes(p), p);
 });
 
+test("silent Web Push (D44): Chrome lets extensions use it from 121, with the notifications permission", () => {
+  assert.ok(manifest.permissions.includes("notifications"));
+  assert.ok(Number(manifest.minimum_chrome_version) >= 121);
+});
+
 test("no site access at install: listed sites are asked for one by one (optional_host_permissions)", () => {
   assert.equal(manifest.host_permissions, undefined);
   assert.deepEqual(manifest.optional_host_permissions, ["*://*/*"]);

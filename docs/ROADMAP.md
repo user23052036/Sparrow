@@ -154,7 +154,9 @@ the repo's `CLAUDE.md`.
 - **T2.5 Instant start on the laptop.** The extension subscribes to Web Push in its service worker so a
   session started elsewhere reaches it in seconds; 30-second polling stays as the fallback (D10).
   **[assumed]** that silent push is allowed for extensions in current Chrome; read Chrome's docs first
-  and drop the task with a DECISIONS note if it is not.
+  and drop the task with a DECISIONS note if it is not. *Done (D44): allowed since Chrome 121; built with
+  migration `0036` (no number was assigned; `0032` to `0035` stay with their tasks and must not replace
+  `claim_push`).*
 
 ### WS3: the phone (lane: android)
 - **T3.1 Evening review and proofs on Android** (photo through the system camera, text).

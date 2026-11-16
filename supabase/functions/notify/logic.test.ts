@@ -1,7 +1,18 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildPayload, GUEST_KEY as GUEST_KEY_SHAPE, notify, parseRequest, PUSH_ENDPOINT, PUSH_TEXT, type Deps, type Subscription } from "./logic.ts";
+import {
+  buildPayload,
+  GUEST_KEY as GUEST_KEY_SHAPE,
+  notify,
+  parseRequest,
+  PUSH_ENDPOINT,
+  PUSH_TEXT,
+  SESSION_KINDS,
+  SYNC_PAYLOAD,
+  type Deps,
+  type Subscription,
+} from "./logic.ts";
 import { copy } from "../../../packages/shared/src/copy.ts";
 
 const REF = "11111111-1111-4111-8111-111111111111";
@@ -23,6 +34,7 @@ function deps(over: Partial<Deps> & { failures?: Record<string, number> } = {}) 
     claim: async () => ({ to: "user", id: PARTNER }),
     subscriptionsOf: async () => [sub("phone"), sub("laptop"), sub("old")],
     guestSubscriptionsOf: async () => [sub("guest-phone")],
+    extensionsOf: async () => [],
     async send(s, payload) {
       const code = over.failures?.[s.id];
       if (code) throw Object.assign(new Error("push service said no"), { statusCode: code });
@@ -84,6 +96,47 @@ describe("notify", () => {
     assert.deepEqual(sentTo, ["phone"]);
   });
 
+  it("a session started or ended elsewhere only wakes the person's extensions, with nothing in the push", async () => {
+    for (const kind of SESSION_KINDS) {
+      const { d, sentTo, payloads } = deps({ extensionsOf: async () => [sub("extension")] });
+      assert.deepEqual(await notify(kind, REF, d), { sent: 1, removed: 0, failed: 0 });
+      assert.deepEqual(sentTo, ["extension"], "no notification on the phone or laptop");
+      assert.deepEqual(payloads, [SYNC_PAYLOAD]);
+      assert.deepEqual(JSON.parse(SYNC_PAYLOAD), { sync: true });
+    }
+  });
+
+  it("an answer to a key request also wakes the asker's extensions: an approval ends the session", async () => {
+    const { d, sentTo, payloads } = deps({ extensionsOf: async () => [sub("extension")] });
+    assert.deepEqual(await notify("key_answer", REF, d), { sent: 4, removed: 0, failed: 0 });
+    assert.deepEqual(sentTo, ["phone", "laptop", "old", "extension"]);
+    assert.equal(payloads.at(-1), SYNC_PAYLOAD);
+  });
+
+  it("requests and proofs don't wake anyone's extensions, and a guest has none", async () => {
+    for (const kind of ["key_request", "proof_shared"] as const) {
+      const { d, sentTo } = deps({ extensionsOf: async () => [sub("extension")] });
+      await notify(kind, REF, d);
+      assert.ok(!sentTo.includes("extension"), kind);
+    }
+    let asked = false;
+    const { d } = deps({
+      claim: async () => ({ to: "guest", id: GUEST }),
+      extensionsOf: async () => {
+        asked = true;
+        return [];
+      },
+    });
+    await notify("key_answer", REF, d);
+    assert.equal(asked, false);
+  });
+
+  it("forgets an extension the push service says is gone", async () => {
+    const { d, removed } = deps({ extensionsOf: async () => [sub("extension")], failures: { extension: 404 } });
+    assert.deepEqual(await notify("session_started", REF, d), { sent: 0, removed: 1, failed: 0 });
+    assert.deepEqual(removed, ["extension"]);
+  });
+
   it("knows the real push services and refuses look-alikes", () => {
     for (const ok of [
       "https://fcm.googleapis.com/fcm/send/x",
@@ -132,6 +185,7 @@ describe("payloads", () => {
   });
   it("requests are checked before anything happens", () => {
     assert.deepEqual(parseRequest({ kind: "key_answer", ref: REF }), { kind: "key_answer", ref: REF });
+    assert.deepEqual(parseRequest({ kind: "session_started", ref: REF }), { kind: "session_started", ref: REF });
     for (const bad of [null, {}, { kind: "key_answer" }, { kind: "everything", ref: REF }, { kind: "key_answer", ref: "1; drop table" }]) {
       assert.equal(parseRequest(bad), null);
     }
@@ -141,6 +195,7 @@ describe("payloads", () => {
     for (const bad of [
       { kind: "key_request", ref: REF, key: GUEST_KEY },
       { kind: "proof_shared", ref: REF, key: GUEST_KEY },
+      { kind: "session_started", ref: REF, key: GUEST_KEY },
       { kind: "key_answer", ref: REF, key: GUEST_KEY.slice(0, -1) },
       { kind: "key_answer", ref: REF, key: "spt_" + "0".repeat(64) },
       { kind: "key_answer", ref: REF, key: null },
@@ -160,6 +215,13 @@ describe("the guest key shape matches migration 0030", () => {
   it("the function accepts exactly the keys the database does", () => {
     const sql = readFileSync(new URL("../../migrations/0030_guest_partner.sql", import.meta.url), "utf8");
     assert.ok(sql.includes(`p_key !~ '${GUEST_KEY_SHAPE.source}'`), "the key pattern in 0030 differs from GUEST_KEY");
+  });
+});
+
+describe("the session kinds match migration 0036", () => {
+  it("claim_push knows every kind that wakes an extension", () => {
+    const sql = readFileSync(new URL("../../migrations/0036_extension_push.sql", import.meta.url), "utf8");
+    for (const kind of SESSION_KINDS) assert.ok(sql.includes(`p_kind = '${kind}'`), kind);
   });
 });
 

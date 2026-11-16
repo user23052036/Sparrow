@@ -12,6 +12,17 @@ export function notifyPartner(kind: PushKind, ref: string | null | undefined) {
     .catch(() => {});
 }
 
+/**
+ * A session started, or ended early: wakes the person's Sparrow extensions on other computers at once (D44)
+ * instead of at their next 30-second check. Fire and forget; nothing is shown anywhere.
+ */
+export function notifyMyExtensions(kind: "session_started" | "session_ended", sessionId: string | null | undefined) {
+  if (!sessionId) return;
+  void supabase()
+    .functions.invoke("notify", { body: { kind, ref: sessionId } })
+    .catch(() => {});
+}
+
 export function pushSupported(): boolean {
   return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 }

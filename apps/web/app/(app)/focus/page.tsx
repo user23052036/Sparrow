@@ -7,7 +7,7 @@ import { supabase, errorText } from "@/lib/supabase";
 import { clock, timeAgo } from "@/lib/format";
 import { extSyncNow } from "@/lib/extension";
 import { FocusLinks } from "@/components/FocusLinks";
-import { notifyPartner } from "@/lib/push";
+import { notifyMyExtensions, notifyPartner } from "@/lib/push";
 
 interface FocusState {
   active: boolean;
@@ -43,7 +43,10 @@ function EarlyExit({ sessionId, onEnded, onCancel }: { sessionId: string; onEnde
   async function end() {
     const { error } = await supabase().rpc("end_focus_session", { p_session_id: sessionId, p_reason: reason });
     if (error) setErr(errorText(error));
-    else onEnded();
+    else {
+      notifyMyExtensions("session_ended", sessionId);
+      onEnded();
+    }
   }
   return (
     <div className="panel stack" aria-live="polite">
@@ -287,10 +290,11 @@ function FocusInner() {
       setErr(copy.focus.addOne);
       return;
     }
-    const { error } = await supabase().rpc("start_focus_session", { p_minutes: minutes, p_item_id: itemId, p_locked: lockIt && partnerName !== null });
+    const { data, error } = await supabase().rpc("start_focus_session", { p_minutes: minutes, p_item_id: itemId, p_locked: lockIt && partnerName !== null });
     if (error) setErr(errorText(error));
     else {
       extSyncNow();
+      notifyMyExtensions("session_started", (data as { id?: string } | null)?.id);
       await load();
     }
   }

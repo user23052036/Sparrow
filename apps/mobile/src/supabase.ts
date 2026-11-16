@@ -21,3 +21,12 @@ export function errorText(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
   return "Something went wrong. Please try again.";
 }
+
+/**
+ * A session started, or ended early: wakes the person's Sparrow extensions on their computers at once (D44)
+ * instead of at their next 30-second check. Fire and forget; nothing is shown anywhere.
+ */
+export function notifyMyExtensions(kind: "session_started" | "session_ended", sessionId: string | null | undefined) {
+  if (!sessionId) return;
+  void supabase.functions.invoke("notify", { body: { kind, ref: sessionId } }).catch(() => {});
+}

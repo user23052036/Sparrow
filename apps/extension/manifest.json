@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Sparrow Focus",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Blocks the sites you choose during your Sparrow focus sessions.",
-  "minimum_chrome_version": "120",
-  "permissions": ["storage", "alarms", "declarativeNetRequest"],
+  "minimum_chrome_version": "121",
+  "permissions": ["storage", "alarms", "declarativeNetRequest", "notifications"],
   "optional_host_permissions": ["*://*/*"],
   "background": {
     "service_worker": "background.js",
