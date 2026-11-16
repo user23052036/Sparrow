@@ -61,6 +61,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: bash supabase/tests/run.sh
+      # "What Sparrow stores" (T4.1): the page's snapshot must match what the migrations make.
+      - run: bash supabase/tests/snapshot.sh --check
 
   # The Android blocking rules (apps and websites) on a plain JVM, and a type-check of all the
   # Kotlin against the real Android API jar. No Gradle and no emulator; the full build is in

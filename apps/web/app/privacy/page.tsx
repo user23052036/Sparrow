@@ -36,6 +36,9 @@ export default function Privacy() {
         <h3>{p.ownTitle}</h3>
         <p>{p.own}</p>
       </div>
+      <p>
+        <Link href="/stored">{copy.stored.privacyLink}</Link>
+      </p>
     </main>
   );
 }

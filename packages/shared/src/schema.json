@@ -1,0 +1,1610 @@
+{
+    "tables": [
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "blocklists",
+            "columns": [
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "domains",
+                    "readable": true
+                },
+                {
+                    "name": "android_packages",
+                    "readable": true
+                },
+                {
+                    "name": "updated_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "blocklist_all"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "buddy_links",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "requester_id",
+                    "readable": true
+                },
+                {
+                    "name": "partner_id",
+                    "readable": true
+                },
+                {
+                    "name": "invite_code",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "mutual",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "requester_shares",
+                    "readable": true
+                },
+                {
+                    "name": "partner_shares",
+                    "readable": true
+                },
+                {
+                    "name": "requester_penalty_ok",
+                    "readable": true
+                },
+                {
+                    "name": "partner_penalty_ok",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "buddy_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "charities",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "name",
+                    "readable": true
+                },
+                {
+                    "name": "blurb",
+                    "readable": true
+                },
+                {
+                    "name": "active",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "charities_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "circle_cheers",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "circle_id",
+                    "readable": true
+                },
+                {
+                    "name": "from_id",
+                    "readable": true
+                },
+                {
+                    "name": "to_id",
+                    "readable": true
+                },
+                {
+                    "name": "day",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "circle_cheers_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "circle_goals",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "circle_id",
+                    "readable": true
+                },
+                {
+                    "name": "target",
+                    "readable": true
+                },
+                {
+                    "name": "started_at",
+                    "readable": true
+                },
+                {
+                    "name": "ends_at",
+                    "readable": true
+                },
+                {
+                    "name": "reached_at",
+                    "readable": true
+                },
+                {
+                    "name": "let_go_at",
+                    "readable": true
+                },
+                {
+                    "name": "started_by",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "circle_goals_select_member"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "circle_members",
+            "columns": [
+                {
+                    "name": "circle_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "member_key",
+                    "readable": true
+                },
+                {
+                    "name": "shares",
+                    "readable": true
+                },
+                {
+                    "name": "joined_at",
+                    "readable": true
+                },
+                {
+                    "name": "alias",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "circle_members_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "circles",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "name",
+                    "readable": true
+                },
+                {
+                    "name": "invite_code",
+                    "readable": true
+                },
+                {
+                    "name": "created_by",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "circles_select_member"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "crafted_badges",
+            "columns": [
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "key",
+                    "readable": true
+                },
+                {
+                    "name": "crafted_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "crafted_badges_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "daily_plans",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "date",
+                    "readable": true
+                },
+                {
+                    "name": "committed_at",
+                    "readable": true
+                },
+                {
+                    "name": "stake_type",
+                    "readable": true
+                },
+                {
+                    "name": "stake_amount",
+                    "readable": true
+                },
+                {
+                    "name": "mood_morning",
+                    "readable": true
+                },
+                {
+                    "name": "mood_evening",
+                    "readable": true
+                },
+                {
+                    "name": "reviewed_at",
+                    "readable": true
+                },
+                {
+                    "name": "points_earned",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "plans_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "devices",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "platform",
+                    "readable": true
+                },
+                {
+                    "name": "label",
+                    "readable": true
+                },
+                {
+                    "name": "last_heartbeat_at",
+                    "readable": true
+                },
+                {
+                    "name": "protection_enabled",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "push_token",
+                    "readable": true
+                },
+                {
+                    "name": "secret_hash",
+                    "readable": true
+                },
+                {
+                    "name": "asleep",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "devices_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "end_requests",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "session_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "reason",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "decided_by",
+                    "readable": true
+                },
+                {
+                    "name": "decided_at",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "decided_by_guest",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "end_requests_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "feedback",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "message",
+                    "readable": true
+                },
+                {
+                    "name": "helpful",
+                    "readable": true
+                },
+                {
+                    "name": "page",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "feedback_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "focus_links",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "label",
+                    "readable": true
+                },
+                {
+                    "name": "minutes",
+                    "readable": true
+                },
+                {
+                    "name": "key_hash",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "last_used_at",
+                    "readable": true
+                },
+                {
+                    "name": "use_count",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "focus_links_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "focus_sessions",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "started_at",
+                    "readable": true
+                },
+                {
+                    "name": "planned_minutes",
+                    "readable": true
+                },
+                {
+                    "name": "ends_at",
+                    "readable": true
+                },
+                {
+                    "name": "ended_at",
+                    "readable": true
+                },
+                {
+                    "name": "ended_early",
+                    "readable": true
+                },
+                {
+                    "name": "exit_reason",
+                    "readable": true
+                },
+                {
+                    "name": "started_from_device_id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_item_id",
+                    "readable": true
+                },
+                {
+                    "name": "locked",
+                    "readable": true
+                },
+                {
+                    "name": "started_by_link",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "focus_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "guest_keys",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "owner_id",
+                    "readable": true
+                },
+                {
+                    "name": "name",
+                    "readable": true
+                },
+                {
+                    "name": "key_hash",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "last_seen_at",
+                    "readable": true
+                },
+                {
+                    "name": "quiet_from",
+                    "readable": false
+                },
+                {
+                    "name": "quiet_to",
+                    "readable": false
+                },
+                {
+                    "name": "quiet_tz",
+                    "readable": false
+                }
+            ],
+            "readPolicies": [
+                "guest_keys_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "kind_acts",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "note",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "kind_acts_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "makeup_steps",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "from_plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "due_on",
+                    "readable": true
+                },
+                {
+                    "name": "title",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "settled_at",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "makeup_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "partner_pledges",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "payer_id",
+                    "readable": true
+                },
+                {
+                    "name": "for_user_id",
+                    "readable": true
+                },
+                {
+                    "name": "charity_id",
+                    "readable": true
+                },
+                {
+                    "name": "amount",
+                    "readable": true
+                },
+                {
+                    "name": "currency",
+                    "readable": true
+                },
+                {
+                    "name": "mode",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "partner_pledges_select_payer"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "plan_items",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "daily_plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "task_id",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "completed_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "items_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "pledges",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "charity_id",
+                    "readable": true
+                },
+                {
+                    "name": "amount",
+                    "readable": true
+                },
+                {
+                    "name": "currency",
+                    "readable": true
+                },
+                {
+                    "name": "mode",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "owed",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "settled_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "pledges_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "points_ledger",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "delta",
+                    "readable": true
+                },
+                {
+                    "name": "reason",
+                    "readable": true
+                },
+                {
+                    "name": "ref_id",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "points_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "profiles",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "display_name",
+                    "readable": true
+                },
+                {
+                    "name": "timezone",
+                    "readable": true
+                },
+                {
+                    "name": "gentle_mode",
+                    "readable": true
+                },
+                {
+                    "name": "onboarded",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "light_day",
+                    "readable": true
+                },
+                {
+                    "name": "share_rating",
+                    "readable": true
+                },
+                {
+                    "name": "leaderboard_optin",
+                    "readable": true
+                },
+                {
+                    "name": "leaderboard_handle",
+                    "readable": true
+                },
+                {
+                    "name": "remind_morning",
+                    "readable": true
+                },
+                {
+                    "name": "remind_evening",
+                    "readable": true
+                },
+                {
+                    "name": "quiet_from",
+                    "readable": true
+                },
+                {
+                    "name": "quiet_to",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "profiles_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "proofs",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_item_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "kind",
+                    "readable": true
+                },
+                {
+                    "name": "storage_path",
+                    "readable": true
+                },
+                {
+                    "name": "text_body",
+                    "readable": true
+                },
+                {
+                    "name": "image_phash",
+                    "readable": true
+                },
+                {
+                    "name": "flagged_similar",
+                    "readable": true
+                },
+                {
+                    "name": "visibility",
+                    "readable": true
+                },
+                {
+                    "name": "server_created_at",
+                    "readable": true
+                },
+                {
+                    "name": "duration_s",
+                    "readable": true
+                },
+                {
+                    "name": "photo_age_hours",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "proofs_select_buddy",
+                "proofs_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "push_sent",
+            "columns": [
+                {
+                    "name": "kind",
+                    "readable": false
+                },
+                {
+                    "name": "ref",
+                    "readable": false
+                },
+                {
+                    "name": "created_at",
+                    "readable": false
+                }
+            ],
+            "readPolicies": [
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "push_subscriptions",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "endpoint",
+                    "readable": true
+                },
+                {
+                    "name": "p256dh",
+                    "readable": true
+                },
+                {
+                    "name": "auth",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "guest_key_id",
+                    "readable": true
+                },
+                {
+                    "name": "silent",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "push_subscriptions_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "reminder_job",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": false
+                },
+                {
+                    "name": "function_url",
+                    "readable": false
+                },
+                {
+                    "name": "secret",
+                    "readable": false
+                }
+            ],
+            "readPolicies": [
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "reminder_sent",
+            "columns": [
+                {
+                    "name": "user_id",
+                    "readable": false
+                },
+                {
+                    "name": "local_date",
+                    "readable": false
+                },
+                {
+                    "name": "slot",
+                    "readable": false
+                },
+                {
+                    "name": "sent_at",
+                    "readable": false
+                }
+            ],
+            "readPolicies": [
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "tamper_events",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "device_id",
+                    "readable": true
+                },
+                {
+                    "name": "focus_session_id",
+                    "readable": true
+                },
+                {
+                    "name": "kind",
+                    "readable": true
+                },
+                {
+                    "name": "detail",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "tamper_select_buddy",
+                "tamper_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "task_steps",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "task_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "title",
+                    "readable": true
+                },
+                {
+                    "name": "est_minutes",
+                    "readable": true
+                },
+                {
+                    "name": "position",
+                    "readable": true
+                },
+                {
+                    "name": "done_on",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "steps_all"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "tasks",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "title",
+                    "readable": true
+                },
+                {
+                    "name": "notes",
+                    "readable": true
+                },
+                {
+                    "name": "proof_required",
+                    "readable": true
+                },
+                {
+                    "name": "archived",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "if_cue",
+                    "readable": true
+                },
+                {
+                    "name": "then_action",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "tasks_all"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "verifications",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "proof_id",
+                    "readable": true
+                },
+                {
+                    "name": "verifier_id",
+                    "readable": true
+                },
+                {
+                    "name": "verdict",
+                    "readable": true
+                },
+                {
+                    "name": "comment",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "verif_select"
+            ]
+        }
+    ],
+    "functions": [
+        {
+            "anon": false,
+            "hash": "bc7c574db1e403e696fc92fbd30d66b4",
+            "signature": "accept_buddy_invite(text)"
+        },
+        {
+            "anon": false,
+            "hash": "d1e69586816b5808f0be26b897d3f306",
+            "signature": "check_my_heartbeats()"
+        },
+        {
+            "anon": false,
+            "hash": "3f0fde6e21567544de3545f3ef589e49",
+            "signature": "circle_goal()"
+        },
+        {
+            "anon": false,
+            "hash": "e093955c1dca8aefe03bbc1780bdfb57",
+            "signature": "circle_overview()"
+        },
+        {
+            "anon": false,
+            "hash": "6e292b9a714970676f60efdc10ed24f4",
+            "signature": "claim_push(text,uuid)"
+        },
+        {
+            "anon": false,
+            "hash": "4570e44328bf99d2cc91f5a969aa36f7",
+            "signature": "commit_day(uuid[],integer,integer,boolean)"
+        },
+        {
+            "anon": false,
+            "hash": "94afe5f227b9ebb3ae4fd603cdfb10fc",
+            "signature": "convert_guest_key(text)"
+        },
+        {
+            "anon": false,
+            "hash": "fa6dc8b010b1957024903f0c51d42c3e",
+            "signature": "craft_badge(text)"
+        },
+        {
+            "anon": false,
+            "hash": "e1a83b3919e441c732bf51576fb67b22",
+            "signature": "create_buddy_invite()"
+        },
+        {
+            "anon": false,
+            "hash": "802ac84f24159403087832290ec952bb",
+            "signature": "create_circle(text,text)"
+        },
+        {
+            "anon": false,
+            "hash": "d5f6dc40a088de15faaefa7f13d8ba38",
+            "signature": "create_focus_link(text,integer)"
+        },
+        {
+            "anon": false,
+            "hash": "8332ae5068212f693731bef61b91da07",
+            "signature": "create_guest_key(text)"
+        },
+        {
+            "anon": false,
+            "hash": "742fc4395435c06322e1394f2fde2d75",
+            "signature": "decide_end_request(uuid,boolean)"
+        },
+        {
+            "anon": true,
+            "hash": "9e7e649011223eda4338b5826602290c",
+            "signature": "device_decide_end_request(uuid,text,uuid,boolean)"
+        },
+        {
+            "anon": true,
+            "hash": "5f0391375a1953f138cad74441f663ec",
+            "signature": "device_sync(uuid,text,boolean,boolean)"
+        },
+        {
+            "anon": false,
+            "hash": "37644ce34a6c1bf45eabfd455b85f258",
+            "signature": "end_buddy_link(uuid)"
+        },
+        {
+            "anon": false,
+            "hash": "dbe695579d1126f0deac52d8d862bbc8",
+            "signature": "end_focus_session(uuid,text)"
+        },
+        {
+            "anon": false,
+            "hash": "f36b8494b771869a0bdeadc7e5d0aedb",
+            "signature": "export_my_data()"
+        },
+        {
+            "anon": false,
+            "hash": "d268a20d5bc85bf8b17716ff2e0a76c5",
+            "signature": "forget_device_secret(uuid)"
+        },
+        {
+            "anon": false,
+            "hash": "5148411f790b60917cbaec9ba5e2d195",
+            "signature": "get_focus_state()"
+        },
+        {
+            "anon": false,
+            "hash": "a83a5e3dbddd84ab3bd5c20b9baa69b1",
+            "signature": "get_today()"
+        },
+        {
+            "anon": true,
+            "hash": "55a0a4137124b5a419581383a754a3de",
+            "signature": "guest_decide(text,uuid,boolean)"
+        },
+        {
+            "anon": true,
+            "hash": "c461bc1c974ef50ace06c20a1d78eb3c",
+            "signature": "guest_overview(text)"
+        },
+        {
+            "anon": true,
+            "hash": "6378acfb04fa59dfdf7977cdb24e2045",
+            "signature": "guest_push_is_on(text,text)"
+        },
+        {
+            "anon": true,
+            "hash": "7b3ba686ac64220d6631065e34f9df82",
+            "signature": "guest_set_quiet(text,time without time zone,time without time zone,text)"
+        },
+        {
+            "anon": false,
+            "hash": "6f53e5725e6719a1862e1a6de7a227a1",
+            "signature": "heartbeat(uuid,text,text,boolean)"
+        },
+        {
+            "anon": false,
+            "hash": "28c41bf99a46295b466438c35d6f56bc",
+            "signature": "is_buddy_of(uuid,uuid)"
+        },
+        {
+            "anon": false,
+            "hash": "8a7f64a345193084a506f07bf3e48d29",
+            "signature": "issue_device_secret(uuid)"
+        },
+        {
+            "anon": false,
+            "hash": "18c9ed403cce21b0f3ab54a06409b67d",
+            "signature": "join_circle(text,text)"
+        },
+        {
+            "anon": false,
+            "hash": "70e21ba078a17704a4e776c6a76c3742",
+            "signature": "join_leaderboard(text)"
+        },
+        {
+            "anon": false,
+            "hash": "beb1507902fd3191cdf52965ab8e35ca",
+            "signature": "key_request_status(uuid)"
+        },
+        {
+            "anon": false,
+            "hash": "37664738338126db9ae5d26bc77469af",
+            "signature": "leave_circle()"
+        },
+        {
+            "anon": false,
+            "hash": "07229bc24e0d3000c481994d7143cf6b",
+            "signature": "leave_leaderboard()"
+        },
+        {
+            "anon": false,
+            "hash": "bab84c9433bff46235015ef5d716e6e0",
+            "signature": "let_go_circle_goal()"
+        },
+        {
+            "anon": true,
+            "hash": "d6840f37b464f4ee4ddace974d934cbb",
+            "signature": "log_kind_act(uuid,text)"
+        },
+        {
+            "anon": false,
+            "hash": "1d364c22ae9bf685921730677690db38",
+            "signature": "monthly_leaderboard()"
+        },
+        {
+            "anon": false,
+            "hash": "3c14630f673a02d192aa133f94862aea",
+            "signature": "my_collection()"
+        },
+        {
+            "anon": false,
+            "hash": "2f1aa62b09478c319a79c1784c3cd047",
+            "signature": "my_progress(integer)"
+        },
+        {
+            "anon": false,
+            "hash": "ee6ba236dc10db5947dde4da49166fb1",
+            "signature": "my_rating()"
+        },
+        {
+            "anon": false,
+            "hash": "4470a80c960651ea86868ee9e4a1712a",
+            "signature": "partner_badge()"
+        },
+        {
+            "anon": false,
+            "hash": "a01e1c8cb55bf65d3acdbcef4bab4348",
+            "signature": "partner_overview()"
+        },
+        {
+            "anon": false,
+            "hash": "9187eeed9dba87aa5affc557d653bf19",
+            "signature": "partner_rating()"
+        },
+        {
+            "anon": true,
+            "hash": "cde307e2b92dd44efc0168cf51cd4436",
+            "signature": "partner_support_nudge()"
+        },
+        {
+            "anon": true,
+            "hash": "f8082c8302c3dd34a65169e421dc8592",
+            "signature": "penalty_status()"
+        },
+        {
+            "anon": true,
+            "hash": "799069261ee89750181df6115fdea925",
+            "signature": "pledge_limit()"
+        },
+        {
+            "anon": false,
+            "hash": "de677060308014533d1c0e3960fa29e8",
+            "signature": "points_balance()"
+        },
+        {
+            "anon": false,
+            "hash": "9a34de0af4fb42c5b18eabbdb3fadbeb",
+            "signature": "preview_buddy_invite(text)"
+        },
+        {
+            "anon": false,
+            "hash": "138be78abaf32dcd069a46bb41340959",
+            "signature": "preview_circle_invite(text)"
+        },
+        {
+            "anon": false,
+            "hash": "aaf7f6613a531c713895c8c6c025eab5",
+            "signature": "proof_context(uuid)"
+        },
+        {
+            "anon": false,
+            "hash": "8f1d31775afb1a701e618ff139a3940d",
+            "signature": "recent_completion(integer)"
+        },
+        {
+            "anon": false,
+            "hash": "09a5398b72bfbd8cfe4dde8f2fdfcd44",
+            "signature": "remove_focus_link(uuid)"
+        },
+        {
+            "anon": false,
+            "hash": "807a0955ba096f95ee9101cd2d0b6385",
+            "signature": "remove_guest_key()"
+        },
+        {
+            "anon": true,
+            "hash": "be1ff90b8e3360d1c18f47b6c7916f39",
+            "signature": "remove_guest_push(text,text)"
+        },
+        {
+            "anon": false,
+            "hash": "f9744686ee0951d3e00012fcbd6df1c3",
+            "signature": "remove_push_subscription(text)"
+        },
+        {
+            "anon": false,
+            "hash": "bfa0da21ac08fb5b17999396e266e810",
+            "signature": "request_end_session(uuid,text)"
+        },
+        {
+            "anon": false,
+            "hash": "7a7516281a7c9f48e324f8531c0bf884",
+            "signature": "review_day(uuid,jsonb,integer)"
+        },
+        {
+            "anon": false,
+            "hash": "07269a1cd28bf558bd0df68d3a33c814",
+            "signature": "save_extension_push(text,text,text)"
+        },
+        {
+            "anon": true,
+            "hash": "ffdd41915cf8b3d6ea2c86600aa3352d",
+            "signature": "save_guest_push(text,text,text,text)"
+        },
+        {
+            "anon": false,
+            "hash": "10b540a208a202ed1a3a1df687802916",
+            "signature": "save_push_subscription(text,text,text)"
+        },
+        {
+            "anon": false,
+            "hash": "bfc4eeb8adced3a7bdbf25994079a36a",
+            "signature": "send_cheer(uuid)"
+        },
+        {
+            "anon": false,
+            "hash": "18aa1fdb5f2a2d47aca3ec3f6a92d2b2",
+            "signature": "set_circle_alias(text)"
+        },
+        {
+            "anon": false,
+            "hash": "0bc6be6683f3a87c864d81e95cb0098c",
+            "signature": "set_circle_sharing(boolean)"
+        },
+        {
+            "anon": false,
+            "hash": "05b886e938ff456ba2b36fb9e9c067dc",
+            "signature": "set_item_status(uuid,text)"
+        },
+        {
+            "anon": false,
+            "hash": "1aa5afae5a93a691c12e13eb3ec2eb9d",
+            "signature": "set_my_sharing(boolean)"
+        },
+        {
+            "anon": true,
+            "hash": "49cf5ae231ad6e1ab4ea272f6c9a5d89",
+            "signature": "set_penalty_optin(boolean)"
+        },
+        {
+            "anon": true,
+            "hash": "4e840e68b73c0cb57605203295f2af93",
+            "signature": "set_pledge(integer,uuid,boolean)"
+        },
+        {
+            "anon": false,
+            "hash": "ca76d0392bafed15d438804e8921e1c9",
+            "signature": "set_push_token(uuid,text)"
+        },
+        {
+            "anon": false,
+            "hash": "0a6e24d172a63174f2e424e11c2ad8fb",
+            "signature": "set_quiet_hours(time without time zone,time without time zone)"
+        },
+        {
+            "anon": false,
+            "hash": "8540ec4376e2a4b8d5d8eb055ae1be65",
+            "signature": "set_share_rating(boolean)"
+        },
+        {
+            "anon": false,
+            "hash": "b385a55f0aeba8ebfb20276a53f46b33",
+            "signature": "settle_makeup_step(uuid,text)"
+        },
+        {
+            "anon": false,
+            "hash": "23ff0f7a2815086f5c54e5acbd3ebd23",
+            "signature": "start_circle_goal(integer)"
+        },
+        {
+            "anon": false,
+            "hash": "b337a51626bb32d1cfff719f4149f8a5",
+            "signature": "start_focus_session(integer,uuid,uuid,boolean)"
+        },
+        {
+            "anon": false,
+            "hash": "d6e7b893be1757414bd2f2cb737d81c0",
+            "signature": "unreviewed_days()"
+        },
+        {
+            "anon": true,
+            "hash": "5c35e7683df89b983c4f208f058e47c0",
+            "signature": "use_focus_link(text)"
+        },
+        {
+            "anon": false,
+            "hash": "9a820a76edc9b58a23d74b84b27e7b3b",
+            "signature": "verify_proof(uuid,text,text)"
+        }
+    ]
+}

@@ -9,3 +9,5 @@ next-env.d.ts
 apps/mobile/android
 apps/web/public/sw.js
 apps/web/out
+# Written by supabase/tests/snapshot.sh; CI compares it byte for byte (D47).
+packages/shared/src/schema.json

@@ -22,3 +22,4 @@ export * from "./craft";
 export * from "./guest";
 export * from "./review";
 export * from "./setupcheck";
+export * from "./stored";
