@@ -83,6 +83,8 @@ class BlockedActivity : Activity() {
 
   override fun onResume() {
     super.onResume()
+    // T3.3: the screen really showed (some phones stop apps from opening screens in the background).
+    EngineStore(this).saveLastCover(System.currentTimeMillis())
     main.post(countdown)
   }
 

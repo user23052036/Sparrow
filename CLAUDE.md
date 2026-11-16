@@ -11,8 +11,8 @@ DECISIONS.md are not reversed without a new entry. If a task would contradict on
 `docs/STATUS.md` ("Parked for the owner") and take the next task; do not stop to ask.
 
 ## Where things stand
-- `main` has the roadmap through T3.2: decisions D1 to D46, migrations to `0032` plus `0036` (D44: `0032` to `0035` stay with their tasks and must not touch `claim_push`, `save_push_subscription`, `save_extension_push`, `convert_guest_key` or the `silent` column (a test checks)). Always `git fetch origin` and branch from `origin/main`.
-- Start at the task ID that `docs/STATUS.md` names as next (T3.3 after 2026-11-16).
+- `main` has the roadmap through T3.3: decisions D1 to D46, migrations to `0032` plus `0036` (D44: `0032` to `0035` stay with their tasks and must not touch `claim_push`, `save_push_subscription`, `save_extension_push`, `convert_guest_key` or the `silent` column (a test checks)). Always `git fetch origin` and branch from `origin/main`.
+- Start at the task ID that `docs/STATUS.md` names as next (T4.1 after 2026-11-16).
 - The web app is deployed as a static export on GitHub Pages (https://user23052036.github.io/Sparrow/), backed by the owner's Supabase project since 2026-11-16: a push to `main` touching `supabase/` deploys to the real database, and the live smoke test runs against it.
 - The Android app-blocking engine has run on an emulator in CI (`Android emulator test`); never on a phone. Phone website blocking (D30) has never run.
 

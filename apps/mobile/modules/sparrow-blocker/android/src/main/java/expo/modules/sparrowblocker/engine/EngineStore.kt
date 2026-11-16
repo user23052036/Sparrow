@@ -70,6 +70,27 @@ class EngineStore(context: Context) {
     prefs.edit().putBoolean("webBlocking", on).apply()
   }
 
+  /** T3.3: when the background service (not the open app) last checked in, on this phone's clock. */
+  fun serviceSyncMs(): Long = prefs.getLong("serviceSyncedAt", 0L)
+
+  fun saveServiceSync(ms: Long) {
+    prefs.edit().putLong("serviceSyncedAt", ms).apply()
+  }
+
+  /** T3.3: server clock minus phone clock, from the last check-in. */
+  fun serverOffsetMs(): Long = prefs.getLong("serverOffset", 0L)
+
+  fun saveServerOffset(ms: Long) {
+    prefs.edit().putLong("serverOffset", ms).apply()
+  }
+
+  /** T3.3: when the blocked screen last actually showed over a listed app ("Check my setup" looks for it). */
+  fun lastCoverMs(): Long = prefs.getLong("lastCover", 0L)
+
+  fun saveLastCover(ms: Long) {
+    prefs.edit().putLong("lastCover", ms).apply()
+  }
+
   /** T3.2: key requests the last sync listed as waiting on this phone's owner, and the ones already on screen. */
   fun waitingRequests(): List<String> = prefs.getString("keyWaiting", "")!!.split(',').filter { it.isNotBlank() }
 

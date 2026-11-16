@@ -13,6 +13,8 @@ import { key, supabase, url } from "./supabase";
 export const ENGINE_READY = isNativeAvailable;
 
 const KEY = "sparrow:deviceId";
+/** "Check my setup"'s live test result (T3.3), kept per account and dropped on sign-out. */
+export const SETUP_TEST_KEY = "sparrow:setupTest";
 
 function uuid(): string {
   const hex = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
@@ -74,5 +76,6 @@ export async function forgetEngine(): Promise<void> {
       ),
       new Promise<void>((done) => setTimeout(done, 3000)),
     ]);
+  await AsyncStorage.removeItem(SETUP_TEST_KEY);
   engine.clear();
 }

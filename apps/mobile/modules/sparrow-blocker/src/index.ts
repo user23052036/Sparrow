@@ -13,6 +13,12 @@ export interface EngineState {
   endsAtMs: number;
   packages: string[];
   lastSyncMs: number;
+  /** When a listed app was last covered by the blocked screen (0: never). */
+  lastCoverMs: number;
+  /** When the background service itself last checked in (0: never). */
+  serviceSyncMs: number;
+  /** Server clock minus phone clock at the last check-in. */
+  serverOffsetMs: number;
 }
 
 /** M5b-5: website blocking in the phone's browsers (a local DNS filter). */
