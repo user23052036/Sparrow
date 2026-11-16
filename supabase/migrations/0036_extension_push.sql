@@ -2,22 +2,41 @@
 -- The Sparrow extension subscribes to Web Push in its service worker with userVisibleOnly: false (Chrome 121+).
 -- Its address is stored here as a silent one: it never gets a notification, only a wake-up after which it asks
 -- get_focus_state() at once. The 30-second poll (D10) stays as the fallback. The push carries no data at all.
--- Numbered 0036 because the roadmap gave T2.5 no number and 0032 to 0035 belong to later tasks (D44).
+-- Numbered 0036 because the roadmap gave T2.5 no number and 0032 to 0035 belong to later tasks (D44). Live
+-- databases get this before 0032 to 0035, so those must not touch what this file defines (a test checks).
 
 alter table public.push_subscriptions add column silent boolean not null default false;
 -- Only a person's own extension wakes up silently; a guest's browser (0030) always shows what it gets.
 alter table public.push_subscriptions add constraint push_subscriptions_silent_user check (not silent or user_id is not null);
 
--- Same rules as save_push_subscription (0028): an address belongs to whoever saved it last, ten per person.
+-- An address belongs to whoever saved it last (as in 0028). The daily re-check of the same address by the same
+-- person only refreshes its keys, so it never jumps the queue. Extensions and notifying browsers each keep
+-- their own ten, so neither kind can push the other out.
 create function public.save_extension_push(p_endpoint text, p_p256dh text, p_auth text) returns void
 language plpgsql security definer set search_path = '' as $$
 declare uid uuid := public.require_user();
 begin
+  update public.push_subscriptions set p256dh = p_p256dh, auth = p_auth
+   where endpoint = p_endpoint and user_id = uid and silent;
+  if found then return; end if;
   delete from public.push_subscriptions where endpoint = p_endpoint;
   insert into public.push_subscriptions (user_id, endpoint, p256dh, auth, silent) values (uid, p_endpoint, p_p256dh, p_auth, true);
   delete from public.push_subscriptions
-   where user_id = uid
-     and id not in (select id from public.push_subscriptions where user_id = uid order by created_at desc limit public._push_limit());
+   where user_id = uid and silent
+     and id not in (select id from public.push_subscriptions where user_id = uid and silent order by created_at desc limit public._push_limit());
+end;
+$$;
+
+-- 0028's function, now trimming only notifying browsers.
+create or replace function public.save_push_subscription(p_endpoint text, p_p256dh text, p_auth text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare uid uuid := public.require_user();
+begin
+  delete from public.push_subscriptions where endpoint = p_endpoint;
+  insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values (uid, p_endpoint, p_p256dh, p_auth);
+  delete from public.push_subscriptions
+   where user_id = uid and not silent
+     and id not in (select id from public.push_subscriptions where user_id = uid and not silent order by created_at desc limit public._push_limit());
 end;
 $$;
 

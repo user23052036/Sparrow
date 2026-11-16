@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import {
   buildPayload,
   GUEST_KEY as GUEST_KEY_SHAPE,
@@ -222,6 +222,29 @@ describe("the session kinds match migration 0036", () => {
   it("claim_push knows every kind that wakes an extension", () => {
     const sql = readFileSync(new URL("../../migrations/0036_extension_push.sql", import.meta.url), "utf8");
     for (const kind of SESSION_KINDS) assert.ok(sql.includes(`p_kind = '${kind}'`), kind);
+  });
+});
+
+describe("migration 0036 lands before 0032 to 0035 on live databases (D44)", () => {
+  it("those migrations leave what 0036 defines alone, so every database ends the same", () => {
+    const dir = new URL("../../migrations/", import.meta.url);
+    for (const f of readdirSync(dir).filter((f) => /^003[2-5]_/.test(f))) {
+      const sql = readFileSync(new URL(f, dir), "utf8");
+      for (const name of ["claim_push", "save_extension_push", "save_push_subscription", "silent"])
+        assert.ok(!sql.includes(name), `${f} mentions ${name}: put that change in a migration after 0036`);
+    }
+  });
+});
+
+describe("silent and notifying addresses stay apart where the functions read them", () => {
+  it("notify reads extensions only for wake-ups and browsers only for notifications; remind never reads extensions", () => {
+    const notifySrc = readFileSync(new URL("./index.ts", import.meta.url), "utf8");
+    assert.match(notifySrc, /\.eq\(column, id\)\.eq\("silent", silent\)/);
+    assert.match(notifySrc, /extensionsOf: \(userId\) => subscriptions\("user_id", userId, true\)/);
+    assert.match(notifySrc, /subscriptionsOf: \(userId\) => subscriptions\("user_id", userId\),/);
+    const remindSrc = readFileSync(new URL("../remind/index.ts", import.meta.url), "utf8");
+    assert.match(remindSrc, /\.eq\(column, id\)\.eq\("silent", false\)/);
+    assert.ok(!/silent", true|silent", silent/.test(remindSrc));
   });
 });
 

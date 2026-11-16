@@ -155,8 +155,8 @@ the repo's `CLAUDE.md`.
   session started elsewhere reaches it in seconds; 30-second polling stays as the fallback (D10).
   **[assumed]** that silent push is allowed for extensions in current Chrome; read Chrome's docs first
   and drop the task with a DECISIONS note if it is not. *Done (D44): allowed since Chrome 121; built with
-  migration `0036` (no number was assigned; `0032` to `0035` stay with their tasks and must not replace
-  `claim_push`).*
+  migration `0036` (no number was assigned; `0032` to `0035` stay with their tasks and must not touch
+  `claim_push`, `save_push_subscription`, `save_extension_push` or `silent`).*
 
 ### WS3: the phone (lane: android)
 - **T3.1 Evening review and proofs on Android** (photo through the system camera, text).

@@ -9,8 +9,9 @@ and migrations to `0031` plus `0036` (T2.5 had no number; see D44). Live site (s
 3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D44).
 
 **Next task: T3.1 (evening review and proofs on Android).** Then T3.2 (`0032`), T3.3, WS4 (`0033`, `0034`),
-WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not replace `claim_push` or
-`save_extension_push`; a change to either goes in a migration after `0036`.
+WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not touch `claim_push`,
+`save_push_subscription`, `save_extension_push` or the `silent` column (a test checks); such a change goes in a
+migration after `0036`.
 
 ## Done in this run (Mode C: Claude Code on the owner's Mac, `gh` signed in, PR loop)
 Each task: own branch from `origin/main`, full local check list, PR, CI green, squash merge. T0.3, T1.2,
@@ -32,7 +33,7 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
 | T2.2 | #22 | Reminders (`0029`): morning/evening times, `claim_due_reminders`, `remind` function, pg_cron + pg_net job scheduled by the deploy workflow. |
 | T2.4 | #26 | Partner fatigue guard (D43, `0031`): 3 asks per session, 5 per local day; quiet hours for account partners (profile) and guests (key page); requests wait and the reminder job delivers them when quiet hours end; `key_request_status` for kind notes on Focus. |
 | T2.3 | #24 | Guest partner (D39, `0030`): key link `/key#spg_…`, anonymous guest functions, one key holder at a time, `claim_push` answers `{to, id}`, guest push, `convert_guest_key`. Run 2026-11-16; two review rounds (a race between invites and guests, push state, key memory on the page), all fixed before merging. |
-| T2.5 | see git log | Instant start on the laptop (D44, `0036`): Chrome allows silent push in extensions since 121, so the extension subscribes (`userVisibleOnly: false`), saves a silent address, and syncs on each push; `session_started`/`session_ended` from the web and phone apps and `key_answer` wake it; 30 s polling stays. Deploy pushes with `--include-all`. |
+| T2.5 | see git log | Instant start on the laptop (D44, `0036`): Chrome allows silent push in extensions since 121, so the extension subscribes (`userVisibleOnly: false`), saves a silent address, and syncs on each push; `session_started`/`session_ended` from the web and phone apps and `key_answer` wake it; 30 s polling stays. Deploy pushes with `--include-all` (remove it once `0035` lands). |
 
 ## Checks run in this run
 - Locally, per task, with Node 24 (`fnm exec --using=24`; the Mac's default Node 20 is below the repo's

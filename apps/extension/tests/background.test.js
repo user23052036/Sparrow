@@ -317,6 +317,21 @@ test("disconnect clears everything", async () => {
   assert.equal(push.sub, null);
 });
 
+test("a push arriving while disconnecting can't save the address again", async () => {
+  await send(connectMsg());
+  const saves = server.pushSaved.length;
+  const removed = server.pushRemoved.length;
+  const out = send({ type: "SPARROW_SIGN_OUT" });
+  const woke = fire("push");
+  await Promise.all([out, woke]);
+  await send({ type: "SPARROW_SYNC_NOW" });
+  assert.equal(server.pushSaved.length, saves, "not saved again");
+  assert.equal(server.pushRemoved.length, removed + 1);
+  assert.equal(store.push, null);
+  assert.equal(push.sub, null);
+  assert.equal(rules.length, 0);
+});
+
 test("when Chrome replaces the push address, the new one is saved", async () => {
   await send(connectMsg());
   const saves = server.pushSaved.length;

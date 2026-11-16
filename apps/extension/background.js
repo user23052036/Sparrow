@@ -95,7 +95,7 @@ async function doSync() {
       // session we can no longer confirm, and ask the user to reconnect.
       await set({ auth: null, focus: { active: false }, lastError: "Signed out. Reconnect from the Sparrow website." });
       focus = { active: false };
-      await dropPush(null);
+      await dropPush(null, null);
     } else {
       // Offline or server error: keep enforcing the last known session until it ends.
       await set({ lastError: String(e.message || e) });
@@ -131,11 +131,21 @@ async function ensurePush(config) {
   }
 }
 
-/** Forgets this extension's push address: on the server when still signed in, and in the browser. */
-async function dropPush(config) {
+/** Forgets this extension's push address: on the server with the sign-in being ended (if any), and in the browser. */
+async function dropPush(config, auth) {
   const { push } = await get("push");
   await set({ push: null });
-  if (config && push?.endpoint) await api.rpc(config, getAuth, saveAuth, "remove_push_subscription", { p_endpoint: push.endpoint }).catch(() => {});
+  if (config && auth && push?.endpoint) {
+    await api
+      .rpc(
+        config,
+        async () => auth,
+        async () => {},
+        "remove_push_subscription",
+        { p_endpoint: push.endpoint },
+      )
+      .catch(() => {});
+  }
   const sub = await self.registration?.pushManager?.getSubscription().catch(() => null);
   await sub?.unsubscribe().catch(() => false);
 }
@@ -287,13 +297,14 @@ async function handle(msg, sender) {
     }
 
     case "SPARROW_SIGN_OUT": {
-      const { config, auth } = await get(["config", "auth"]);
-      if (config && auth) {
-        await queue(() => dropPush(config));
-        await api.signOut(config, auth);
-      }
-      await set({ auth: null, focus: { active: false } });
-      await queue(() => applyBlocking({ active: false }));
+      // One step in the queue, signed-out state first: a sync or push arriving meanwhile can't save the address again.
+      await queue(async () => {
+        const { config, auth } = await get(["config", "auth"]);
+        await set({ auth: null, focus: { active: false } });
+        await dropPush(config, auth);
+        if (config && auth) await api.signOut(config, auth);
+        await applyBlocking({ active: false });
+      });
       return status();
     }
 
