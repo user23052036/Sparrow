@@ -14,6 +14,8 @@ import {
   normalizeFocusLinkLabel,
   parseFocusLinkKey,
   validFocusLinkMinutes,
+  FOCUS_LINK_STARTS_PER_DAY,
+  FOCUS_LINK_USES_PER_HOUR,
 } from "./focuslink";
 
 const KEY = "spt_" + "0123456789abcdef".repeat(4);
@@ -59,5 +61,11 @@ describe("focus links", () => {
     expect(sql).toContain(`char_length(lbl) > ${FOCUS_LINK_LABEL_MAX}`);
     expect(sql).toContain(`where user_id = uid) >= ${FOCUS_LINK_MAX} then`);
     expect(sql).toContain(`p_key !~ '${FOCUS_LINK_KEY_PATTERN.source}'`);
+  });
+  it("uses the same attempt limits as migration 0034", () => {
+    const sql = readFileSync(resolve(__dirname, "../../../supabase/migrations/0034_focus_link_limits.sql"), "utf8");
+    expect(sql).toContain(`_focus_link_uses_per_hour() returns int language sql immutable as $$ select ${FOCUS_LINK_USES_PER_HOUR} $$`);
+    expect(sql).toContain(`_focus_link_starts_per_day() returns int language sql immutable as $$ select ${FOCUS_LINK_STARTS_PER_DAY} $$`);
+    expect(sql).toContain("using errcode = 'PT429'");
   });
 });

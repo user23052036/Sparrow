@@ -67,6 +67,8 @@ export class FakeSupabase {
   /** Focus links (D35): the keys handed out, and the sessions they started. The real rules are in rls_test.sql. */
   linkKeys: Record<string, string> = {};
   linkSession: { ends_at: string; minutes: number } | null = null;
+  /** D49: set to make use_focus_link answer as a link used too often lately (PT429, HTTP 429). */
+  linkLimited = false;
   /** Crafted badges (D36), as my_collection() would answer with this.progress.badges. */
   crafted: string[] = [];
   private collection() {
@@ -493,6 +495,8 @@ export class FakeSupabase {
       const id = this.linkKeys[String(args.p_key)];
       const link = this.db.focus_links.find((l) => l.id === id);
       if (!link) return this.send(route, 400, { code: "28000", message: "this focus link isn't valid anymore", details: null, hint: null });
+      if (this.linkLimited)
+        return this.send(route, 429, { code: "PT429", message: "this focus link was used many times in the last hour", details: null, hint: null });
       if (this.linkSession) return ok({ started: false, running: true, ...this.linkSession });
       const minutes = Number(link.minutes);
       this.linkSession = { ends_at: new Date(Date.now() + minutes * 60000).toISOString(), minutes };

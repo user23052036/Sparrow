@@ -312,3 +312,12 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Tested:** SQL suite (the default removes nothing, the choices, files before notes, only the owner's expired proofs, server-only functions, partner notes kept without words, a note kept after a change of mind), the remind function's retention logic (files first, refused batches retried file by file, nested own folders, foreign or odd paths never touched but their rows cleared, odd rows can't starve others), e2e (the setting and the confirmation). Retention runs after reminders and key requests, with a 30-second budget per run; each Supabase call has a 20-second limit, and a batch refused slowly is held rather than retried file by file. **Not verified:** removal against the live project's storage.
 **Status:** Built (T4.2).
 
+## D49 — Focus links have use limits, not guess limits
+**Decision:** ROADMAP T4.3, migration `0034`. A focus link's key is 256 random bits (D35), so limiting wrong guesses would protect against nothing and could let a stranger lock the feature for everyone. The real risk is a key that leaks: whoever has it could start the owner's sessions again and again, or keep asking when the running one ends. So:
+- each link answers at most **20 times an hour** (every answered use counts, whether it started a session or found one running);
+- links start at most **8 sessions a day** for one person, across all their links;
+- past either limit `use_focus_link` refuses with PostgREST's `PT429` (HTTP 429) and the `/go` page says, kindly, that the link is resting, that a session can be started in Sparrow any time, and to remove the link if the owner didn't use it that often. A refused call isn't counted, and removing the link still stops it at once.
+- Uses are kept a day in `focus_link_uses` (server only; the function clears older ones as it goes). The numbers are `_focus_link_uses_per_hour()` and `_focus_link_starts_per_day()`, mirrored in shared and pinned by a test.
+**Tested:** SQL suite (the 21st use in an hour and the 9th start in a day refused with `PT429`, refused calls not counted, a day later it starts again, only a day of uses kept, the log unreadable, unknown keys unchanged), shared pins, e2e (the resting message). `stored.ts` describes the new table, and `use_focus_link`'s new fingerprint was checked against the page (D47).
+**Status:** Built (T4.3).
+

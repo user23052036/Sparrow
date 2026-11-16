@@ -455,6 +455,35 @@
         {
             "rls": true,
             "kind": "table",
+            "table": "focus_link_uses",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": false
+                },
+                {
+                    "name": "link_id",
+                    "readable": false
+                },
+                {
+                    "name": "user_id",
+                    "readable": false
+                },
+                {
+                    "name": "started",
+                    "readable": false
+                },
+                {
+                    "name": "at",
+                    "readable": false
+                }
+            ],
+            "readPolicies": [
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
             "table": "focus_links",
             "columns": [
                 {
@@ -1602,7 +1631,7 @@
         },
         {
             "anon": true,
-            "hash": "5c35e7683df89b983c4f208f058e47c0",
+            "hash": "ee0256a76b77184539a618b5156521f4",
             "signature": "use_focus_link(text)"
         },
         {

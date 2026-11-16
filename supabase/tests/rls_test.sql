@@ -2069,3 +2069,58 @@ select pg_temp.check(delete_expired_proofs(:'rids2'::uuid[]) = 0, 'a written not
 reset role;
 select pg_temp.check(exists (select 1 from pg_proc where proname = 'claim_expired_proofs' and has_function_privilege('service_role', oid, 'execute')),
   'the five-minute job can claim them');
+
+-- ------------------------------------------------------------ focus link limits (0034)
+create or replace function pg_temp.sqlstate_of(q text) returns text language plpgsql as $$
+begin execute q; return 'none'; exception when others then return sqlstate; end $$;
+insert into auth.users values ('36363636-0000-0000-0000-000000000001', 'l1@test');
+select pg_temp.as_user('36363636-0000-0000-0000-000000000001');
+update blocklists set domains = '{youtube.com}';
+select set_config('test.lk', create_focus_link('Desk', 5) ->> 'key', false);
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check((use_focus_link(current_setting('test.lk')) ->> 'started')::boolean, 'a focus link starts a session');
+select use_focus_link(current_setting('test.lk')) from generate_series(1, 19);
+select pg_temp.check(pg_temp.sqlstate_of(format('select use_focus_link(%L)', current_setting('test.lk'))) = 'PT429',
+  'the 21st use within an hour is refused, as HTTP 429');
+select pg_temp.check(pg_temp.sqlstate_of(format('select use_focus_link(%L)', current_setting('test.lk'))) = 'PT429',
+  'and stays refused while the hour lasts');
+reset role;
+select pg_temp.check((select count(*) from focus_link_uses where user_id = '36363636-0000-0000-0000-000000000001') = 20,
+  'refused tries are not counted');
+-- an hour later the link answers again; a day of starts is capped at eight
+update focus_link_uses set at = at - interval '2 hours' where user_id = '36363636-0000-0000-0000-000000000001';
+update focus_sessions set ended_at = now(), ends_at = now() where user_id = '36363636-0000-0000-0000-000000000001' and ended_at is null;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+create or replace function pg_temp.start_and_end(k text) returns boolean language plpgsql as $$
+declare started boolean;
+begin
+  started := (public.use_focus_link(k) ->> 'started')::boolean;
+  reset role;
+  update public.focus_sessions set ended_at = now(), ends_at = now() where user_id = '36363636-0000-0000-0000-000000000001' and ended_at is null;
+  set role anon;
+  return started;
+end $$;
+reset role;
+select pg_temp.check((select bool_and(pg_temp.start_and_end(current_setting('test.lk'))) from generate_series(1, 7)),
+  'links can start eight sessions in a day (one earlier, seven now)');
+set role anon;
+select pg_temp.check(pg_temp.sqlstate_of(format('select use_focus_link(%L)', current_setting('test.lk'))) = 'PT429',
+  'the ninth start in a day is refused');
+reset role;
+select pg_temp.check(not exists (select 1 from focus_sessions where user_id = '36363636-0000-0000-0000-000000000001' and ended_at is null),
+  'and starts nothing');
+-- the day moves on: uses older than a day are cleared, and the link starts again
+update focus_link_uses set at = at - interval '2 days' where user_id = '36363636-0000-0000-0000-000000000001';
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check((use_focus_link(current_setting('test.lk')) ->> 'started')::boolean, 'a day later the link starts again');
+reset role;
+select pg_temp.check((select count(*) from focus_link_uses where user_id = '36363636-0000-0000-0000-000000000001') = 1,
+  'and only a day of uses is kept');
+select pg_temp.as_user('36363636-0000-0000-0000-000000000001');
+select pg_temp.expect_error($q$select * from focus_link_uses$q$, 'nobody reads the use log through the app');
+reset role;
+select pg_temp.check(pg_temp.sqlstate_of($q$select use_focus_link('spt_' || repeat('0', 64))$q$) = '28000', 'an unknown key is still just not valid');

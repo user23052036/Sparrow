@@ -172,7 +172,7 @@ the repo's `CLAUDE.md`.
   can read it), with a test that fails when a new column is not described. *Done (D47, `/stored`).*
 - **T4.2 Proof retention setting, migration `0033`:** keep proofs 7, 30, 90 days or until deleted;
   a scheduled job removes older ones, photos first (same order as D20). *Done (D48).*
-- **T4.3 Attempt limit on `use_focus_link`, migration `0034`.**
+- **T4.3 Attempt limit on `use_focus_link`, migration `0034`.** *Done (D49): use limits per link and per day.*
 - **T4.4 `SECURITY.md`** and a short threat model in `docs/`.
 
 ### WS5: focus the product (lane: web+db, last)
