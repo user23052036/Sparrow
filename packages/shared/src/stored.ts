@@ -209,10 +209,10 @@ export const STORED: Record<string, StoredTable> = {
     who: "You and the partner who wrote it.",
     columns: {
       id: "The note's id.",
-      proof_id: "Which proof.",
+      proof_id: "Which proof (empty once that proof was removed).",
       verifier_id: "Who wrote it.",
       verdict: "Looks good, or a question.",
-      comment: "Their words, if any.",
+      comment: "Their words, if any (cleared when the proof is removed).",
       created_at: "When they wrote it.",
     },
   },
