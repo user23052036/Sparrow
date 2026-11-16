@@ -453,6 +453,19 @@ export const copy = {
     allowed: "Notifications are on.",
     denied: "Notifications are off for Sparrow. You can switch them on in the phone's settings.",
   },
+  /** How long proofs are kept (T4.2, D48). */
+  retention: {
+    title: "How long to keep proofs",
+    body: "Photos, voice notes and written notes you add as proof. Kept until you delete them, unless you choose a time here.",
+    forever: "Until I delete them",
+    days: (n: number) => `${n} days`,
+    save: "Save",
+    saved: "Saved.",
+    confirm: (n: number) =>
+      `Proofs older than ${n} days, photos and voice notes included, are removed within a few minutes, and from then on each one after ${n} days. They can't be brought back. Shared ones go from your partner's view too.`,
+    confirmYes: "Yes, keep them for that long",
+    cancel: "Cancel",
+  },
   /** "What Sparrow stores" (T4.1, D47). Table and column words are in stored.ts. */
   stored: {
     title: "What Sparrow stores",
@@ -659,7 +672,7 @@ export const copy = {
     keep: [
       "Your account (email), name and time zone, and your reminder times if you set any.",
       "Your tasks and steps (with any if-then plans and calendar notes), daily plans, moods, points, kind acts and focus sessions.",
-      "Proof photos, voice notes and written notes. These are private unless you share one with your partner. For a photo, also how many hours passed between the photo's own date and adding it (read on your device; the rest of the photo's hidden details are removed before upload).",
+      "Proof photos, voice notes and written notes, until you delete them or for 7, 30 or 90 days if you choose that in Settings. These are private unless you share one with your partner. For a photo, also how many hours passed between the photo's own date and adding it (read on your device; the rest of the photo's hidden details are removed before upload).",
       "If you join a circle: its name and who is in it, the cheers you send, and the made-up name you chose for it, if any.",
       "Which of your devices are blocking sites, and when they last checked in.",
       "If you make focus links: their names, lengths and when they were last used. The key itself is not kept, only a fingerprint of it.",

@@ -60,3 +60,47 @@ export async function runWaitingKeyRequests(deps: WaitingDeps): Promise<Tally & 
   }
   return { ...tally, requests: waiting.length };
 }
+
+/** A proof past its owner's chosen time (claim_expired_proofs, migration 0033). */
+export interface ExpiredProof {
+  id: string;
+  storage_path: string | null;
+}
+
+export interface RetentionDeps {
+  claimExpired(): Promise<ExpiredProof[]>;
+  /** Removes files from the private proofs bucket through the Storage API; rejects when it couldn't. */
+  removeFiles(paths: string[]): Promise<void>;
+  /** delete_expired_proofs(): removes the rows, answers how many went. */
+  deleteRows(ids: string[]): Promise<number>;
+}
+
+/** Files live in their owner's folder (0018, 0032): "<user id>/<name>". Nothing else is ever removed. */
+const PROOF_FILE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[^/]+$/;
+/** How many files one Storage API call removes. */
+export const FILES_PER_CALL = 100;
+
+/**
+ * Proof retention (D48): files first, then rows, as account deletion does (D20). A batch of files that can't be
+ * removed keeps its rows, so the next run tries again; a row is never removed while its file may still be there.
+ */
+export async function runRetention(deps: RetentionDeps): Promise<{ files: number; proofs: number; held: number }> {
+  const expired = await deps.claimExpired();
+  const gone = expired.filter((p) => p.storage_path === null).map((p) => p.id);
+  const withFile = expired.filter((p) => p.storage_path !== null);
+  let files = 0;
+  let held = withFile.filter((p) => !PROOF_FILE.test(p.storage_path!)).length;
+  const safe = withFile.filter((p) => PROOF_FILE.test(p.storage_path!));
+  for (let i = 0; i < safe.length; i += FILES_PER_CALL) {
+    const batch = safe.slice(i, i + FILES_PER_CALL);
+    try {
+      await deps.removeFiles(batch.map((p) => p.storage_path!));
+      files += batch.length;
+      gone.push(...batch.map((p) => p.id));
+    } catch {
+      held += batch.length;
+    }
+  }
+  const proofs = gone.length ? await deps.deleteRows(gone) : 0;
+  return { files, proofs, held };
+}

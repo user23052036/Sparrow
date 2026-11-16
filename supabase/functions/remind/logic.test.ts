@@ -1,6 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildReminder, REMINDER_TEXT, runReminders, runWaitingKeyRequests, type Deps, type WaitingDeps } from "./logic.ts";
+import { readFileSync } from "node:fs";
+import {
+  buildReminder,
+  FILES_PER_CALL,
+  REMINDER_TEXT,
+  runReminders,
+  runRetention,
+  runWaitingKeyRequests,
+  type Deps,
+  type ExpiredProof,
+  type WaitingDeps,
+} from "./logic.ts";
 import { PUSH_TEXT } from "../notify/logic.ts";
 import { copy } from "../../../packages/shared/src/copy.ts";
 
@@ -106,5 +117,74 @@ describe("key requests that waited through quiet hours", () => {
     const { d, sent } = waitingDeps([]);
     assert.deepEqual(await runWaitingKeyRequests(d), { sent: 0, removed: 0, failed: 0, requests: 0 });
     assert.equal(sent.length, 0);
+  });
+});
+
+describe("proof retention (D48)", () => {
+  const U = "33333333-3333-4333-8333-333333333333";
+  function retention(expired: ExpiredProof[], refuse: (paths: string[]) => boolean = () => false) {
+    const removed: string[][] = [];
+    const deleted: string[][] = [];
+    const order: string[] = [];
+    return {
+      removed,
+      deleted,
+      order,
+      d: {
+        claimExpired: async () => expired,
+        async removeFiles(paths: string[]) {
+          order.push("files");
+          if (refuse(paths)) throw new Error("storage said no");
+          removed.push(paths);
+        },
+        async deleteRows(ids: string[]) {
+          order.push("rows");
+          deleted.push(ids);
+          return ids.length;
+        },
+      },
+    };
+  }
+
+  it("removes files first, then the rows, written notes included", async () => {
+    const r = retention([
+      { id: "p1", storage_path: `${U}/a.jpg` },
+      { id: "p2", storage_path: `${U}/b.webm` },
+      { id: "t1", storage_path: null },
+    ]);
+    assert.deepEqual(await runRetention(r.d), { files: 2, proofs: 3, held: 0 });
+    assert.deepEqual(r.removed, [[`${U}/a.jpg`, `${U}/b.webm`]]);
+    assert.deepEqual(r.deleted, [["t1", "p1", "p2"]]);
+    assert.deepEqual(r.order, ["files", "rows"]);
+  });
+
+  it("keeps the rows of files it couldn't remove, so the next run tries again", async () => {
+    const many = Array.from({ length: FILES_PER_CALL + 1 }, (_, i) => ({ id: `p${i}`, storage_path: `${U}/${i}.jpg` }));
+    const r = retention(many, (paths) => paths.length === 1);
+    assert.deepEqual(await runRetention(r.d), { files: FILES_PER_CALL, proofs: FILES_PER_CALL, held: 1 });
+    assert.ok(!r.deleted[0].includes(`p${FILES_PER_CALL}`));
+  });
+
+  it("never touches a path outside a person's own folder", async () => {
+    const r = retention([
+      { id: "x1", storage_path: "../other/secret.jpg" },
+      { id: "x2", storage_path: `${U}/nested/deep.jpg` },
+      { id: "x3", storage_path: "not-a-user/a.jpg" },
+    ]);
+    assert.deepEqual(await runRetention(r.d), { files: 0, proofs: 0, held: 3 });
+    assert.deepEqual(r.removed, []);
+    assert.deepEqual(r.deleted, []);
+  });
+
+  it("does nothing when nothing is past its time", async () => {
+    const r = retention([]);
+    assert.deepEqual(await runRetention(r.d), { files: 0, proofs: 0, held: 0 });
+    assert.deepEqual(r.order, []);
+  });
+
+  it("the claim is the server's only, and lists files before notes (0033)", () => {
+    const sql = readFileSync(new URL("../../migrations/0033_proof_retention.sql", import.meta.url), "utf8");
+    assert.match(sql, /order by \(p\.storage_path is null\), p\.server_created_at/);
+    assert.match(sql, /grant execute on function public\.claim_expired_proofs\(int\), public\.delete_expired_proofs\(uuid\[\]\) to service_role;/);
   });
 });

@@ -2009,3 +2009,50 @@ select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_p
 insert into proofs (plan_item_id, kind, storage_path) values ((select id from plan_items limit 1), 'photo', 'a1a1a1a1-0000-0000-0000-000000000001/mine.jpg');
 select pg_temp.check(exists (select 1 from proofs where storage_path = 'a1a1a1a1-0000-0000-0000-000000000001/mine.jpg'), 'a photo in my own folder is fine');
 reset role;
+
+-- ------------------------------------------------------------ proof retention (0033)
+insert into auth.users values ('35353535-0000-0000-0000-000000000001', 'r1@test'), ('35353535-0000-0000-0000-000000000002', 'r2@test');
+select pg_temp.as_user('35353535-0000-0000-0000-000000000001');
+insert into tasks (title) values ('Keep a week');
+select commit_day(array(select id from tasks), 3);
+insert into proofs (plan_item_id, kind, text_body) values ((select id from plan_items limit 1), 'text', 'old note');
+insert into proofs (plan_item_id, kind, storage_path) values ((select id from plan_items limit 1), 'photo', auth.uid() || '/old.jpg');
+insert into proofs (plan_item_id, kind, text_body) values ((select id from plan_items limit 1), 'text', 'new note');
+select pg_temp.check((select proof_keep_days from profiles) is null, 'proofs are kept until deleted unless the person chooses otherwise');
+select pg_temp.expect_error($q$update profiles set proof_keep_days = 10$q$, 'only 7, 30 or 90 days can be chosen');
+reset role;
+select pg_temp.as_user('35353535-0000-0000-0000-000000000002');
+insert into tasks (title) values ('Keep forever');
+select commit_day(array(select id from tasks), 3);
+insert into proofs (plan_item_id, kind, storage_path) values ((select id from plan_items limit 1), 'photo', auth.uid() || '/keep.jpg');
+reset role;
+set session_replication_role = replica; -- skips the proof trigger that stamps the time
+update proofs set server_created_at = now() - interval '8 days'
+ where user_id in ('35353535-0000-0000-0000-000000000001', '35353535-0000-0000-0000-000000000002') and coalesce(text_body, '') <> 'new note';
+set session_replication_role = origin;
+select pg_temp.check(not exists (select 1 from claim_expired_proofs(1000) c join proofs p on p.id = c.id where p.user_id::text like '35353535%'),
+  'with the default, nothing is ever removed');
+select pg_temp.as_user('35353535-0000-0000-0000-000000000001');
+update profiles set proof_keep_days = 7;
+select pg_temp.expect_error($q$select * from claim_expired_proofs()$q$, 'people cannot list expired proofs themselves');
+select pg_temp.expect_error($q$select delete_expired_proofs(array(select id from proofs))$q$, 'or remove them through the server''s function');
+reset role;
+set role anon;
+select pg_temp.expect_error($q$select * from claim_expired_proofs()$q$, 'anonymous visitors cannot either');
+reset role;
+select pg_temp.check((select array_agg(coalesce(c.storage_path, 'text') order by ord) from (select c.*, row_number() over () ord from claim_expired_proofs(1000) c) c
+                       join proofs p on p.id = c.id where p.user_id::text like '35353535%')
+                     = array['35353535-0000-0000-0000-000000000001/old.jpg', 'text'],
+  'past their week: the photo first, then the note; the new note and the other person''s photo stay');
+select id as rp1 from proofs where storage_path = '35353535-0000-0000-0000-000000000001/old.jpg' \gset
+insert into verifications (proof_id, verifier_id, verdict) values (:'rp1', '35353535-0000-0000-0000-000000000002', 'approve');
+select array_agg(c.id)::text as rids from claim_expired_proofs(1000) c join proofs p on p.id = c.id where p.user_id::text like '35353535%' \gset
+set role service_role;
+select pg_temp.check(delete_expired_proofs(:'rids'::uuid[]) = 2, 'the server removes them once their files are gone');
+reset role;
+select pg_temp.check((select array_agg(coalesce(text_body, storage_path) order by text_body) from proofs where user_id::text like '35353535%')
+                     = array['new note', '35353535-0000-0000-0000-000000000002/keep.jpg'],
+  'only the expired ones went');
+select pg_temp.check(not exists (select 1 from verifications where proof_id = :'rp1'), 'a partner''s note on a removed proof goes with it');
+select pg_temp.check(exists (select 1 from pg_proc where proname = 'claim_expired_proofs' and has_function_privilege('service_role', oid, 'execute')),
+  'the five-minute job can claim them');

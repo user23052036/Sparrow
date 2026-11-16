@@ -36,6 +36,7 @@ export const STORED: Record<string, StoredTable> = {
       remind_evening: "Your evening reminder time, if you set one.",
       quiet_from: "When your quiet hours start, if you hold someone's key.",
       quiet_to: "When your quiet hours end.",
+      proof_keep_days: "How many days your proofs are kept (7, 30 or 90), or empty to keep them until you delete them.",
     },
   },
   tasks: {

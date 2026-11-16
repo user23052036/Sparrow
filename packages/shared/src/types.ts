@@ -13,6 +13,8 @@ export interface Profile {
   /** Reminder times in the person's own time zone ("HH:MM[:SS]"), null when off (T2.2). */
   remind_morning?: string | null;
   remind_evening?: string | null;
+  /** D48: keep proofs this many days, or until deleted (null). */
+  proof_keep_days?: 7 | 30 | 90 | null;
 }
 
 export interface Task {
