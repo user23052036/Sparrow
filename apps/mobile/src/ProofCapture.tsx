@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Switch, Text, TextInput, View } from "react-native";
+import { AppState, Switch, Text, TextInput, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
@@ -13,8 +13,22 @@ import { s } from "./theme";
 const CAMERA_ITEM = "sparrow:cameraItem";
 type Photo = ImagePicker.ImagePickerAsset;
 
-/** A photo the camera returned after Android closed Sparrow, read once and handed to the item it belongs to. */
+/**
+ * A photo the camera returned after Android closed Sparrow, handed to the item it belongs to exactly once. It is
+ * read again whenever Sparrow comes back to the front (Android may have closed only the screen, not the app).
+ */
 let pending: Promise<{ itemId: string; photo: Photo } | null> | null = null;
+const recovered = new Set<string>();
+AppState.addEventListener("change", (st) => {
+  if (st === "active") pending = null;
+});
+async function takePendingPhoto(itemId: string): Promise<Photo | null> {
+  const p = await pendingPhoto();
+  if (!p || p.itemId !== itemId || recovered.has(p.photo.uri)) return null;
+  recovered.add(p.photo.uri);
+  pending = Promise.resolve(null);
+  return p.photo;
+}
 function pendingPhoto() {
   pending ??= (async () => {
     try {
@@ -35,7 +49,8 @@ function pendingPhoto() {
  */
 async function encode(photo: Photo): Promise<Uint8Array> {
   const { bytes } = await compressWithin(async ({ max, quality }) => {
-    const image = await ImageManipulator.manipulate(photo.uri, { maxWidth: max, maxHeight: max }).renderAsync();
+    const ctx = ImageManipulator.manipulate(photo.uri, { maxWidth: max, maxHeight: max });
+    const image = await ctx.renderAsync();
     try {
       const out = await image.saveAsync({ compress: quality, format: SaveFormat.JPEG, base64: true });
       if (!out.base64) throw new Error(copy.proof.processError);
@@ -43,6 +58,7 @@ async function encode(photo: Photo): Promise<Uint8Array> {
       return { bytes: b, size: b.length };
     } finally {
       image.release();
+      ctx.release();
     }
   });
   return bytes;
@@ -97,8 +113,8 @@ export function ProofCapture({
 
   useEffect(() => {
     let live = true;
-    void pendingPhoto().then((p) => {
-      if (live && p?.itemId === itemId) void savePhoto(p.photo);
+    void takePendingPhoto(itemId).then((photo) => {
+      if (live && photo) void savePhoto(photo);
     });
     return () => {
       live = false;
