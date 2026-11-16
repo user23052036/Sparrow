@@ -445,6 +445,7 @@ export const copy = {
     confirmBody: "This ends their locked session now.",
     confirmYes: "Yes, let them out",
     notSent: "Sparrow couldn't send your answer. Open Sparrow's website to answer.",
+    unlock: "Unlock your phone to answer.",
     allowTitle: "Key requests on this phone",
     allowBody:
       "If you hold someone's key, their requests to end a session early can show here as a notification you answer right away. It never says who asked or why.",

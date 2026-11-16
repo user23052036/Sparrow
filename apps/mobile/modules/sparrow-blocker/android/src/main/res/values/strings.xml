@@ -19,5 +19,6 @@
   <string name="sparrow_key_confirm_title">Let them out?</string>
   <string name="sparrow_key_confirm_body">This ends their locked session now.</string>
   <string name="sparrow_key_confirm_yes">Yes, let them out</string>
+  <string name="sparrow_key_unlock">Unlock your phone to answer.</string>
   <string name="sparrow_key_not_sent">Sparrow couldn\'t send your answer. Open Sparrow\'s website to answer.</string>
 </resources>

@@ -15,8 +15,8 @@ object SyncClient {
   enum class Answer { SENT, GONE, NOT_SENT }
 
   /**
-   * T3.2: answers a key request with this phone's credential (device_decide_end_request, 0032), then asks the
-   * notify function to tell the asker, best effort. Blocking I/O: call it off the main thread.
+   * T3.2: answers a key request with this phone's credential (device_decide_end_request, 0032). Blocking I/O
+   * with short timeouts: it runs while a notification button's broadcast waits (about ten seconds at most).
    */
   fun decide(store: EngineStore, requestId: String, approve: Boolean): Answer {
     val c = store.config() ?: return Answer.NOT_SENT
@@ -25,29 +25,33 @@ object SyncClient {
       .put("p_secret", c.secret)
       .put("p_request_id", requestId)
       .put("p_approve", approve)
-    val code = post(c, "/rest/v1/rpc/device_decide_end_request", body) ?: return Answer.NOT_SENT
+    val code = post(c, "/rest/v1/rpc/device_decide_end_request", body, connectMs = 3_000, readMs = 4_000) ?: return Answer.NOT_SENT
     if (code == 401 || code == 403) {
       store.saveStatus("signed_out")
       return Answer.NOT_SENT
     }
     if (code == 400 || code == 404) return Answer.GONE
-    if (code !in 200..299) return Answer.NOT_SENT
+    return if (code in 200..299) Answer.SENT else Answer.NOT_SENT
+  }
+
+  /** After an answer was sent: asks the notify function to tell the asker (D46). Best effort. */
+  fun announceAnswer(store: EngineStore, requestId: String) {
+    val c = store.config() ?: return
     val note = JSONObject()
       .put("kind", "key_answer")
       .put("ref", requestId)
       .put("device", JSONObject().put("id", c.deviceId).put("secret", c.secret))
-    post(c, "/functions/v1/notify", note)
-    return Answer.SENT
+    post(c, "/functions/v1/notify", note, connectMs = 5_000, readMs = 10_000)
   }
 
   /** One POST with the anon key; the HTTP status, or null when offline. */
-  private fun post(c: EngineStore.Config, path: String, body: JSONObject): Int? {
+  private fun post(c: EngineStore.Config, path: String, body: JSONObject, connectMs: Int, readMs: Int): Int? {
     var conn: HttpURLConnection? = null
     return try {
       conn = (URL("${c.url}$path").openConnection() as HttpURLConnection).apply {
         requestMethod = "POST"
-        connectTimeout = 10_000
-        readTimeout = 10_000
+        connectTimeout = connectMs
+        readTimeout = readMs
         doOutput = true
         setRequestProperty("apikey", c.anonKey)
         setRequestProperty("Authorization", "Bearer ${c.anonKey}")

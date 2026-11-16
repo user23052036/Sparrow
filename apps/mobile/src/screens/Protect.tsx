@@ -14,8 +14,10 @@ const NEEDS_ASKING = Platform.OS === "android" && Number(Platform.Version) >= 33
 type Notif = "on" | "off" | "denied";
 
 async function notificationState(): Promise<Notif> {
-  if (!NEEDS_ASKING) return "on";
-  return (await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS)) ? "on" : "off";
+  if (engine.notificationsOn()) return "on";
+  // Allowed, but switched off in the phone's settings (or on a phone that never asks): only Settings helps.
+  if (!NEEDS_ASKING || (await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS))) return "denied";
+  return "off";
 }
 
 function ago(ms: number): string {
@@ -50,7 +52,7 @@ export function Protect() {
       return;
     }
     const r = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
-    setNotif(r === PermissionsAndroid.RESULTS.GRANTED ? "on" : r === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ? "denied" : "off");
+    setNotif(r === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ? "denied" : await notificationState());
     // Requests that waited for this show up straight away.
     if (r === PermissionsAndroid.RESULTS.GRANTED) await engine.syncNow();
   }

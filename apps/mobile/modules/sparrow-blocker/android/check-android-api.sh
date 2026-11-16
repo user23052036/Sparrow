@@ -27,6 +27,9 @@ mkdir -p "$OUT/r/expo/modules/sparrowblocker"
   echo "package expo.modules.sparrowblocker"
   echo "object R { object string {"
   grep -o '<string name="[a-z0-9_]*"' src/main/res/values/strings.xml | sed -E 's/.*"([a-z0-9_]+)"/  const val \1: Int = 0/'
+  echo "}"
+  echo "object drawable {"
+  for f in src/main/res/drawable/*.xml; do echo "  const val $(basename "$f" .xml): Int = 0"; done
   echo "} }"
 } >"$OUT/r/expo/modules/sparrowblocker/R.kt"
 

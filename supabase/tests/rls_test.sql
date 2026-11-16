@@ -991,7 +991,7 @@ insert into proofs (id, plan_item_id, kind, storage_path, image_phash, photo_age
 insert into proofs (id, plan_item_id, kind, text_body, visibility)
   values ('f1f1f1f1-9999-0000-0000-000000000003', (select id from plan_items), 'text', 'Did it', 'buddy');
 select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, text_body, photo_age_hours) values ((select id from plan_items), 'text', 'x', 3)$q$, 'only a photo has a photo age');
-select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path, photo_age_hours) values ((select id from plan_items), 'photo', 'p.jpg', -5)$q$, 'a photo age cannot be negative');
+select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path, photo_age_hours) values ((select id from plan_items), 'photo', auth.uid() || '/p.jpg', -5)$q$, 'a photo age cannot be negative');
 update proofs set photo_age_hours = 0 where id = 'f1f1f1f1-9999-0000-0000-000000000001';
 select pg_temp.check((select photo_age_hours from proofs where id = 'f1f1f1f1-9999-0000-0000-000000000001') = 72, 'the photo age cannot be changed after saving');
 select pg_temp.check((proof_context('f1f1f1f1-9999-0000-0000-000000000001') ->> 'photo_age') = 'older', 'a photo dated days earlier is noted as older');
@@ -1989,6 +1989,19 @@ select pg_temp.check(exists (select 1 from tamper_events where user_id = '343434
   'and it is noted like any partner approval');
 select pg_temp.check(exists (select 1 from pg_proc where proname = '_device_by_secret' and not has_function_privilege('anon', oid, 'execute')),
   'the device check itself is internal');
+-- signing out on the phone revokes its secret on the server
+select pg_temp.as_user('34343434-0000-0000-0000-000000000003');
+select forget_device_secret('34343434-aaaa-0000-0000-000000000002');
+reset role;
+select pg_temp.check((select secret_hash is not null from devices where id = '34343434-aaaa-0000-0000-000000000002'), 'nobody can revoke someone else''s phone');
+select pg_temp.as_user('34343434-0000-0000-0000-000000000002');
+select forget_device_secret('34343434-aaaa-0000-0000-000000000002');
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error(format('select device_sync(%L, %L, true, false)', '34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret')),
+  'a signed-out phone''s secret no longer works');
+reset role;
 -- every proof file, not only a recording, must be in the author's own folder (0032)
 select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000001');
 select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path) values ((select id from plan_items limit 1), 'photo', 'a1a1a1a1-0000-0000-0000-000000000002/someone-else.jpg')$q$,

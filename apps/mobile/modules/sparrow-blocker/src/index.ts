@@ -34,6 +34,7 @@ interface Native {
   syncNow(): Promise<{ ok: boolean; status: string; active: boolean; endsAtMs: number; packages: string[] }>;
   getEngineState(): EngineState;
   isProtectionEnabled(): boolean;
+  notificationsEnabled(): boolean;
   openAccessibilitySettings(): void;
   isIgnoringBatteryOptimizations(): boolean;
   openBatterySettings(): void;
@@ -71,6 +72,8 @@ export const engine = {
   syncNow: async () => (native ? await native.syncNow() : null),
   state: (): EngineState | null => native?.getEngineState() ?? null,
   protectionOn: (): boolean => native?.isProtectionEnabled() ?? false,
+  /** Key requests can show as notifications (D46): permission, Sparrow's switch and the channel all on. */
+  notificationsOn: (): boolean => native?.notificationsEnabled() ?? false,
   openAccessibilitySettings: () => native?.openAccessibilitySettings(),
   batteryOk: (): boolean => native?.isIgnoringBatteryOptimizations() ?? true,
   openBatterySettings: () => native?.openBatterySettings(),

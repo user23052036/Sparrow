@@ -19,6 +19,7 @@ describe("key requests on the phone match copy.phoneKey", () => {
     ["sparrow_key_confirm_body", copy.phoneKey.confirmBody],
     ["sparrow_key_confirm_yes", copy.phoneKey.confirmYes],
     ["sparrow_key_not_sent", copy.phoneKey.notSent],
+    ["sparrow_key_unlock", copy.phoneKey.unlock],
   ];
   it.each(pairs)("%s", (name, text) => expect(strings[name]).toBe(text));
   it("says what Web Push says, and the same two answers", () => {

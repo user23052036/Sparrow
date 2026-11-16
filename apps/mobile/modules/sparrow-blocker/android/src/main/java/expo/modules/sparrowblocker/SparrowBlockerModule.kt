@@ -92,6 +92,11 @@ class SparrowBlockerModule : Module() {
     }
 
     // ------------------------------------------------------------ setup (M5b-4)
+    // T3.2: whether key requests can show as notifications (permission, app switch and channel).
+    Function("notificationsEnabled") {
+      KeyRequestNotifier.enabled(context)
+    }
+
     Function("isProtectionEnabled") {
       isServiceEnabled(context)
     }

@@ -20,13 +20,22 @@ $$;
 
 -- Requests the person holds the key for, still waiting on a running session, outside their quiet hours (0031):
 -- the same moments a notification would reach them anywhere else. Only ids: a lock screen is not private.
+-- Runs on every phone's sync, so it starts from the holder's own links (is_buddy_of's rule, 0001), not from
+-- every waiting request.
+create index end_requests_pending_user on public.end_requests (user_id) where status = 'pending';
+
 create function public._waiting_key_requests(p_holder uuid) returns jsonb
 language sql stable security definer set search_path = '' as $$
+  with askers as (
+    select b.requester_id as id from public.buddy_links b where b.status = 'active' and b.partner_id = p_holder
+    union
+    select b.partner_id from public.buddy_links b where b.status = 'active' and b.mutual and b.requester_id = p_holder
+  )
   select coalesce(jsonb_agg(jsonb_build_object('id', r.id) order by r.created_at), '[]'::jsonb)
-    from public.end_requests r
+    from askers a
+    join public.end_requests r on r.user_id = a.id and r.status = 'pending'
     join public.focus_sessions s on s.id = r.session_id
-   where r.status = 'pending' and s.ended_at is null and s.ends_at > now()
-     and public.is_buddy_of(r.user_id, p_holder)
+   where s.ended_at is null and s.ends_at > now()
      and public._holder_quiet_until(r.user_id, now()) is null;
 $$;
 
@@ -89,6 +98,16 @@ begin
 end;
 $$;
 
+-- Signing out on the phone: its secret stops working on the server too, not only on the phone (D29's narrow
+-- credential can now also answer a key request, so it shouldn't outlive the sign-in).
+create function public.forget_device_secret(p_device_id uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+declare uid uuid := public.require_user();
+begin
+  update public.devices set secret_hash = null where id = p_device_id and user_id = uid;
+end;
+$$;
+
 -- For the notify function only (service_role): after a phone answered, who should hear about it, once.
 -- Mirrors the key_answer rule for signed-in callers; the asker's own extensions wake up too (D44).
 create function public.claim_device_push(p_device_id uuid, p_secret text, p_kind text, p_ref uuid) returns jsonb
@@ -136,5 +155,7 @@ $$;
 revoke execute on function public._device_by_secret(uuid, text), public._waiting_key_requests(uuid) from public, anon, authenticated;
 revoke execute on function public.device_decide_end_request(uuid, text, uuid, boolean) from public;
 grant execute on function public.device_decide_end_request(uuid, text, uuid, boolean) to anon, authenticated;
+revoke execute on function public.forget_device_secret(uuid) from public, anon;
+grant execute on function public.forget_device_secret(uuid) to authenticated;
 revoke execute on function public.claim_device_push(uuid, text, text, uuid) from public, anon, authenticated;
 grant execute on function public.claim_device_push(uuid, text, text, uuid) to service_role;
