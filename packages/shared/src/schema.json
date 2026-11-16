@@ -898,6 +898,10 @@
                 {
                     "name": "quiet_to",
                     "readable": true
+                },
+                {
+                    "name": "proof_keep_days",
+                    "readable": true
                 }
             ],
             "readPolicies": [

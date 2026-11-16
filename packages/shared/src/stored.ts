@@ -121,6 +121,7 @@ export const STORED: Record<string, StoredTable> = {
       remind_evening: "Your evening reminder time, if you set one.",
       quiet_from: "When your quiet hours start, if you hold someone's key.",
       quiet_to: "When your quiet hours end.",
+      proof_keep_days: "How many days your proofs are kept (7, 30 or 90), or empty to keep them until you delete them.",
     },
   },
   tasks: {
@@ -208,10 +209,10 @@ export const STORED: Record<string, StoredTable> = {
     who: "You and the partner who wrote it.",
     columns: {
       id: "The note's id.",
-      proof_id: "Which proof.",
+      proof_id: "Which proof (empty once that proof was removed).",
       verifier_id: "Who wrote it.",
       verdict: "Looks good, or a question.",
-      comment: "Their words, if any.",
+      comment: "Their words, if any (cleared when the proof is removed).",
       created_at: "When they wrote it.",
     },
   },

@@ -5,6 +5,7 @@ import { DeleteAccount } from "@/components/DeleteAccount";
 import { ExportData } from "@/components/ExportData";
 import { PushSettings } from "@/components/PushSettings";
 import { ReminderSettings } from "@/components/ReminderSettings";
+import { ProofRetention } from "@/components/ProofRetention";
 
 export default function Settings() {
   return (
@@ -27,6 +28,7 @@ export default function Settings() {
           {copy.helpTitle}
         </Link>
       </div>
+      <ProofRetention />
       <ExportData />
       <DeleteAccount />
     </>

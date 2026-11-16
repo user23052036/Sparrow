@@ -1,6 +1,19 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildReminder, REMINDER_TEXT, runReminders, runWaitingKeyRequests, type Deps, type WaitingDeps } from "./logic.ts";
+import { readFileSync } from "node:fs";
+import {
+  buildReminder,
+  FILES_PER_CALL,
+  QUICK_REFUSAL_MS,
+  RETENTION_BUDGET_MS,
+  REMINDER_TEXT,
+  runReminders,
+  runRetention,
+  runWaitingKeyRequests,
+  type Deps,
+  type ExpiredProof,
+  type WaitingDeps,
+} from "./logic.ts";
 import { PUSH_TEXT } from "../notify/logic.ts";
 import { copy } from "../../../packages/shared/src/copy.ts";
 
@@ -106,5 +119,118 @@ describe("key requests that waited through quiet hours", () => {
     const { d, sent } = waitingDeps([]);
     assert.deepEqual(await runWaitingKeyRequests(d), { sent: 0, removed: 0, failed: 0, requests: 0 });
     assert.equal(sent.length, 0);
+  });
+});
+
+describe("proof retention (D48)", () => {
+  const U = "33333333-3333-4333-8333-333333333333";
+  const OTHER = "44444444-4444-4444-8444-444444444444";
+  const file = (id: string, path: string | null, user = U): ExpiredProof => ({ id, user_id: user, storage_path: path });
+  function retention(expired: ExpiredProof[], refuse: (paths: string[]) => boolean = () => false) {
+    const removed: string[][] = [];
+    const deleted: string[][] = [];
+    const order: string[] = [];
+    return {
+      removed,
+      deleted,
+      order,
+      d: {
+        claimExpired: async () => expired,
+        async removeFiles(paths: string[]) {
+          order.push("files");
+          if (refuse(paths)) throw new Error("storage said no");
+          removed.push(paths);
+        },
+        async deleteRows(ids: string[]) {
+          order.push("rows");
+          deleted.push(ids);
+          return ids.length;
+        },
+      },
+    };
+  }
+
+  it("removes files first, then the rows, written notes included", async () => {
+    const r = retention([file("p1", `${U}/a.jpg`), file("p2", `${U}/b.webm`), file("t1", null)]);
+    assert.deepEqual(await runRetention(r.d), { files: 2, proofs: 3, held: 0 });
+    assert.deepEqual(r.removed, [[`${U}/a.jpg`, `${U}/b.webm`]]);
+    assert.deepEqual([...r.deleted[0]].sort(), ["p1", "p2", "t1"]);
+    assert.deepEqual(r.order, ["files", "rows"]);
+  });
+
+  it("a refused batch is tried one file at a time, so one odd name holds back only itself", async () => {
+    const many = Array.from({ length: FILES_PER_CALL }, (_, i) => file(`p${i}`, `${U}/${i}.jpg`));
+    const r = retention(many, (paths) => paths.includes(`${U}/7.jpg`));
+    assert.deepEqual(await runRetention(r.d), { files: FILES_PER_CALL - 1, proofs: FILES_PER_CALL - 1, held: 1 });
+    assert.ok(!r.deleted[0].includes("p7"));
+  });
+
+  it("removes files in folders inside the owner's own folder too", async () => {
+    const r = retention([file("n1", `${U}/2026/a.jpg`)]);
+    assert.deepEqual(await runRetention(r.d), { files: 1, proofs: 1, held: 0 });
+  });
+
+  it("never removes a file outside its owner's folder: such a row goes, the file stays", async () => {
+    const r = retention([
+      file("x1", `${OTHER}/their.jpg`),
+      file("x2", `${U}/../${OTHER}/their.jpg`),
+      file("x3", "no-folder.jpg"),
+      file("x4", `${U}//double.jpg`),
+    ]);
+    assert.deepEqual(await runRetention(r.d), { files: 0, proofs: 4, held: 0 });
+    assert.deepEqual(r.removed, []);
+    assert.deepEqual([...r.deleted[0]].sort(), ["x1", "x2", "x3", "x4"]);
+  });
+
+  it("odd rows can't hold up everyone else's: they are cleared in the same run", async () => {
+    const odd = Array.from({ length: 150 }, (_, i) => file(`o${i}`, `${OTHER}/${i}.jpg`));
+    const r = retention([...odd, file("good", `${U}/a.jpg`)]);
+    const out = await runRetention(r.d);
+    assert.equal(out.files, 1);
+    assert.equal(out.proofs, 151);
+  });
+
+  it("a slow refusal holds the batch instead of trying each file, and the run stops at its time budget", async () => {
+    let clock = 0;
+    let calls = 0;
+    const many = Array.from({ length: FILES_PER_CALL * 2 }, (_, i) => file(`s${i}`, `${U}/${i}.jpg`));
+    const out = await runRetention({
+      now: () => clock,
+      claimExpired: async () => many,
+      async removeFiles() {
+        calls++;
+        clock += Math.max(QUICK_REFUSAL_MS, RETENTION_BUDGET_MS / 2) + 1; // the service hangs until its timeout
+        throw new Error("timed out");
+      },
+      deleteRows: async (ids) => ids.length,
+    });
+    assert.equal(calls, 2, "one call per batch, never one per file");
+    assert.deepEqual(out, { files: 0, proofs: 0, held: FILES_PER_CALL * 2 });
+    clock = 0;
+    calls = 0;
+    const late = await runRetention({
+      now: () => clock,
+      claimExpired: async () => many,
+      async removeFiles() {
+        calls++;
+        clock += RETENTION_BUDGET_MS; // one slow success uses the whole budget
+      },
+      deleteRows: async (ids) => ids.length,
+    });
+    assert.equal(calls, 1, "the second batch waits for the next run");
+    assert.deepEqual(late, { files: FILES_PER_CALL, proofs: FILES_PER_CALL, held: FILES_PER_CALL });
+  });
+
+  it("does nothing when nothing is past its time", async () => {
+    const r = retention([]);
+    assert.deepEqual(await runRetention(r.d), { files: 0, proofs: 0, held: 0 });
+    assert.deepEqual(r.order, []);
+  });
+
+  it("the claim is the server's only, lists files before notes and says whose they are (0033)", () => {
+    const sql = readFileSync(new URL("../../migrations/0033_proof_retention.sql", import.meta.url), "utf8");
+    assert.match(sql, /returns table \(id uuid, user_id uuid, storage_path text\)/);
+    assert.match(sql, /order by \(p\.storage_path is null\), p\.server_created_at/);
+    assert.match(sql, /grant execute on function public\.claim_expired_proofs\(int\), public\.delete_expired_proofs\(uuid\[\]\) to service_role;/);
   });
 });
