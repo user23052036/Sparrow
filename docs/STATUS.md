@@ -30,7 +30,7 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
 | T1.5 | #20 | CSP, no framing, referrer policy: real headers under `next start`, `<meta>` plus frame guard in the export. |
 | T2.1 | #21 | Web Push (D38, `0028`): `push_subscriptions`, `claim_push`, `notify` function, service worker handlers, Settings switch, push-service allow-list. |
 | T2.2 | #22 | Reminders (`0029`): morning/evening times, `claim_due_reminders`, `remind` function, pg_cron + pg_net job scheduled by the deploy workflow. |
-| T2.3 | see git log | Guest partner (D39, `0030`): key link `/key#spg_…`, anonymous guest functions, one key holder at a time, `claim_push` answers `{to, id}`, guest push, `convert_guest_key`. Run 2026-11-16. |
+| T2.3 | #24 | Guest partner (D39, `0030`): key link `/key#spg_…`, anonymous guest functions, one key holder at a time, `claim_push` answers `{to, id}`, guest push, `convert_guest_key`. Run 2026-11-16; two review rounds (a race between invites and guests, push state, key memory on the page), all fixed before merging. |
 
 ## Checks run in this run
 - Locally, per task, with Node 24 (`fnm exec --using=24`; the Mac's default Node 20 is below the repo's
@@ -43,11 +43,16 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
   every PR's `android-rules` job; the Gradle build and the emulator job ran green in CI.
 - CI read with `gh pr checks` for every PR; all green before each merge.
 
+After the T2.3 merge, every workflow on `main` was green (CI, Android build, Deploy database skipped without
+secrets, Deploy web, Live smoke test).
+
 ## Not verified yet (needs the owner's Supabase project)
 - Anything against a real Supabase project: deploy, live smoke test, Web Push delivery through a real
   push service (`npm:web-push` under Supabase's Deno runtime), pg_cron/pg_net reminders.
 - The extension in a real Chrome (optional site access prompt and redirect after granting).
 - The Android engine on a real phone (the emulator run covers app blocking only, not the VPN filter).
+- Guest partner (T2.3) against a real project: a guest's browser getting a push, and two real accounts
+  converting (the e2e fake has one user; the SQL suite covers it).
 
 ## Parked for the owner (nothing here blocks the next tasks)
 - Create a Supabase project, then add repository secrets `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`,
