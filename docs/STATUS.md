@@ -1,16 +1,15 @@
 # Sparrow: current status (2026-11-16, second local run)
 
-Repo: github.com/user23052036/Sparrow. `main` has everything through T2.3 (guest partner): D1 to D42 and
-migrations to `0030`. Live site (static export, no backend yet): https://user23052036.github.io/Sparrow/
+Repo: github.com/user23052036/Sparrow. `main` has everything through T2.4 (partner fatigue guard): D1 to D43 and
+migrations to `0031`. Live site (static export, no backend yet): https://user23052036.github.io/Sparrow/
 
 ## Start here
 1. `docs/AUTONOMY.md`: how to run without the owner (preflight, modes A/B/C, agents, credentials).
 2. `docs/ROADMAP.md`: audit, position, tasks T0.1 to T5.4 with pre-assigned migration numbers.
 3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D42).
 
-**Next task: T2.4 (partner fatigue guard, migration `0031`).** Then T2.5, WS3 (android lane, T3.2 uses
-`0032`), WS4 (`0033`, `0034`), WS5 (`0035`). T2.4 must cover guest partners too (requests reach a guest the
-same way; quiet hours would be set from the key page or by the owner for them).
+**Next task: T2.5 (instant start on the laptop: Web Push in the extension; read Chrome's docs first).** Then
+WS3 (android lane, T3.2 uses `0032`), WS4 (`0033`, `0034`), WS5 (`0035`).
 
 ## Done in this run (Mode C: Claude Code on the owner's Mac, `gh` signed in, PR loop)
 Each task: own branch from `origin/main`, full local check list, PR, CI green, squash merge. T0.3, T1.2,
@@ -30,6 +29,7 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
 | T1.5 | #20 | CSP, no framing, referrer policy: real headers under `next start`, `<meta>` plus frame guard in the export. |
 | T2.1 | #21 | Web Push (D38, `0028`): `push_subscriptions`, `claim_push`, `notify` function, service worker handlers, Settings switch, push-service allow-list. |
 | T2.2 | #22 | Reminders (`0029`): morning/evening times, `claim_due_reminders`, `remind` function, pg_cron + pg_net job scheduled by the deploy workflow. |
+| T2.4 | see git log | Partner fatigue guard (D43, `0031`): 3 asks per session, 5 per local day; quiet hours for account partners (profile) and guests (key page); requests wait and the reminder job delivers them when quiet hours end; `key_request_status` for kind notes on Focus. |
 | T2.3 | #24 | Guest partner (D39, `0030`): key link `/key#spg_…`, anonymous guest functions, one key holder at a time, `claim_push` answers `{to, id}`, guest push, `convert_guest_key`. Run 2026-11-16; two review rounds (a race between invites and guests, push state, key memory on the page), all fixed before merging. |
 
 ## Checks run in this run
@@ -51,6 +51,7 @@ secrets, Deploy web, Live smoke test).
   push service (`npm:web-push` under Supabase's Deno runtime), pg_cron/pg_net reminders.
 - The extension in a real Chrome (optional site access prompt and redirect after granting).
 - The Android engine on a real phone (the emulator run covers app blocking only, not the VPN filter).
+- The reminder job delivering key requests that waited through quiet hours (T2.4) on a real project.
 - Guest partner (T2.3) against a real project: a guest's browser getting a push, and two real accounts
   converting (the e2e fake has one user; the SQL suite covers it).
 
@@ -65,13 +66,15 @@ secrets, Deploy web, Live smoke test).
 
 ## Working notes
 - SQL test user prefixes used so far: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1,
-  f1f1f1f1, 24242424, 25252525, 26262626, 28282828 (push), 29292929 (reminders), 30303030 (guest partner).
-  Next: 31313131.
+  f1f1f1f1, 24242424, 25252525, 26262626, 28282828 (push), 29292929 (reminders), 30303030 (guest partner),
+  31313131 (fatigue guard). Next: 32323232.
 - The test stub now has Supabase's `service_role` role (bypass RLS); grant server-only functions to it.
 - The e2e fake answers `use_focus_link` and the four guest RPCs (`guest_overview`, `guest_decide`,
   `save_guest_push`, `remove_guest_push`) before its signed-in check; they are the anonymous RPCs.
 - `partner_overview()` now wraps the 0005 function, renamed `_partner_overview_accounts()`, and adds the
   `guest` state. `keyHolderName()` in shared turns any overview into the key holder's name (Focus, Today).
+- The `remind` function imports `buildPayload` from `../notify/logic.ts` (one source for key-request
+  notifications); it now answers `{ reminders, key_requests }`.
 - The e2e push stand-in lives in `apps/web/e2e/push-mock.ts`; it forgets its subscription on reload. It now also
   models focus sessions, key requests, push subscriptions and the notify function.
 - Edge Functions share code through `supabase/functions/_shared/` (push delivery and allow-list).

@@ -33,6 +33,8 @@ export interface GuestOverview {
   guest: string;
   pending_end_requests: PartnerEndRequest[];
   proofs: GuestProof[];
+  /** The guest's own quiet hours (D43), as "HH:MM", or null. */
+  quiet: { from: string; to: string } | null;
 }
 
 /** Reads a key from a bare key, a "#key" fragment or a whole key link. Null when there is none. */

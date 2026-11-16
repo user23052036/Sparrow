@@ -7,6 +7,7 @@ import { errorText, isConfigured, supabase } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
 import { basePath } from "@/lib/site";
 import { timeAgo } from "@/lib/format";
+import { QuietHours } from "@/components/QuietHours";
 import { guestPushIsOn, notifyAsGuest, pushSupported, turnOffGuestPush, turnOnGuestPush } from "@/lib/push";
 
 type Load = { kind: "loading" } | { kind: "no-key" } | { kind: "invalid" } | { kind: "offline" } | { kind: "ok"; ov: GuestOverview };
@@ -283,6 +284,18 @@ export default function KeyPage() {
           </div>
 
           <GuestPush guestKey={key} name={ov.name} />
+
+          <QuietHours
+            key={ov.quiet ? `${ov.quiet.from}-${ov.quiet.to}` : "none"}
+            name={ov.name}
+            initial={ov.quiet}
+            save={async (from, to) => {
+              // A guest has no profile: their quiet hours follow this browser's time zone.
+              const tz = from ? Intl.DateTimeFormat().resolvedOptions().timeZone : null;
+              const { error } = await supabase().rpc("guest_set_quiet", { p_key: key, p_from: from, p_to: to, p_tz: tz });
+              return error ? errorText(error) : null;
+            }}
+          />
 
           <div className="panel stack">
             <h3>{copy.keyPage.accountTitle}</h3>

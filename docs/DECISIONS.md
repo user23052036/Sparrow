@@ -252,3 +252,14 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Why:** the installation prompt no longer asks to "read and change all your data on all websites", which was the main Chrome Web Store review risk and a poor fit for "nothing tracked". Blocking itself never depends on the grant.
 **Tested:** extension unit and integration tests (rules per grant, the popup's request, base-path handling, store packaging). **Not verified:** a real Chrome (the prompt, and the redirect once access is granted).
 **Status:** Built, untested in a real browser.
+
+## D43 — Partner fatigue guard
+**Decision:** ROADMAP T2.4, migration `0031`. Holding someone's key should stay easy to say yes to.
+- **Ask limits:** at most 3 key requests per locked session and 5 per day (the asker's local day), enforced in `request_end_session`. Asking again while a request waits is not another ask. The numbers live in `_key_requests_per_session()` / `_key_requests_per_day()` and are mirrored in shared (`KEY_REQUESTS_PER_SESSION`, `KEY_REQUESTS_PER_DAY`, pinned by a test).
+- **Quiet hours:** the key holder sets them. An account partner sets them on their profile (`quiet_from`, `quiet_to`, in their profile's time zone; Partner page). A guest (D39) sets them on the key page (`guest_set_quiet`, in the time zone their browser reports, kept on `guest_keys`). They may cross midnight.
+- **Requests wait:** during quiet hours a request is still made and shows on the holder's page, but `claim_push` sends nothing (shared proofs don't notify either). The five-minute reminder job (0029) also calls `claim_waiting_key_requests()`, which delivers requests still waiting on a running session once quiet hours end, once each. It also catches a request whose app never sent its own notification, after a minute.
+- **Told kindly:** `key_request_status()` gives the Focus page asks used and left, and when the holder's quiet hours end. The asker sees the quiet-hours note before locking and after asking, how many asks are left, and a kind sentence instead of the button once a limit is reached; the session still ends on its own.
+**Why:** the roadmap's "partner fatigue" risk; with both limits and quiet hours, a friend never gets more than a handful of asks a day and never at night.
+**Tested:** SQL suite (limits, a new local day, quiet-hours arithmetic across midnight and time zones, no push in quiet hours, delivery after them for partners and guests, nothing for ended sessions, permissions), the remind function's delivery, e2e (limits, quiet notes, setting quiet hours as partner and guest). **Not verified:** the job's delivery against a real project.
+**Status:** Built (T2.4).
+

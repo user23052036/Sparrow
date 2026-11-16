@@ -572,6 +572,7 @@ export const copy = {
       "Which of your devices are blocking sites, and when they last checked in.",
       "If you make focus links: their names, lengths and when they were last used. The key itself is not kept, only a fingerprint of it.",
       "If a friend holds your key through a link: the name you gave them and when they last opened it. The key itself is not kept, only a fingerprint of it.",
+      "If you hold someone's key and set quiet hours: those two times (for a friend holding a key through a link, also the time zone their browser reported).",
       "Badges you crafted, and any circle goal you started.",
       "If you turn on notifications: the push address your browser gives Sparrow for this, one per browser, until you turn them off there. A notification only says what happened (for example that your partner answered), never what anyone wrote. It travels through your browser maker's push service (Google, Mozilla or Apple).",
       "Feedback you choose to send.",
@@ -582,6 +583,7 @@ export const copy = {
       "Your accountability partner sees only what you switch on: your day and focus activity, and proofs you share one at a time. With a shared proof they also see a few plain notes: how long after the planned day it was added, and whether a photo's own date is older. Never a score.",
       "A circle (if you join one) sees your name, or the made-up name you chose for it instead, and, unless you switch it off, how many planned things moved forward and your focus minutes today. Never task titles, proofs or moods. A circle goal shows one number for the whole circle, never who moved how many.",
       "Anyone who has one of your focus links can start a focus session for you, and nothing else: it shows them nothing about you. Remove the link to stop that.",
+      "If you set quiet hours, the person whose key you hold sees only when they end, and only while they are on, so they know their request waits.",
       "A friend who holds your key through a link sees your name, your requests to end a locked session early with the reason you give, and proofs you share with them (the written ones in full; for a photo or voice note only that there is one). Nothing else. Take the key back in Partner to stop that.",
       "The people running the beta see anonymous totals, such as how many people finished their day. They do not read your tasks, moods or proofs.",
       "Nothing is sold, and there are no ads or third-party trackers.",
@@ -721,6 +723,27 @@ export const copy = {
     removeConfirm: (label: string) => `Remove “${label}”? Anything that still opens it will stop working.`,
     yesRemove: "Yes, remove it",
     keep: "Keep it",
+  },
+  /** Partner fatigue guard (D43): ask limits and the key holder's quiet hours. */
+  fatigue: {
+    quietTitle: "Quiet hours",
+    quietBody: (name: string) =>
+      `Between these times, ${name}'s requests for the key and shared proofs don't send you a notification. A request waits here, and reaches you when quiet hours end if their session is still running.`,
+    from: "From",
+    to: "Until",
+    save: "Save quiet hours",
+    turnOff: "Turn off quiet hours",
+    saved: (from: string, to: string) => `Quiet from ${from} until ${to}.`,
+    none: "No quiet hours: requests reach you whenever they come.",
+    needBoth: "Pick two different times.",
+    quietNow: (name: string, until: string) =>
+      `${name} has quiet hours until ${until}, so they won't get a notification before then. Your request waits for them, and the session still ends on its own.`,
+    lockQuiet: (name: string, until: string) => `${name} has quiet hours until ${until}. If you ask for the key before then, they'll see it afterwards.`,
+    asksLeft: (n: number) => (n === 1 ? "You can ask once more in this session." : `You can ask ${n} more times in this session.`),
+    sessionLimit: (name: string, n: number) =>
+      `You've asked ${name} ${n} times in this session, which is the most. This stretch is yours to finish, and the session ends on its own.`,
+    dayLimit: (name: string, n: number) =>
+      `You've asked for the key ${n} times today, which is the most for one day. It keeps holding the key easy for ${name}. This session ends on its own.`,
   },
   /** The owner's side of a guest partner (D39): Partner page panels. */
   guestKey: {
