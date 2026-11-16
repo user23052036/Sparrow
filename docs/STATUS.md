@@ -96,6 +96,8 @@ secrets, Deploy web, Live smoke test).
 - For T4.4 (found building T4.1): `log_kind_act`, `partner_support_nudge`, `penalty_status`, `pledge_limit`,
   `set_penalty_optin` and `set_pledge` are executable by `anon` (never revoked from it). Each starts with
   `require_user()`, so nothing is exposed, but they should be revoked from `anon` in a later migration.
+- Also for T4.4: `is_buddy_of(owner, viewer)` answers any signed-in caller for any two account ids; limit `viewer`
+  to `auth.uid()` for callers other than the server.
 - The test stub now has Supabase's `service_role` role (bypass RLS); grant server-only functions to it.
 - The e2e fake answers `use_focus_link` and the four guest RPCs (`guest_overview`, `guest_decide`,
   `save_guest_push`, `remove_guest_push`) before its signed-in check; they are the anonymous RPCs.
