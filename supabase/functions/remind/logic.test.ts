@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import {
   buildReminder,
   FILES_PER_CALL,
+  QUICK_REFUSAL_MS,
+  RETENTION_BUDGET_MS,
   REMINDER_TEXT,
   runReminders,
   runRetention,
@@ -186,6 +188,37 @@ describe("proof retention (D48)", () => {
     const out = await runRetention(r.d);
     assert.equal(out.files, 1);
     assert.equal(out.proofs, 151);
+  });
+
+  it("a slow refusal holds the batch instead of trying each file, and the run stops at its time budget", async () => {
+    let clock = 0;
+    let calls = 0;
+    const many = Array.from({ length: FILES_PER_CALL * 2 }, (_, i) => file(`s${i}`, `${U}/${i}.jpg`));
+    const out = await runRetention({
+      now: () => clock,
+      claimExpired: async () => many,
+      async removeFiles() {
+        calls++;
+        clock += Math.max(QUICK_REFUSAL_MS, RETENTION_BUDGET_MS / 2) + 1; // the service hangs until its timeout
+        throw new Error("timed out");
+      },
+      deleteRows: async (ids) => ids.length,
+    });
+    assert.equal(calls, 2, "one call per batch, never one per file");
+    assert.deepEqual(out, { files: 0, proofs: 0, held: FILES_PER_CALL * 2 });
+    clock = 0;
+    calls = 0;
+    const late = await runRetention({
+      now: () => clock,
+      claimExpired: async () => many,
+      async removeFiles() {
+        calls++;
+        clock += RETENTION_BUDGET_MS; // one slow success uses the whole budget
+      },
+      deleteRows: async (ids) => ids.length,
+    });
+    assert.equal(calls, 1, "the second batch waits for the next run");
+    assert.deepEqual(late, { files: FILES_PER_CALL, proofs: FILES_PER_CALL, held: FILES_PER_CALL });
   });
 
   it("does nothing when nothing is past its time", async () => {
