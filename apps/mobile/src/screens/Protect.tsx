@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppState, Linking, PermissionsAndroid, Platform, ScrollView, Text, View } from "react-native";
-import { copy } from "@sparrow/shared";
+import { copy, isAutostartBrand } from "@sparrow/shared";
 import { engine, isNativeAvailable, type EngineState, type WebBlocking } from "../../modules/sparrow-blocker/src";
 import { setUpEngine } from "../device";
 import { Button } from "../ui";
+import { SetupCheck } from "./SetupCheck";
 import { s } from "../theme";
-
-/** Brands known to stop background apps unless "autostart" is allowed (dontkillmyapp.com). */
-const AUTOSTART_BRANDS = ["xiaomi", "redmi", "poco", "oppo", "realme", "oneplus", "vivo", "iqoo", "huawei", "honor", "samsung"];
 
 /** Android 13+ asks before an app may post notifications; older versions allow them by default. */
 const NEEDS_ASKING = Platform.OS === "android" && Number(Platform.Version) >= 33;
@@ -34,8 +32,9 @@ export function Protect() {
   const [note, setNote] = useState<string | null>(null);
   const [web, setWeb] = useState<WebBlocking>(engine.webBlocking());
   const [notif, setNotif] = useState<Notif>("on");
+  const [checking, setChecking] = useState(false);
   const brand = engine.manufacturer();
-  const needsAutostart = AUTOSTART_BRANDS.some((b) => brand.toLowerCase().includes(b));
+  const needsAutostart = isAutostartBrand(brand);
 
   const refresh = useCallback(async () => {
     setOn(engine.protectionOn());
@@ -64,11 +63,15 @@ export function Protect() {
     return () => sub.remove();
   }, [refresh]);
 
+  if (checking) return <SetupCheck onBack={() => setChecking(false)} />;
+  const checkButton = <Button label={copy.setupCheck.open} onPress={() => setChecking(true)} />;
+
   if (!isNativeAvailable)
     return (
       <ScrollView style={s.screen} contentContainerStyle={s.body}>
         <Text style={s.h1}>{copy.protect.title}</Text>
         <Text style={s.text}>{copy.protect.devBuild}</Text>
+        {checkButton}
       </ScrollView>
     );
 
@@ -79,6 +82,7 @@ export function Protect() {
         <Text style={s.text}>{on && state?.configured ? copy.protect.ready : copy.protect.notReady}</Text>
         {state?.configured && <Text style={s.quiet}>{copy.protect.lastSync(ago(state.lastSyncMs))}</Text>}
         {state?.status === "signed_out" && <Text style={s.text}>{copy.protect.signedOut}</Text>}
+        {checkButton}
       </View>
 
       <View style={s.panel}>

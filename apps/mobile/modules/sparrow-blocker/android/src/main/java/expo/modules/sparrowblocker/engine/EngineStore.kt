@@ -70,6 +70,13 @@ class EngineStore(context: Context) {
     prefs.edit().putBoolean("webBlocking", on).apply()
   }
 
+  /** T3.3: when a listed app was last covered by the blocked screen ("Check my setup" looks for it). */
+  fun lastCoverMs(): Long = prefs.getLong("lastCover", 0L)
+
+  fun saveLastCover(ms: Long) {
+    prefs.edit().putLong("lastCover", ms).apply()
+  }
+
   /** T3.2: key requests the last sync listed as waiting on this phone's owner, and the ones already on screen. */
   fun waitingRequests(): List<String> = prefs.getString("keyWaiting", "")!!.split(',').filter { it.isNotBlank() }
 

@@ -96,6 +96,7 @@ class SparrowAccessibilityService : AccessibilityService() {
     val last = lastCover
     if (last != null && last.first == pkg && now - last.second < BlockRules.REBLOCK_GAP_MS) return
     lastCover = pkg to now
+    store.saveLastCover(now)
     startActivity(BlockedActivity.intent(this, pkg, state.task, state.endsAtMs))
   }
 
