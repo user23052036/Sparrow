@@ -916,6 +916,8 @@ export const copy = {
     noKey: "This link is missing its key. Make a new one under Focus.",
     invalid: "This focus link doesn't work anymore. It may have been removed. You can make a new one under Focus.",
     offline: "Can't reach Sparrow right now. Check your connection and open the link again.",
+    limited:
+      "This focus link has been used a lot lately, so it's resting for a while. You can start a session in Sparrow any time. If you didn't use it this often, remove the link under Focus and make a new one.",
     open: "Open Sparrow",
   },
   craft: {

@@ -72,6 +72,21 @@ test("a removed, unknown or keyless link starts nothing and says so kindly", asy
   await expect(page.getByText(/failed|lazy|broken|wasted/i)).toHaveCount(0);
 });
 
+test("a link used too often lately rests, and says so kindly", async ({ page, fake, context }) => {
+  fake.seedUser();
+  await signIn(page, fake);
+  await page.getByRole("link", { name: copy.nav.focus, exact: true }).click();
+  await page.getByLabel(copy.focusLinks.labelField).fill("Desk");
+  await page.getByRole("button", { name: copy.focusLinks.create }).click();
+  const url = await page.getByLabel(copy.focusLinks.urlLabel).inputValue();
+  fake.linkLimited = true;
+  const other = await context.newPage();
+  await other.goto(url);
+  await expect(other.locator('[data-go="limited"]')).toBeVisible();
+  await expect(other.getByText(copy.go.limited)).toBeVisible();
+  expect(fake.linkSession).toBeNull();
+});
+
 test("a link can be removed after a confirmation, and five is the most", async ({ page, fake }) => {
   fake.seedUser();
   for (let i = 1; i <= FOCUS_LINK_MAX; i++)

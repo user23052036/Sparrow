@@ -354,6 +354,18 @@ export const STORED: Record<string, StoredTable> = {
       use_count: "How many times it has.",
     },
   },
+  focus_link_uses: {
+    title: "Focus link uses",
+    what: "Each time one of your focus links answered, for a day, so a link that leaks can't be used without limit.",
+    who: "No one reads this through the app; only Sparrow's server uses it.",
+    columns: {
+      id: "The entry's number.",
+      link_id: "Which link.",
+      user_id: "Whose link.",
+      started: "Whether that use started a session.",
+      at: "When.",
+    },
+  },
   push_subscriptions: {
     title: "Notification addresses",
     what: "The push address a browser, a friend's key-link page or the Sparrow extension gave for notifications.",

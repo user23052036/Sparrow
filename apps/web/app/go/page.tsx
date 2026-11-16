@@ -6,7 +6,13 @@ import { isConfigured, supabase } from "@/lib/supabase";
 import { NotConfigured } from "@/components/NotConfigured";
 import { basePath } from "@/lib/site";
 
-type State = { kind: "starting" } | { kind: "ok"; result: FocusLinkResult } | { kind: "no-key" } | { kind: "invalid" } | { kind: "offline" };
+type State =
+  | { kind: "starting" }
+  | { kind: "ok"; result: FocusLinkResult }
+  | { kind: "no-key" }
+  | { kind: "invalid" }
+  | { kind: "limited" }
+  | { kind: "offline" };
 
 /**
  * D35: opening /go#<key> starts a focus session. No sign-in is needed: the key is the whole
@@ -28,7 +34,8 @@ export default function Go() {
       .rpc("use_focus_link", { p_key: key })
       .then(
         ({ data, error }) => {
-          if (error) setState(/fetch|network/i.test(error.message) ? { kind: "offline" } : { kind: "invalid" });
+          // PT429 (0034): the link was used many times lately (D49).
+          if (error) setState(error.code === "PT429" ? { kind: "limited" } : /fetch|network/i.test(error.message) ? { kind: "offline" } : { kind: "invalid" });
           else setState({ kind: "ok", result: data as FocusLinkResult });
         },
         () => setState({ kind: "offline" }),
@@ -55,6 +62,7 @@ export default function Go() {
         )}
         {state.kind === "no-key" && <p>{copy.go.noKey}</p>}
         {state.kind === "invalid" && <p>{copy.go.invalid}</p>}
+        {state.kind === "limited" && <p>{copy.go.limited}</p>}
         {state.kind === "offline" && <p>{copy.go.offline}</p>}
       </div>
       <div>

@@ -8,6 +8,9 @@ export const FOCUS_LINK_MAX_MINUTES = 120;
 export const FOCUS_LINK_DEFAULT_MINUTES = 25;
 export const FOCUS_LINK_LABEL_MAX = 40;
 export const FOCUS_LINK_KEY_PATTERN = /^spt_[0-9a-f]{64}$/;
+/** Attempt limits (D49, migration 0034): answers per link per hour, and sessions links start per person per day. */
+export const FOCUS_LINK_USES_PER_HOUR = 20;
+export const FOCUS_LINK_STARTS_PER_DAY = 8;
 
 export interface FocusLink {
   id: string;
