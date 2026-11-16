@@ -75,10 +75,11 @@ test("a removed, unknown or keyless link starts nothing and says so kindly", asy
 test("a link used too often lately rests, and says so kindly", async ({ page, fake, context }) => {
   fake.seedUser();
   await signIn(page, fake);
-  await page.getByRole("link", { name: copy.nav.focus, exact: true }).click();
-  await page.getByLabel(copy.focusLinks.labelField).fill("Desk");
-  await page.getByRole("button", { name: copy.focusLinks.create }).click();
-  const url = await page.getByLabel(copy.focusLinks.urlLabel).inputValue();
+  await page.getByRole("link", { name: copy.nav.focus }).click();
+  const panel = page.getByRole("region", { name: copy.focusLinks.title });
+  await panel.getByLabel(copy.focusLinks.nameLabel).fill("Desk");
+  await panel.getByRole("button", { name: copy.focusLinks.create }).click();
+  const url = await panel.getByLabel(copy.focusLinks.linkLabel).inputValue();
   fake.linkLimited = true;
   const other = await context.newPage();
   await other.goto(url);

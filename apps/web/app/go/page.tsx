@@ -7,12 +7,7 @@ import { NotConfigured } from "@/components/NotConfigured";
 import { basePath } from "@/lib/site";
 
 type State =
-  | { kind: "starting" }
-  | { kind: "ok"; result: FocusLinkResult }
-  | { kind: "no-key" }
-  | { kind: "invalid" }
-  | { kind: "limited" }
-  | { kind: "offline" };
+  { kind: "starting" } | { kind: "ok"; result: FocusLinkResult } | { kind: "no-key" } | { kind: "invalid" } | { kind: "limited" } | { kind: "offline" };
 
 /**
  * D35: opening /go#<key> starts a focus session. No sign-in is needed: the key is the whole

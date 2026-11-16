@@ -97,7 +97,7 @@ export const REVIEWED_FUNCTIONS: Record<string, { hash: string; anon: boolean }>
   "start_circle_goal(integer)": { hash: "23ff0f7a2815086f5c54e5acbd3ebd23", anon: false },
   "start_focus_session(integer,uuid,uuid,boolean)": { hash: "b337a51626bb32d1cfff719f4149f8a5", anon: false },
   "unreviewed_days()": { hash: "d6e7b893be1757414bd2f2cb737d81c0", anon: false },
-  "use_focus_link(text)": { hash: "5c35e7683df89b983c4f208f058e47c0", anon: true },
+  "use_focus_link(text)": { hash: "ee0256a76b77184539a618b5156521f4", anon: true },
   "verify_proof(uuid,text,text)": { hash: "9a820a76edc9b58a23d74b84b27e7b3b", anon: false },
 };
 

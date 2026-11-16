@@ -13,7 +13,10 @@ import {
   focusLinkUrl,
   normalizeFocusLinkLabel,
   parseFocusLinkKey,
-  validFocusLinkMinutes, FOCUS_LINK_STARTS_PER_DAY, FOCUS_LINK_USES_PER_HOUR } from "./focuslink";
+  validFocusLinkMinutes,
+  FOCUS_LINK_STARTS_PER_DAY,
+  FOCUS_LINK_USES_PER_HOUR,
+} from "./focuslink";
 
 const KEY = "spt_" + "0123456789abcdef".repeat(4);
 
