@@ -7,6 +7,7 @@ import {
   inviteLink,
   parseInviteCode,
   proofContextLines,
+  quietTime,
   type NewGuestKey,
   type PartnerOverview,
   type PartnerProof,
@@ -20,6 +21,34 @@ import { PartnerRating } from "@/components/PartnerRating";
 import { siteUrl } from "@/lib/site";
 import { notifyPartner } from "@/lib/push";
 import { GuestKeyCreate, GuestKeyHeld, GuestKeyShown } from "@/components/GuestKey";
+import { QuietHours } from "@/components/QuietHours";
+
+/** My quiet hours as the one holding the key (D43), kept on my profile in my time zone. */
+function MyQuietHours({ name }: { name: string }) {
+  const [hours, setHours] = useState<{ from: string; to: string } | null | undefined>(undefined);
+  useEffect(() => {
+    void supabase()
+      .from("profiles")
+      .select("quiet_from, quiet_to")
+      .maybeSingle()
+      .then(({ data }) => {
+        const from = quietTime((data as { quiet_from?: string } | null)?.quiet_from);
+        const to = quietTime((data as { quiet_to?: string } | null)?.quiet_to);
+        setHours(from && to ? { from, to } : null);
+      });
+  }, []);
+  if (hours === undefined) return null;
+  return (
+    <QuietHours
+      name={name}
+      initial={hours}
+      save={async (from, to) => {
+        const { error } = await supabase().rpc("set_quiet_hours", { p_from: from, p_to: to });
+        return error ? errorText(error) : null;
+      }}
+    />
+  );
+}
 
 type Active = Extract<PartnerOverview, { state: "active" }>;
 
@@ -240,6 +269,8 @@ function ActiveView({ ov, call, busy }: { ov: Active; call: (fn: string, args?: 
           </ul>
         </details>
       )}
+
+      <MyQuietHours name={name} />
 
       <PartnerRating />
 

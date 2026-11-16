@@ -9,6 +9,8 @@ import type { BrowserContext, Request, Route } from "@playwright/test";
 import {
   CRAFT_RECIPES,
   FOCUS_LINK_MAX,
+  KEY_REQUESTS_PER_DAY,
+  KEY_REQUESTS_PER_SESSION,
   isCraftedKey,
   KIND_ACT_POINTS,
   LIGHT_DAY_MAX_TASKS,
@@ -91,7 +93,9 @@ export class FakeSupabase {
   /** Key requests the signed-in person answered as someone's partner. */
   decided: Row[] = [];
   /** A guest partner (D39): the key link the owner made, as create_guest_key() keeps it. Real rules: rls_test.sql. */
-  guestKey: { id: string; name: string; key: string; last_seen_at: string | null } | null = null;
+  guestKey: { id: string; name: string; key: string; last_seen_at: string | null; quiet?: { from: string; to: string; tz: string } | null } | null = null;
+  /** When the key holder's quiet hours end, as key_request_status() would say (D43); null when they're not quiet. */
+  holderQuietUntil: string | null = null;
   /** The owner's name as the guest sees it (defaults to the profile's name). */
   guestOwnerName: string | null = null;
   /** What partner_overview() answers (defaults to "no partner"). */
@@ -447,7 +451,14 @@ export class FakeSupabase {
               task: titleOf(p.plan_item_id),
               created_at: p.server_created_at ?? now,
             })),
+          quiet: g.quiet ? { from: g.quiet.from, to: g.quiet.to } : null,
         });
+      }
+      case "guest_set_quiet": {
+        if ((args.p_from == null) !== (args.p_to == null) || (args.p_from != null && args.p_from === args.p_to))
+          return this.send(route, 400, { code: "P0001", message: "pick two different times, or none", details: null, hint: null });
+        g.quiet = args.p_from == null ? null : { from: String(args.p_from), to: String(args.p_to), tz: String(args.p_tz) };
+        return ok(null);
       }
       case "guest_decide": {
         const r = this.db.end_requests.find((x) => x.id === args.p_request_id && x.status === "pending");
@@ -490,10 +501,29 @@ export class FakeSupabase {
       return ok({ started: true, running: true, ...this.linkSession });
     }
     // a guest partner's calls (0030): the key is the permission, as with focus links
-    if (["guest_overview", "guest_decide", "save_guest_push", "remove_guest_push", "guest_push_is_on"].includes(name)) return this.guestRpc(route, name, args);
+    if (["guest_overview", "guest_decide", "save_guest_push", "remove_guest_push", "guest_push_is_on", "guest_set_quiet"].includes(name))
+      return this.guestRpc(route, name, args);
     if (!this.signedIn) return this.send(route, 401, { message: "JWT expired" });
 
     switch (name) {
+      case "key_request_status": {
+        const inSession = args.p_session_id ? this.db.end_requests.filter((r) => r.session_id === args.p_session_id).length : 0;
+        const today = this.db.end_requests.length;
+        return ok({
+          session_asked: inSession,
+          session_max: KEY_REQUESTS_PER_SESSION,
+          day_asked: today,
+          day_max: KEY_REQUESTS_PER_DAY,
+          can_ask: inSession < KEY_REQUESTS_PER_SESSION && today < KEY_REQUESTS_PER_DAY,
+          quiet_until: this.holderQuietUntil,
+        });
+      }
+      case "set_quiet_hours": {
+        if ((args.p_from == null) !== (args.p_to == null) || (args.p_from != null && args.p_from === args.p_to))
+          throw new RpcError("pick two different times, or none");
+        Object.assign(this.db.profiles[0], { quiet_from: args.p_from ?? null, quiet_to: args.p_to ?? null });
+        return ok(null);
+      }
       case "create_guest_key": {
         const nm = String(args.p_name ?? "")
           .trim()
@@ -574,6 +604,11 @@ export class FakeSupabase {
         if (String(args.p_reason ?? "").trim().length < 3) throw new RpcError("tell your partner why you want to stop");
         const open = this.db.end_requests.find((r) => r.session_id === s.id && r.status === "pending");
         if (open) return ok(open);
+        // As 0031: three asks per session, five a day (every request in the fake is today's).
+        if (this.db.end_requests.filter((r) => r.session_id === s.id).length >= KEY_REQUESTS_PER_SESSION)
+          throw new RpcError(`you have asked for the key ${KEY_REQUESTS_PER_SESSION} times in this session, which is the most: it ends on its own`);
+        if (this.db.end_requests.length >= KEY_REQUESTS_PER_DAY)
+          throw new RpcError(`you have asked for the key ${KEY_REQUESTS_PER_DAY} times today, which is the most for one day`);
         const r = {
           id: uid(),
           session_id: s.id,

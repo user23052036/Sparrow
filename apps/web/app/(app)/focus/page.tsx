@@ -2,7 +2,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { copy, keyHolderName, normalizeDomainList, type Device, type PartnerOverview } from "@sparrow/shared";
+import { copy, keyHolderName, normalizeDomainList, type Device, type KeyRequestStatus, type PartnerOverview } from "@sparrow/shared";
 import { supabase, errorText } from "@/lib/supabase";
 import { clock, timeAgo } from "@/lib/format";
 import { extSyncNow } from "@/lib/extension";
@@ -80,10 +80,31 @@ function EarlyExit({ sessionId, onEnded, onCancel }: { sessionId: string; onEnde
 }
 
 /** Locked sessions: only the partner can end them early. */
+const hourMinute = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+/** Quiet hours that are still on: a note fetched a while ago never outlives them. */
+const stillQuiet = (until: string | null | undefined): until is string => !!until && new Date(until).getTime() > Date.now();
+
 function LockedExit({ sessionId, name, req, onChanged }: { sessionId: string; name: string; req: EndReq | null; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  // Asks left and the key holder's quiet hours (D43), refreshed whenever the request changes.
+  const [status, setStatus] = useState<KeyRequestStatus | null>(null);
+  useEffect(() => {
+    const fetchStatus = () =>
+      supabase()
+        .rpc("key_request_status", { p_session_id: sessionId })
+        .then(({ data }) => setStatus((data as KeyRequestStatus | null) ?? null));
+    void fetchStatus();
+    // quiet hours begin and end while a session runs
+    const t = setInterval(fetchStatus, 60_000);
+    return () => clearInterval(t);
+  }, [sessionId, req?.status]);
+  const quiet = stillQuiet(status?.quiet_until) ? (
+    <p className="note small" role="status">
+      {copy.fatigue.quietNow(name, hourMinute(status!.quiet_until!))}
+    </p>
+  ) : null;
   async function ask() {
     const { data, error } = await supabase().rpc("request_end_session", { p_session_id: sessionId, p_reason: reason });
     if (error) setErr(errorText(error));
@@ -97,10 +118,19 @@ function LockedExit({ sessionId, name, req, onChanged }: { sessionId: string; na
   }
   if (req?.status === "pending")
     return (
-      <p className="note" role="status">
-        {copy.partnerWaiting(name)}
-      </p>
+      <div className="stack">
+        <p className="note" role="status">
+          {copy.partnerWaiting(name)}
+        </p>
+        {quiet}
+      </div>
     );
+  const limit =
+    status && !status.can_ask
+      ? status.session_asked >= status.session_max
+        ? copy.fatigue.sessionLimit(name, status.session_max)
+        : copy.fatigue.dayLimit(name, status.day_max)
+      : null;
   return (
     <div className="stack">
       {req?.status === "denied" && (
@@ -108,7 +138,23 @@ function LockedExit({ sessionId, name, req, onChanged }: { sessionId: string; na
           {copy.partnerKeepGoing(name)}
         </p>
       )}
-      {open ? (
+      {limit ? (
+        <p className="note" role="status">
+          {limit}
+        </p>
+      ) : (
+        <>
+          {quiet}
+          {status && status.session_asked > 0 && (
+            <p className="small quiet">
+              {status.day_max - status.day_asked < status.session_max - status.session_asked
+                ? copy.fatigue.asksLeftToday(status.day_max - status.day_asked)
+                : copy.fatigue.asksLeft(status.session_max - status.session_asked)}
+            </p>
+          )}
+        </>
+      )}
+      {limit ? null : open ? (
         <div className="stack">
           <label htmlFor="key-reason">{copy.focus.askWhy(name)}</label>
           <input id="key-reason" value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />
@@ -152,6 +198,7 @@ function FocusInner() {
   const [err, setErr] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState<string | null>(null);
   const [lockIt, setLockIt] = useState(false);
+  const [holderQuietUntil, setHolderQuietUntil] = useState<string | null>(null);
   const [endReq, setEndReq] = useState<EndReq | null>(null);
   const stateRef = useRef<FocusState | null>(null);
 
@@ -171,6 +218,10 @@ function FocusInner() {
     const ov = po.data as PartnerOverview | null;
     const pname = keyHolderName(ov);
     setPartnerName(pname);
+    if (pname && !s.active) {
+      const ks = await sb.rpc("key_request_status");
+      setHolderQuietUntil((ks.data as KeyRequestStatus | null)?.quiet_until ?? null);
+    }
     if (s.locked && s.session_id) {
       const er = await sb.from("end_requests").select("status").eq("session_id", s.session_id).order("created_at", { ascending: false }).limit(1);
       setEndReq((er.data as EndReq[] | null)?.[0] ?? null);
@@ -338,9 +389,23 @@ function FocusInner() {
           </div>
           {partnerName && (
             <label className="check">
-              <input type="checkbox" checked={lockIt} onChange={(e) => setLockIt(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={lockIt}
+                onChange={(e) => {
+                  setLockIt(e.target.checked);
+                  // fresh when it matters: the page may have been open for hours
+                  if (e.target.checked)
+                    void supabase()
+                      .rpc("key_request_status")
+                      .then(({ data }) => setHolderQuietUntil((data as KeyRequestStatus | null)?.quiet_until ?? null));
+                }}
+              />
               {copy.focus.lockIt(partnerName)}
             </label>
+          )}
+          {partnerName && lockIt && stillQuiet(holderQuietUntil) && (
+            <p className="note small">{copy.fatigue.lockQuiet(partnerName, hourMinute(holderQuietUntil))}</p>
           )}
           {blockers.length === 0 && (
             <p className="note small">

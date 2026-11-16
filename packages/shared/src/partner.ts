@@ -36,3 +36,24 @@ export function keyHolderName(ov: PartnerOverview | null | undefined): string | 
   if (ov?.state === "guest") return ov.guest.name;
   return null;
 }
+
+/** Partner fatigue guard (D43, migration 0031): the most key requests per locked session and per local day. */
+export const KEY_REQUESTS_PER_SESSION = 3;
+export const KEY_REQUESTS_PER_DAY = 5;
+
+/** What key_request_status() answers, for being kind about it on the Focus page. */
+export interface KeyRequestStatus {
+  session_asked: number;
+  session_max: number;
+  day_asked: number;
+  day_max: number;
+  can_ask: boolean;
+  /** When the key holder's quiet hours end, or null when they aren't in quiet hours. */
+  quiet_until: string | null;
+}
+
+/** "22:00:00" or "22:00" → "22:00"; anything else → null. Quiet hours are whole minutes. */
+export function quietTime(t: string | null | undefined): string | null {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)(:00)?$/.exec(t ?? "");
+  return m ? `${m[1]}:${m[2]}` : null;
+}

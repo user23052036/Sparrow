@@ -1446,7 +1446,7 @@ set session_replication_role = origin;
 -- the guest: no session at all, just the anon role and the key
 set role anon;
 select set_config('request.jwt.claim.sub', '', false);
-select pg_temp.check((select count(*) from guest_keys) = 0, 'anonymous visitors see no guests');
+select pg_temp.expect_error($q$select count(*) from guest_keys$q$, 'anonymous visitors cannot read guests at all (0031)');
 select pg_temp.expect_error($q$select guest_overview('spg_' || repeat('0', 64))$q$, 'an unknown key shows nothing');
 select pg_temp.expect_error($q$select guest_overview('not a key')$q$, 'a malformed key shows nothing');
 select pg_temp.expect_error($q$select guest_overview(null)$q$, 'a missing key shows nothing');
@@ -1578,4 +1578,223 @@ reset role;
 set role anon;
 select set_config('request.jwt.claim.sub', '', false);
 select pg_temp.expect_error(format('select guest_overview(%L)', current_setting('test.guest_key')), 'a converted link stops working');
+reset role;
+
+-- ------------------------------------------------------------ partner fatigue guard (0031)
+insert into auth.users values
+  ('31313131-0000-0000-0000-000000000001', 'q1@test'), ('31313131-0000-0000-0000-000000000002', 'q2@test'),
+  ('31313131-0000-0000-0000-000000000003', 'q3@test'), ('31313131-0000-0000-0000-000000000004', 'q4@test');
+-- quiet hours arithmetic, across midnight and time zones
+select pg_temp.check(_quiet_until('22:00', '07:00', 'UTC', '2026-11-16 23:30+00') = '2026-11-17 07:00+00', 'quiet hours that cross midnight end the next morning');
+select pg_temp.check(_quiet_until('22:00', '07:00', 'UTC', '2026-11-16 03:00+00') = '2026-11-16 07:00+00', 'after midnight they end that morning');
+select pg_temp.check(_quiet_until('22:00', '07:00', 'UTC', '2026-11-16 12:00+00') is null, 'outside quiet hours there is no end');
+select pg_temp.check(_quiet_until('13:00', '14:00', 'Asia/Kolkata', '2026-11-16 08:00+00') = '2026-11-16 08:30+00', 'quiet hours follow the holder''s own time zone');
+select pg_temp.check(_quiet_until('13:00', '14:00', 'Asia/Kolkata', '2026-11-16 08:30+00') is null, 'quiet hours end exactly at their end');
+select pg_temp.check(_quiet_until('22:00', '07:00', 'Not/A_Zone', now()) is null and _quiet_until(null, null, 'UTC', now()) is null,
+  'an unknown time zone or no quiet hours means never quiet');
+
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+update profiles set timezone = 'Asia/Kolkata', display_name = 'Quinn';
+update blocklists set domains = '{youtube.com}';
+select set_config('test.q_code', (create_buddy_invite()).invite_code, false);
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000002');
+select accept_buddy_invite(current_setting('test.q_code'));
+select pg_temp.expect_error($q$select set_quiet_hours('22:00', '22:00')$q$, 'quiet hours need two different times');
+select pg_temp.expect_error($q$select set_quiet_hours('22:00', null)$q$, 'quiet hours need both times');
+select pg_temp.expect_error($q$update profiles set quiet_from = '22:00', quiet_to = null$q$, 'the table refuses half a quiet-hours setting too');
+reset role;
+
+-- three asks per session
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select start_focus_session(60, null, null, true);
+select set_config('test.qs', (select id::text from focus_sessions where ended_at is null), false);
+select pg_temp.check((key_request_status(current_setting('test.qs')::uuid) ->> 'can_ask')::boolean
+  and key_request_status(current_setting('test.qs')::uuid) ->> 'session_max' = '3' and key_request_status() ->> 'day_max' = '5',
+  'before asking, the Focus page sees three asks per session and five per day');
+select request_end_session(current_setting('test.qs')::uuid, 'first ask');
+select pg_temp.check((select count(*) from end_requests) = 1 and (request_end_session(current_setting('test.qs')::uuid, 'again')).reason = 'first ask',
+  'asking again while one waits does not count as another ask');
+reset role;
+select id as qd from end_requests where user_id = '31313131-0000-0000-0000-000000000001' and status = 'pending' \gset
+select pg_temp.as_user('31313131-0000-0000-0000-000000000002');
+select decide_end_request(:'qd', false);
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select request_end_session(current_setting('test.qs')::uuid, 'second ask');
+reset role;
+select id as qd from end_requests where user_id = '31313131-0000-0000-0000-000000000001' and status = 'pending' \gset
+select pg_temp.as_user('31313131-0000-0000-0000-000000000002');
+select decide_end_request(:'qd', false);
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select request_end_session(current_setting('test.qs')::uuid, 'third ask');
+reset role;
+select id as qd from end_requests where user_id = '31313131-0000-0000-0000-000000000001' and status = 'pending' \gset
+select pg_temp.as_user('31313131-0000-0000-0000-000000000002');
+select decide_end_request(:'qd', false);
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select pg_temp.expect_error(format('select request_end_session(%L, %L)', current_setting('test.qs'), 'fourth ask'), 'at most three asks per session');
+select pg_temp.check(not (key_request_status(current_setting('test.qs')::uuid) ->> 'can_ask')::boolean
+  and key_request_status(current_setting('test.qs')::uuid) ->> 'session_asked' = '3', 'the Focus page knows the session''s asks are used up');
+reset role;
+
+-- five asks per day
+update focus_sessions set ended_at = now() where id = current_setting('test.qs')::uuid;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select start_focus_session(60, null, null, true);
+select set_config('test.qs', (select id::text from focus_sessions where ended_at is null), false);
+select request_end_session(current_setting('test.qs')::uuid, 'fourth today');
+reset role;
+select id as qd from end_requests where user_id = '31313131-0000-0000-0000-000000000001' and status = 'pending' \gset
+select pg_temp.as_user('31313131-0000-0000-0000-000000000002');
+select decide_end_request(:'qd', false);
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select request_end_session(current_setting('test.qs')::uuid, 'fifth today');
+reset role;
+select id as qd from end_requests where user_id = '31313131-0000-0000-0000-000000000001' and status = 'pending' \gset
+select pg_temp.as_user('31313131-0000-0000-0000-000000000002');
+select decide_end_request(:'qd', false);
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select pg_temp.expect_error(format('select request_end_session(%L, %L)', current_setting('test.qs'), 'sixth today'), 'at most five asks a day');
+select pg_temp.check(not (key_request_status(current_setting('test.qs')::uuid) ->> 'can_ask')::boolean
+  and key_request_status(current_setting('test.qs')::uuid) ->> 'session_asked' = '2' and key_request_status() ->> 'day_asked' = '5',
+  'the Focus page knows the day''s asks are used up, with asks left in the session');
+reset role;
+update end_requests set created_at = (((now() at time zone 'Asia/Kolkata')::date + time '00:01') at time zone 'Asia/Kolkata') where user_id = '31313131-0000-0000-0000-000000000001';
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select pg_temp.check(key_request_status() ->> 'day_asked' = '5', 'asks from just after local midnight count for the local day');
+reset role;
+update end_requests set created_at = (((now() at time zone 'Asia/Kolkata')::date - 1 + time '23:59') at time zone 'Asia/Kolkata') where user_id = '31313131-0000-0000-0000-000000000001';
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select pg_temp.check(key_request_status() ->> 'day_asked' = '0', 'a new local day starts the count again');
+reset role;
+-- a made-up time zone counts by UTC days instead of never counting
+update end_requests set created_at = now() - interval '1 minute' where user_id = '31313131-0000-0000-0000-000000000001';
+update profiles set timezone = 'Bogus/Zone' where id = '31313131-0000-0000-0000-000000000001';
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select pg_temp.check(key_request_status() ->> 'day_asked' = '5' and not (key_request_status() ->> 'can_ask')::boolean,
+  'an unknown time zone cannot slip past the daily cap');
+reset role;
+update profiles set timezone = 'Asia/Kolkata' where id = '31313131-0000-0000-0000-000000000001';
+update end_requests set created_at = now() - interval '1 day' where user_id = '31313131-0000-0000-0000-000000000001';
+select pg_temp.as_user('31313131-0000-0000-0000-000000000004');
+select pg_temp.check(key_request_status(current_setting('test.qs')::uuid) ->> 'session_asked' = '0', 'someone else learns nothing about my asks');
+reset role;
+
+-- the partner's quiet hours: on now, ending in ten minutes (UTC profile)
+select pg_temp.as_user('31313131-0000-0000-0000-000000000002');
+select set_quiet_hours(to_char((now() at time zone 'UTC') - interval '1 hour', 'HH24:MI')::time, to_char((now() at time zone 'UTC') + interval '10 minutes', 'HH24:MI')::time);
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select set_config('test.quiet_until', key_request_status() ->> 'quiet_until', false);
+select pg_temp.check(current_setting('test.quiet_until')::timestamptz between now() + interval '9 minutes' and now() + interval '11 minutes',
+  'the asker is told when the partner''s quiet hours end');
+select request_end_session(current_setting('test.qs')::uuid, 'asked in quiet hours');
+select pg_temp.check(claim_push('key_request', (select id from end_requests where status = 'pending')) is null, 'a request in quiet hours sends no notification');
+insert into tasks (title) values ('Quiet task');
+select commit_day(array(select id from tasks), 3, 0);
+insert into proofs (plan_item_id, kind, text_body, visibility) values ((select id from plan_items limit 1), 'text', 'quiet proof', 'buddy');
+select pg_temp.check(claim_push('proof_shared', (select id from proofs limit 1)) is null, 'neither does a shared proof');
+select pg_temp.expect_error($q$select claim_waiting_key_requests()$q$, 'people cannot run the waiting-requests job themselves');
+reset role;
+select id as qreq from end_requests where user_id = '31313131-0000-0000-0000-000000000001' and status = 'pending' \gset
+select pg_temp.check(not exists (select 1 from push_sent where ref = :'qreq'), 'the request is left waiting, not marked as sent');
+select pg_temp.check(not exists (select 1 from claim_waiting_key_requests(now() + interval '2 minutes') where request_id = :'qreq'),
+  'the job leaves it alone while quiet hours last');
+select pg_temp.check((select to_kind = 'user' and recipient = '31313131-0000-0000-0000-000000000002'
+                        from claim_waiting_key_requests(current_setting('test.quiet_until')::timestamptz + interval '1 minute') where request_id = :'qreq'),
+  'once quiet hours end, the waiting request reaches the partner');
+select pg_temp.check(not exists (select 1 from claim_waiting_key_requests(current_setting('test.quiet_until')::timestamptz + interval '6 minutes') where request_id = :'qreq'),
+  'and only once');
+select pg_temp.as_user('31313131-0000-0000-0000-000000000002');
+select set_quiet_hours(null, null);
+select decide_end_request(:'qreq', false);
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select pg_temp.check(key_request_status() -> 'quiet_until' = 'null'::jsonb, 'without quiet hours there is nothing to wait for');
+reset role;
+-- a request the app never announced is still delivered by the job, after a minute
+update end_requests set created_at = now() - interval '1 day' where user_id = '31313131-0000-0000-0000-000000000001';
+update focus_sessions set ended_at = now() where id = current_setting('test.qs')::uuid;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select start_focus_session(60, null, null, true);
+select set_config('test.qs', (select id::text from focus_sessions where ended_at is null), false);
+select request_end_session(current_setting('test.qs')::uuid, 'unannounced');
+reset role;
+select id as qreq2 from end_requests where reason = 'unannounced' \gset
+select pg_temp.check(not exists (select 1 from claim_waiting_key_requests(now()) where request_id = :'qreq2'), 'the app gets the first minute to notify');
+select pg_temp.check(exists (select 1 from claim_waiting_key_requests(now() + interval '90 seconds') where request_id = :'qreq2'),
+  'after that the job delivers it');
+update end_requests set status = 'denied' where id = :'qreq2';
+select pg_temp.as_user('31313131-0000-0000-0000-000000000001');
+select request_end_session(current_setting('test.qs')::uuid, 'announced');
+select pg_temp.check(claim_push('key_request', (select id from end_requests where reason = 'announced')) ->> 'to' = 'user', 'the app announces a request outside quiet hours');
+reset role;
+select pg_temp.check(not exists (select 1 from claim_waiting_key_requests(now() + interval '90 seconds') r join end_requests e on e.id = r.request_id
+                                 where e.reason = 'announced'), 'the job never sends a request the app already announced');
+update end_requests set status = 'denied' where reason = 'announced';
+update focus_sessions set ended_at = now() where id = current_setting('test.qs')::uuid;
+insert into end_requests (session_id, user_id, reason, created_at)
+  values (current_setting('test.qs')::uuid, '31313131-0000-0000-0000-000000000001', 'left over', now() - interval '10 minutes');
+select pg_temp.check(not exists (select 1 from claim_waiting_key_requests(now()) r join end_requests e on e.id = r.request_id where e.reason = 'left over'),
+  'a request on a session that has ended is never delivered late');
+
+-- a guest's quiet hours
+select pg_temp.as_user('31313131-0000-0000-0000-000000000003');
+update blocklists set domains = '{x.com}';
+select set_config('test.qg_key', create_guest_key('Gus') ->> 'key', false);
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error(format('select guest_set_quiet(%L, %L, %L, %L)', current_setting('test.qg_key'), '22:00', '07:00', 'Not/A_Zone'), 'a guest''s time zone must be a real one');
+select pg_temp.expect_error(format('select guest_set_quiet(%L, %L, %L, %L)', current_setting('test.qg_key'), '22:00', '22:00', 'UTC'), 'a guest needs two different times too');
+select pg_temp.expect_error(format('select guest_set_quiet(%L, %L, %L, %L)', 'spg_' || repeat('0', 64), '22:00', '07:00', 'UTC'), 'quiet hours need a valid key');
+select pg_temp.expect_error($q$select key_request_status()$q$, 'anonymous visitors have no ask counts');
+select pg_temp.expect_error($q$select set_quiet_hours('22:00', '07:00')$q$, 'anonymous visitors have no profile quiet hours');
+select guest_set_quiet(current_setting('test.qg_key'), to_char((now() at time zone 'Europe/Berlin') - interval '1 hour', 'HH24:MI')::time,
+                       to_char((now() at time zone 'Europe/Berlin') + interval '10 minutes', 'HH24:MI')::time, 'Europe/Berlin');
+select pg_temp.check(guest_overview(current_setting('test.qg_key')) -> 'quiet' ->> 'to' = to_char(((now() at time zone 'Europe/Berlin') + interval '10 minutes')::time, 'HH24:MI'),
+  'the key page shows the guest''s quiet hours');
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000003');
+select start_focus_session(60, null, null, true);
+select request_end_session((select id from focus_sessions where ended_at is null), 'guest in quiet hours');
+select pg_temp.check((key_request_status() ->> 'quiet_until')::timestamptz between now() + interval '9 minutes' and now() + interval '11 minutes',
+  'a guest''s quiet hours follow the time zone their browser gave');
+select pg_temp.check(claim_push('key_request', (select id from end_requests where status = 'pending')) is null, 'a guest in quiet hours gets no notification');
+reset role;
+select id as greq3 from end_requests where reason = 'guest in quiet hours' \gset
+select pg_temp.check((select to_kind = 'guest' and recipient = (select id from guest_keys where owner_id = '31313131-0000-0000-0000-000000000003')
+                        from claim_waiting_key_requests(now() + interval '12 minutes') where request_id = :'greq3'),
+  'when a guest''s quiet hours end, the waiting request reaches the guest');
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select guest_set_quiet(current_setting('test.qg_key'), null, null, null);
+select pg_temp.check(guest_overview(current_setting('test.qg_key')) -> 'quiet' = 'null'::jsonb, 'a guest can switch quiet hours off');
+select pg_temp.expect_error(format('select guest_set_quiet(%L, %L, %L, %L)', current_setting('test.qg_key'), '22:00:30', '07:00', 'UTC'), 'quiet hours are whole minutes');
+select guest_set_quiet(current_setting('test.qg_key'), '22:00', '07:00', 'America/Denver');
+reset role;
+select pg_temp.as_user('31313131-0000-0000-0000-000000000003');
+select pg_temp.expect_error($q$select quiet_tz from guest_keys$q$, 'the owner cannot read their guest''s quiet hours or time zone');
+select pg_temp.check((select name from guest_keys) = 'Gus', 'but still sees their guest''s name');
+select pg_temp.check(not ((export_my_data() -> 'guest_key_holder')::text ~ 'quiet') and not (export_my_data()::text ~ 'Denver'), 'nor does the export show them');
+select pg_temp.expect_error($q$update profiles set quiet_from = '22:00:30', quiet_to = '07:00'$q$, 'profile quiet hours are whole minutes too');
+-- a link for someone else starts without the old friend's quiet hours
+select set_config('test.qg_key2', create_guest_key('Ben') ->> 'key', false);
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check(guest_overview(current_setting('test.qg_key2')) -> 'quiet' = 'null'::jsonb, 'a new link starts without quiet hours');
+select guest_set_quiet(current_setting('test.qg_key2'), '23:00', '06:30', 'Europe/Berlin');
+reset role;
+-- Ben signs up: his quiet hours come with him
+update profiles set onboarded = false, timezone = 'UTC' where id = '31313131-0000-0000-0000-000000000004'; -- just signed up
+select pg_temp.as_user('31313131-0000-0000-0000-000000000004');
+select convert_guest_key(current_setting('test.qg_key2'));
+select pg_temp.check((select quiet_from = '23:00' and quiet_to = '06:30' from profiles), 'a guest who signs up keeps the quiet hours they set');
+select pg_temp.check((select timezone from profiles) = 'Europe/Berlin', 'and a brand-new account takes their time zone, so the hours mean the same moments');
 reset role;
