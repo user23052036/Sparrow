@@ -11,8 +11,8 @@ DECISIONS.md are not reversed without a new entry. If a task would contradict on
 `docs/STATUS.md` ("Parked for the owner") and take the next task; do not stop to ask.
 
 ## Where things stand
-- `main` has the roadmap through T4.1: decisions D1 to D47, migrations to `0032` plus `0036` (D44: `0032` to `0035` stay with their tasks and must not touch `claim_push`, `save_push_subscription`, `save_extension_push`, `convert_guest_key` or the `silent` column (a test checks)). Always `git fetch origin` and branch from `origin/main`.
-- Start at the task ID that `docs/STATUS.md` names as next (T4.2 after 2026-11-16).
+- `main` has the roadmap through T4.2: decisions D1 to D48, migrations to `0033` plus `0036` (D44: `0032` to `0035` stay with their tasks and must not touch `claim_push`, `save_push_subscription`, `save_extension_push`, `convert_guest_key` or the `silent` column (a test checks)). Always `git fetch origin` and branch from `origin/main`.
+- Start at the task ID that `docs/STATUS.md` names as next (T4.3 after 2026-11-16).
 - The web app is deployed as a static export on GitHub Pages (https://user23052036.github.io/Sparrow/), backed by the owner's Supabase project since 2026-11-16: a push to `main` touching `supabase/` deploys to the real database, and the live smoke test runs against it.
 - The Android app-blocking engine has run on an emulator in CI (`Android emulator test`); never on a phone. Phone website blocking (D30) has never run.
 
@@ -23,7 +23,7 @@ DECISIONS.md are not reversed without a new entry. If a task would contradict on
 ## Rules of the repo
 - New migration file for every DB change; never edit an applied one. Roadmap migration numbers are pre-assigned (`0028` onward): use the number the task names. Every new public function: `revoke ... from public, anon; grant ... to authenticated` (internal `_helpers`: revoke from all).
 - After any schema change run `bash supabase/tests/snapshot.sh` (same setup as `run.sh`) and describe each new table and column in `packages/shared/src/stored.ts` (D47); CI fails otherwise.
-- Business rules live in Postgres (D13). Change `supabase/tests/rls_test.sql` together with the migration; use a fresh user-id prefix (used: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1, f1f1f1f1, 24242424, 25252525, 26262626, 28282828, 29292929, 30303030, 31313131, 32323232, 34343434; `33333333` is taken). Server-only functions are granted to `service_role` (present in the test stub).
+- Business rules live in Postgres (D13). Change `supabase/tests/rls_test.sql` together with the migration; use a fresh user-id prefix (used: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1, f1f1f1f1, 24242424, 25252525, 26262626, 28282828, 29292929, 30303030, 31313131, 32323232, 34343434, 35353535; `33333333` is taken). Server-only functions are granted to `service_role` (present in the test stub).
 - All user-facing sentences go in `packages/shared/src/copy.ts` (a test fails on inline JSX sentences and on banned words like "failed", "lazy", "broken").
 - Playwright e2e runs against an in-memory fake (`apps/web/e2e/fake-supabase.ts`, D19): add any new table/RPC there.
 - Shared constants mirrored in SQL or Kotlin have a test pinning them (scoring, light day, pledge, ALWAYS_ALLOWED_PACKAGES vs `BlockRules.kt`, focus-link limits vs `0024`, craft recipes vs `0025`, circle-goal limits vs `0026`, the circle-name pattern and the one-day photo line vs migrations `0022`/`0023`).

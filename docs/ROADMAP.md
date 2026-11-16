@@ -171,7 +171,7 @@ the repo's `CLAUDE.md`.
 - **T4.1 "What Sparrow stores" page** generated at build time from the migrations (table, column, who
   can read it), with a test that fails when a new column is not described. *Done (D47, `/stored`).*
 - **T4.2 Proof retention setting, migration `0033`:** keep proofs 7, 30, 90 days or until deleted;
-  a scheduled job removes older ones, photos first (same order as D20).
+  a scheduled job removes older ones, photos first (same order as D20). *Done (D48).*
 - **T4.3 Attempt limit on `use_focus_link`, migration `0034`.**
 - **T4.4 `SECURITY.md`** and a short threat model in `docs/`.
 

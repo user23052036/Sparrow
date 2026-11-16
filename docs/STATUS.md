@@ -1,16 +1,16 @@
 # Sparrow: current status (2026-11-16, second local run, backend live)
 
-Repo: github.com/user23052036/Sparrow. `main` has everything through T4.1 ("What Sparrow stores" page):
-D1 to D46 and migrations to `0032` plus `0036` (T2.5 had no number; see D44). Live site:
+Repo: github.com/user23052036/Sparrow. `main` has everything through T4.2 (proof retention):
+D1 to D46 and migrations to `0033` plus `0036` (T2.5 had no number; see D44). Live site:
 https://user23052036.github.io/Sparrow/, backed since 2026-11-16 by the owner's Supabase project (Tokyo, free plan;
 the ref is in the repo secrets).
 
 ## Start here
 1. `docs/AUTONOMY.md`: how to run without the owner (preflight, modes A/B/C, agents, credentials).
 2. `docs/ROADMAP.md`: audit, position, tasks T0.1 to T5.4 with pre-assigned migration numbers.
-3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D47).
+3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D48).
 
-**Next task: T4.2 (proof retention, `0033`).** Then T4.3 (`0034`), T4.4, WS5 (`0035`). Every migration now also
+**Next task: T4.3 (attempt limit on `use_focus_link`, `0034`).** Then T4.4, WS5 (`0035`). Every migration now also
 needs `bash supabase/tests/snapshot.sh` (in the Docker container) and a description of each new column in
 `packages/shared/src/stored.ts` (D47). `0036` is already applied before them (D44): `0032` to `0035` must not touch `claim_push`,
 `save_push_subscription`, `save_extension_push`, `convert_guest_key` or the `silent` column (a test checks); such a change goes in a
@@ -41,6 +41,7 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
 | T3.2 | see git log | Partner requests on Android (D46, `0032`): `device_sync` lists waiting key requests (ids only, quiet hours respected); the engine posts a notification with "Keep going" and a two-step "Let them out"; `device_decide_end_request` and `notify`'s device path (`claim_device_push`) answer with the phone's own credential; Protect asks for the notification permission. `0032` also requires every proof file to be in its author's folder. |
 | T3.3 | see git log | "Check my setup" (Protect): the BETA.md phone checklist as lines that are done, not yet, check by hand or optional (`setupcheck.ts` in shared, tested); a live test starts a 5-minute session and confirms it reached the phone and that a listed app was covered (the engine now records when it last covered one). |
 | T4.1 | see git log | "What Sparrow stores" (D47): `/stored`, built from `schema.json`, which `supabase/tests/snapshot.sh` writes from the migrations (CI checks it); every table and column described in `stored.ts` (a test fails otherwise); linked from Privacy. |
+| T4.2 | see git log | Proof retention (D48, `0033`): keep proofs until deleted (default) or 7, 30, 90 days; the five-minute job removes files first through the Storage API, then rows; a shorter time asks first in Settings. |
 
 ## Checks run in this run
 - Locally, per task, with Node 24 (`fnm exec --using=24`; the Mac's default Node 20 is below the repo's
@@ -88,8 +89,8 @@ secrets, Deploy web, Live smoke test).
 ## Working notes
 - SQL test user prefixes used so far: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1,
   f1f1f1f1, 24242424, 25252525, 26262626, 28282828 (push), 29292929 (reminders), 30303030 (guest partner),
-  31313131 (fatigue guard), 32323232 (extension push), 34343434 (phone key requests). `33333333` is taken by the
-  early "3 repeated" tests. Next: 35353535.
+  31313131 (fatigue guard), 32323232 (extension push), 34343434 (phone key requests), 35353535 (proof retention).
+  `33333333` is taken by the early "3 repeated" tests. Next: 36363636.
 - Extension push (D44): `push_subscriptions.silent` rows are extensions; `notify` and `remind` read only
   `silent = false` rows for notifications. The extension's push logic is in `apps/extension/lib/push.js`
   and `ensurePush`/`dropPush` in `background.js`; its tests fake `self.registration.pushManager`.
