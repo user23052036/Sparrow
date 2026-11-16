@@ -468,7 +468,9 @@ export const copy = {
     testWaiting: "Waiting for the session to reach this phone…",
     testRunning: "The test session is on this phone. Open one of the apps on your list now: you should see “This can wait.” Then come back here.",
     testNeedsApps: "Pick at least one app in Apps first.",
-    testEnds: "The test session ends by itself after five minutes.",
+    testNeedsBlocking: "Switch on blocking first: the Accessibility and sign-in lines above.",
+    testEnds:
+      "This is a real five-minute focus session: your partner and circle see it like any other, and your laptop keeps your sites away too. It ends by itself.",
     lines: {
       build: { title: "Sparrow's blocking is built into this app", todo: "Install the Sparrow app from the Android build, not Expo Go." },
       account: { title: "Signed in and reaching your account", todo: "Check the internet connection, then sign in again." },

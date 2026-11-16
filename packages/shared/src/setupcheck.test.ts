@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copy } from "./copy";
-import { isAutostartBrand, SETUP_FRESH_MS, setupLines, setupReady, type SetupFacts } from "./setupcheck";
+import { isAutostartBrand, SETUP_FRESH_MS, SETUP_TEST_TTL_MS, setupLines, setupReady, type SetupFacts } from "./setupcheck";
 
 const NOW = 1_800_000_000_000;
 const ready: SetupFacts = {
@@ -40,6 +40,15 @@ describe("check my setup", () => {
     expect(state({ ...ready, server: { lastHeartbeatMs: NOW - SETUP_FRESH_MS - 1, protection: true } }, "server")).toBe("notYet");
     expect(state({ ...ready, server: { lastHeartbeatMs: NOW, protection: false } }, "server")).toBe("notYet");
     expect(state({ ...ready, server: null }, "server")).toBe("notYet");
+  });
+  it("a time far in the future (a clock that is off) doesn't count as recent", () => {
+    expect(state({ ...ready, lastSyncMs: NOW + 5 * 60_000 }, "checkedIn")).toBe("notYet");
+    expect(state({ ...ready, lastSyncMs: NOW + 10_000 }, "checkedIn")).toBe("pass");
+  });
+  it("a live test from more than a day ago has to be run again", () => {
+    const old = { ...ready, test: { startedMs: NOW - SETUP_TEST_TTL_MS, reachedPhone: true, lastCoverMs: NOW - 1000 } };
+    expect(state(old, "testReach")).toBe("notYet");
+    expect(state(old, "testBlock")).toBe("notYet");
   });
   it("the live test passes only after it ran, and only for a cover after it started", () => {
     const notRun = { ...ready, test: { startedMs: null, reachedPhone: false, lastCoverMs: NOW } };

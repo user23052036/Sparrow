@@ -96,7 +96,6 @@ class SparrowAccessibilityService : AccessibilityService() {
     val last = lastCover
     if (last != null && last.first == pkg && now - last.second < BlockRules.REBLOCK_GAP_MS) return
     lastCover = pkg to now
-    store.saveLastCover(now)
     startActivity(BlockedActivity.intent(this, pkg, state.task, state.endsAtMs))
   }
 
@@ -105,7 +104,8 @@ class SparrowAccessibilityService : AccessibilityService() {
     if (!syncing.compareAndSet(false, true) && !asleep) return
     io.execute {
       try {
-        SyncClient.sync(store, protection = true, asleep = asleep)
+        // T3.3: "Check my setup" judges the background engine by its own check-ins, not the open app's.
+        if (SyncClient.sync(store, protection = true, asleep = asleep) != null) store.saveServiceSync(System.currentTimeMillis())
       } catch (ignored: SyncClient.SignedOut) {
         // The app shows "sign in again" next time it opens; keep enforcing the last state until it ends.
       } finally {

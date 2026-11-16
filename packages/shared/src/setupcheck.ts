@@ -37,13 +37,13 @@ export interface SetupFacts {
   /** The engine has its own device credential and the server hasn't refused it. */
   engineConfigured: boolean;
   engineSignedOut: boolean;
-  /** When the engine last checked in, on the phone's clock (0: never). */
+  /** When the background service itself last checked in, on the phone's clock (0: never). Not the open app's check-in. */
   lastSyncMs: number;
   batteryOk: boolean;
   /** Phones known to stop background apps unless "autostart" is allowed. */
   autostartBrand: boolean;
   listedApps: number;
-  /** The server's own record of this phone: last heartbeat (ms) and whether blocking was on. */
+  /** The server's own record of this phone: last heartbeat (ms, already moved onto the phone's clock) and whether blocking was on. */
   server: { lastHeartbeatMs: number; protection: boolean } | null;
   notificationsOn: boolean;
   /** The live test: when it started (null: not run), whether the session reached the engine, and when a listed app was last covered. */
@@ -61,11 +61,15 @@ export function isAutostartBrand(manufacturer: string): boolean {
 
 /** The engine checks in every 30 s while the screen is on; two minutes leaves room for a slow network. */
 export const SETUP_FRESH_MS = 2 * 60 * 1000;
+/** A time a little in the future is clock noise; much further is a clock that is off, and doesn't count. */
+const FUTURE_SLACK_MS = 30 * 1000;
+/** A live test result counts for a day; after that the phone is tested again. */
+export const SETUP_TEST_TTL_MS = 24 * 60 * 60 * 1000;
 
 export function setupLines(f: SetupFacts): SetupLine[] {
-  const fresh = (ms: number) => ms > 0 && f.now - ms <= SETUP_FRESH_MS;
+  const fresh = (ms: number) => ms > 0 && f.now - ms <= SETUP_FRESH_MS && ms - f.now <= FUTURE_SLACK_MS;
   const is = (ok: boolean): SetupState => (ok ? "pass" : "notYet");
-  const tested = f.test.startedMs !== null;
+  const tested = f.test.startedMs !== null && f.now - f.test.startedMs < SETUP_TEST_TTL_MS;
   return [
     { id: "build", state: is(f.nativeBuild) },
     { id: "account", state: is(f.accountOk) },

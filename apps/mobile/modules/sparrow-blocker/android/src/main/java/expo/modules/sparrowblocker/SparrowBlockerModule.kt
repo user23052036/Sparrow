@@ -89,6 +89,8 @@ class SparrowBlockerModule : Module() {
         "packages" to st.packages.toList(),
         "lastSyncMs" to store.lastSyncMs().toDouble(),
         "lastCoverMs" to store.lastCoverMs().toDouble(),
+        "serviceSyncMs" to store.serviceSyncMs().toDouble(),
+        "serverOffsetMs" to store.serverOffsetMs().toDouble(),
       )
     }
 

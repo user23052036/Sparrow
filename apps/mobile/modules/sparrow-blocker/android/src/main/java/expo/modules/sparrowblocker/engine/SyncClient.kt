@@ -105,8 +105,11 @@ object SyncClient {
       // T3.2 (0032): requests waiting on this phone's owner as key holder; ids only. Older servers send none.
       val reqs = json.optJSONArray("key_requests")
       store.saveWaitingRequests((0 until (reqs?.length() ?: 0)).mapNotNull { reqs!!.optJSONObject(it)?.optString("id") }.filter { KeyRequests.isRequestId(it) })
+      val serverNow = BlockRules.parseIsoMillis(json.optString("server_now"))
+      // T3.3: how far the server's clock is ahead of this phone's, so "Check my setup" can compare server times.
+      if (serverNow != null) store.saveServerOffset(serverNow - localNow)
       val state = BlockRules.fromSync(
-        serverNowMs = BlockRules.parseIsoMillis(json.optString("server_now")) ?: localNow,
+        serverNowMs = serverNow ?: localNow,
         localNowMs = localNow,
         active = json.optBoolean("active", false),
         endsAtServerMs = BlockRules.parseIsoMillis(json.optString("ends_at", "")),
