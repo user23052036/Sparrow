@@ -1,4 +1,15 @@
-import { isHeavyStretch, type Charity, type DailyPlan, type MakeupStep, type Pledge, type PlanItem, type Task, type TaskStep } from "@sparrow/shared";
+import {
+  isHeavyStretch,
+  keyHolderName,
+  type Charity,
+  type DailyPlan,
+  type MakeupStep,
+  type PartnerOverview,
+  type Pledge,
+  type PlanItem,
+  type Task,
+  type TaskStep,
+} from "@sparrow/shared";
 import { supabase } from "@/lib/supabase";
 
 export interface Data {
@@ -54,7 +65,7 @@ export async function loadData(): Promise<Data> {
     const item = itemOfProof[v.proof_id];
     if (item) verdicts[item] = { verdict: v.verdict, comment: v.comment };
   }
-  const ov = po.data as { state?: string; partner?: { name: string } } | null;
+  const ov = po.data as PartnerOverview | null;
   const rc = (recent.data ?? []) as { date: string; completion: number }[];
   return {
     plan,
@@ -66,7 +77,7 @@ export async function loadData(): Promise<Data> {
     balance: (bal.data as number) ?? 0,
     heavyStretch: isHeavyStretch(rc),
     verdicts,
-    partnerName: ov?.state === "active" ? (ov.partner?.name ?? null) : null,
+    partnerName: keyHolderName(ov),
     kindActs: ((kind.data ?? []) as { plan_id: string }[]).map((k) => k.plan_id),
     charities: (chars.data ?? []) as Charity[],
     pledges: (pledges.data ?? []) as Pledge[],

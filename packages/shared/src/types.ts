@@ -115,6 +115,8 @@ export interface PartnerActivity {
 
 export type PartnerOverview =
   | { state: "none" }
+  /** A friend holds the key through a link, without an account (D39, migration 0030). */
+  | { state: "guest"; guest: { name: string; created_at: string; last_seen_at: string | null } }
   | { state: "pending"; link_id: string; invite_code: string }
   | {
       state: "active";

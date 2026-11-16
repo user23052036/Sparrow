@@ -32,20 +32,39 @@ export interface PushPayload {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** A guest's key link secret (D39, migration 0030). */
+const GUEST_KEY = /^spg_[0-9a-f]{64}$/;
 
-export function parseRequest(body: unknown): { kind: PushKind; ref: string } | null {
-  const b = body as { kind?: unknown; ref?: unknown } | null;
-  if (!b || typeof b.kind !== "string" || typeof b.ref !== "string") return null;
-  if (!(PUSH_KINDS as readonly string[]).includes(b.kind) || !UUID.test(b.ref)) return null;
-  return { kind: b.kind as PushKind, ref: b.ref };
+export interface NotifyRequest {
+  kind: PushKind;
+  ref: string;
+  /** Set when a guest partner caused the event: their key is their only permission. */
+  guestKey?: string;
 }
 
-export function buildPayload(kind: PushKind, ref: string): PushPayload {
+export function parseRequest(body: unknown): NotifyRequest | null {
+  const b = body as { kind?: unknown; ref?: unknown; key?: unknown } | null;
+  if (!b || typeof b.kind !== "string" || typeof b.ref !== "string") return null;
+  if (!(PUSH_KINDS as readonly string[]).includes(b.kind) || !UUID.test(b.ref)) return null;
+  if (b.key === undefined) return { kind: b.kind as PushKind, ref: b.ref };
+  // A guest can only cause an answer to a key request.
+  if (typeof b.key !== "string" || !GUEST_KEY.test(b.key) || b.kind !== "key_answer") return null;
+  return { kind: "key_answer", ref: b.ref, guestKey: b.key };
+}
+
+/** Who the database says should hear about an event (claim_push / claim_guest_push, migration 0030). */
+export interface Recipient {
+  to: "user" | "guest";
+  id: string;
+}
+
+/** A guest has no account, so their notifications open the key page (it remembers their key) instead of Partner. */
+export function buildPayload(kind: PushKind, ref: string, to: Recipient["to"] = "user"): PushPayload {
   const t = PUSH_TEXT[kind];
   if (kind === "key_request")
     return {
       ...t,
-      url: `partner?request=${ref}`,
+      url: to === "guest" ? `key?request=${ref}` : `partner?request=${ref}`,
       tag: `key-${ref}`,
       actions: [
         { action: "let-out", title: PUSH_TEXT.letOut },
@@ -53,17 +72,20 @@ export function buildPayload(kind: PushKind, ref: string): PushPayload {
       ],
     };
   if (kind === "key_answer") return { ...t, url: "focus", tag: `answer-${ref}` };
-  return { ...t, url: "partner", tag: `proof-${ref}` };
+  return { ...t, url: to === "guest" ? "key" : "partner", tag: `proof-${ref}` };
 }
 
 export interface Deps extends Delivery {
-  /** Asks the database, as the caller, who should hear about this event (claim_push); null means nobody. */
-  claim(kind: PushKind, ref: string): Promise<string | null>;
+  /** Asks the database, as the caller, who should hear about this event; null means nobody. */
+  claim(kind: PushKind, ref: string): Promise<Recipient | null>;
+  /** The browsers of a guest partner (push_subscriptions.guest_key_id). */
+  guestSubscriptionsOf(guestId: string): Promise<Subscription[]>;
 }
 
 /** Claims the event, then sends to every browser of the recipient. */
 export async function notify(kind: PushKind, ref: string, deps: Deps): Promise<Tally> {
   const target = await deps.claim(kind, ref);
   if (!target) return { sent: 0, removed: 0, failed: 0 };
-  return deliver(target, JSON.stringify(buildPayload(kind, ref)), deps);
+  const delivery = target.to === "guest" ? { ...deps, subscriptionsOf: deps.guestSubscriptionsOf } : deps;
+  return deliver(target.id, JSON.stringify(buildPayload(kind, ref, target.to)), delivery);
 }
