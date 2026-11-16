@@ -11,6 +11,57 @@ import org.json.JSONObject
 object SyncClient {
   class SignedOut : Exception("device secret refused")
 
+  /** How an answer from the phone's notification went. GONE: answered elsewhere or the session is over. */
+  enum class Answer { SENT, GONE, NOT_SENT }
+
+  /**
+   * T3.2: answers a key request with this phone's credential (device_decide_end_request, 0032), then asks the
+   * notify function to tell the asker, best effort. Blocking I/O: call it off the main thread.
+   */
+  fun decide(store: EngineStore, requestId: String, approve: Boolean): Answer {
+    val c = store.config() ?: return Answer.NOT_SENT
+    val body = JSONObject()
+      .put("p_device_id", c.deviceId)
+      .put("p_secret", c.secret)
+      .put("p_request_id", requestId)
+      .put("p_approve", approve)
+    val code = post(c, "/rest/v1/rpc/device_decide_end_request", body) ?: return Answer.NOT_SENT
+    if (code == 401 || code == 403) {
+      store.saveStatus("signed_out")
+      return Answer.NOT_SENT
+    }
+    if (code == 400 || code == 404) return Answer.GONE
+    if (code !in 200..299) return Answer.NOT_SENT
+    val note = JSONObject()
+      .put("kind", "key_answer")
+      .put("ref", requestId)
+      .put("device", JSONObject().put("id", c.deviceId).put("secret", c.secret))
+    post(c, "/functions/v1/notify", note)
+    return Answer.SENT
+  }
+
+  /** One POST with the anon key; the HTTP status, or null when offline. */
+  private fun post(c: EngineStore.Config, path: String, body: JSONObject): Int? {
+    var conn: HttpURLConnection? = null
+    return try {
+      conn = (URL("${c.url}$path").openConnection() as HttpURLConnection).apply {
+        requestMethod = "POST"
+        connectTimeout = 10_000
+        readTimeout = 10_000
+        doOutput = true
+        setRequestProperty("apikey", c.anonKey)
+        setRequestProperty("Authorization", "Bearer ${c.anonKey}")
+        setRequestProperty("Content-Type", "application/json")
+      }
+      conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
+      conn.responseCode
+    } catch (e: Exception) {
+      null
+    } finally {
+      conn?.disconnect()
+    }
+  }
+
   @Throws(SignedOut::class)
   fun sync(store: EngineStore, protection: Boolean, asleep: Boolean): EngineState? {
     val c = store.config() ?: return null
@@ -47,6 +98,9 @@ object SyncClient {
       val list = (0 until (pkgs?.length() ?: 0)).map { pkgs!!.optString(it) }
       val doms = json.optJSONArray("domains")
       val sites = (0 until (doms?.length() ?: 0)).map { doms!!.optString(it) }
+      // T3.2 (0032): requests waiting on this phone's owner as key holder; ids only. Older servers send none.
+      val reqs = json.optJSONArray("key_requests")
+      store.saveWaitingRequests((0 until (reqs?.length() ?: 0)).mapNotNull { reqs!!.optJSONObject(it)?.optString("id") }.filter { KeyRequests.isRequestId(it) })
       val state = BlockRules.fromSync(
         serverNowMs = BlockRules.parseIsoMillis(json.optString("server_now")) ?: localNow,
         localNowMs = localNow,

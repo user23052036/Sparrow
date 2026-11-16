@@ -2,6 +2,8 @@
   <uses-permission android:name="android.permission.INTERNET" />
   <!-- M5b-5: read which DNS servers the phone is using, so unlisted sites are answered by the same servers as before. -->
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+  <!-- T3.2: a key request waiting on this phone's owner shows as a notification (asked for on the Protect screen). -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
   <!-- Lets the app list launchable apps without the Play-restricted QUERY_ALL_PACKAGES permission. -->
   <queries>
@@ -40,6 +42,11 @@
         <action android:name="android.net.VpnService" />
       </intent-filter>
     </service>
+
+    <!-- T3.2: the two buttons on a key request. Not exported: only Sparrow's own notifications reach it. -->
+    <receiver
+      android:name="expo.modules.sparrowblocker.engine.KeyAnswerReceiver"
+      android:exported="false" />
 
     <activity
       android:name="expo.modules.sparrowblocker.engine.BlockedActivity"

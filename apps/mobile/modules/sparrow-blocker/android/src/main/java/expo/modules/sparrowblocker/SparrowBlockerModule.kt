@@ -11,6 +11,7 @@ import android.provider.Settings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.sparrowblocker.engine.EngineStore
+import expo.modules.sparrowblocker.engine.KeyRequestNotifier
 import expo.modules.sparrowblocker.engine.SparrowAccessibilityService
 import expo.modules.sparrowblocker.engine.SparrowVpnService
 import expo.modules.sparrowblocker.engine.SyncClient
@@ -48,6 +49,7 @@ class SparrowBlockerModule : Module() {
     }
 
     Function("clearConfig") {
+      KeyRequestNotifier.clearAll(context)
       EngineStore(context).clear()
       SparrowVpnService.apply(context)
     }
@@ -65,6 +67,7 @@ class SparrowBlockerModule : Module() {
         null
       }
       SparrowVpnService.apply(context)
+      KeyRequestNotifier.update(context)
       val now = store.state()
       mapOf(
         "ok" to (st != null),

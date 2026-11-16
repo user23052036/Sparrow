@@ -70,6 +70,19 @@ class EngineStore(context: Context) {
     prefs.edit().putBoolean("webBlocking", on).apply()
   }
 
+  /** T3.2: key requests the last sync listed as waiting on this phone's owner, and the ones already on screen. */
+  fun waitingRequests(): List<String> = prefs.getString("keyWaiting", "")!!.split(',').filter { it.isNotBlank() }
+
+  fun saveWaitingRequests(ids: List<String>) {
+    prefs.edit().putString("keyWaiting", ids.joinToString(",")).apply()
+  }
+
+  fun shownRequests(): Set<String> = prefs.getStringSet("keyShown", emptySet())?.toSet() ?: emptySet()
+
+  fun saveShownRequests(ids: Set<String>) {
+    prefs.edit().putStringSet("keyShown", HashSet(ids)).apply()
+  }
+
   /** "signed_out" when the server refused the secret (e.g. another sign-in replaced it). */
   fun status(): String = prefs.getString("status", "ok") ?: "ok"
 

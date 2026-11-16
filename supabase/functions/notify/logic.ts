@@ -43,18 +43,29 @@ export interface PushPayload {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** A guest's key link secret (D39, migration 0030). */
 export const GUEST_KEY = /^spg_[0-9a-f]{64}$/;
+/** A phone's device secret (migration 0020: two random UUIDs without dashes). */
+export const DEVICE_SECRET = /^[0-9a-f]{64}$/;
 
 export interface NotifyRequest {
   kind: PushKind;
   ref: string;
   /** Set when a guest partner caused the event: their key is their only permission. */
   guestKey?: string;
+  /** Set when a key holder answered from their phone's notification (D46): the phone's own credential. */
+  device?: { id: string; secret: string };
 }
 
 export function parseRequest(body: unknown): NotifyRequest | null {
-  const b = body as { kind?: unknown; ref?: unknown; key?: unknown } | null;
+  const b = body as { kind?: unknown; ref?: unknown; key?: unknown; device?: unknown } | null;
   if (!b || typeof b.kind !== "string" || typeof b.ref !== "string") return null;
   if (!(PUSH_KINDS as readonly string[]).includes(b.kind) || !UUID.test(b.ref)) return null;
+  if (b.device !== undefined) {
+    // A phone, like a guest, can only cause an answer to a key request; never both credentials at once.
+    const d = b.device as { id?: unknown; secret?: unknown } | null;
+    if (b.key !== undefined || b.kind !== "key_answer" || !d || typeof d.id !== "string" || typeof d.secret !== "string") return null;
+    if (!UUID.test(d.id) || !DEVICE_SECRET.test(d.secret)) return null;
+    return { kind: "key_answer", ref: b.ref, device: { id: d.id, secret: d.secret } };
+  }
   if (b.key === undefined) return { kind: b.kind as PushKind, ref: b.ref };
   // A guest can only cause an answer to a key request.
   if (typeof b.key !== "string" || !GUEST_KEY.test(b.key) || b.kind !== "key_answer") return null;
@@ -109,8 +120,8 @@ export async function notify(kind: PushKind, ref: string, deps: Deps): Promise<T
 }
 
 /**
- * Whether the database refused the caller rather than failing: a guest key that is no longer valid (28000, from
- * _guest_by_secret in 0030). The function answers 403 for these instead of a server error.
+ * Whether the database refused the caller rather than failing: a guest key or a phone's secret that is no longer
+ * valid (28000, from _guest_by_secret in 0030 and _device_by_secret in 0032). The function answers 403 for these.
  */
 export function isRefusal(e: unknown): boolean {
   return (e as { code?: unknown } | null)?.code === "28000";

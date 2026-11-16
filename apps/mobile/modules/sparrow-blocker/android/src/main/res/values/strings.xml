@@ -10,4 +10,14 @@
   <string name="sparrow_blocked_step">Start a 5-minute step</string>
   <string name="sparrow_blocked_home">Go to the home screen</string>
   <string name="sparrow_vpn_label">Sparrow website blocking</string>
+  <!-- T3.2: key requests on the key holder's phone. Mirrors copy.phoneKey in packages/shared/src/copy.ts (a shared test compares them). -->
+  <string name="sparrow_key_channel">Key requests</string>
+  <string name="sparrow_key_title">Your partner is asking for the key</string>
+  <string name="sparrow_key_body">They\'d like to end a locked focus session early. You can answer right here.</string>
+  <string name="sparrow_key_let_out">Let them out</string>
+  <string name="sparrow_key_keep_going">Keep going</string>
+  <string name="sparrow_key_confirm_title">Let them out?</string>
+  <string name="sparrow_key_confirm_body">This ends their locked session now.</string>
+  <string name="sparrow_key_confirm_yes">Yes, let them out</string>
+  <string name="sparrow_key_not_sent">Sparrow couldn\'t send your answer. Open Sparrow\'s website to answer.</string>
 </resources>

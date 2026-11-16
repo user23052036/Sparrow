@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AppState, ScrollView, Text, View } from "react-native";
+import { AppState, Linking, PermissionsAndroid, Platform, ScrollView, Text, View } from "react-native";
 import { copy } from "@sparrow/shared";
 import { engine, isNativeAvailable, type EngineState, type WebBlocking } from "../../modules/sparrow-blocker/src";
 import { setUpEngine } from "../device";
@@ -8,6 +8,15 @@ import { s } from "../theme";
 
 /** Brands known to stop background apps unless "autostart" is allowed (dontkillmyapp.com). */
 const AUTOSTART_BRANDS = ["xiaomi", "redmi", "poco", "oppo", "realme", "oneplus", "vivo", "iqoo", "huawei", "honor", "samsung"];
+
+/** Android 13+ asks before an app may post notifications; older versions allow them by default. */
+const NEEDS_ASKING = Platform.OS === "android" && Number(Platform.Version) >= 33;
+type Notif = "on" | "off" | "denied";
+
+async function notificationState(): Promise<Notif> {
+  if (!NEEDS_ASKING) return "on";
+  return (await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS)) ? "on" : "off";
+}
 
 function ago(ms: number): string {
   if (!ms) return "never";
@@ -22,6 +31,7 @@ export function Protect() {
   const [state, setState] = useState<EngineState | null>(engine.state());
   const [note, setNote] = useState<string | null>(null);
   const [web, setWeb] = useState<WebBlocking>(engine.webBlocking());
+  const [notif, setNotif] = useState<Notif>("on");
   const brand = engine.manufacturer();
   const needsAutostart = AUTOSTART_BRANDS.some((b) => brand.toLowerCase().includes(b));
 
@@ -31,7 +41,19 @@ export function Protect() {
     await setUpEngine();
     setState(engine.state());
     setWeb(engine.webBlocking());
+    setNotif(await notificationState());
   }, []);
+
+  async function allowNotifications() {
+    if (notif === "denied") {
+      void Linking.openSettings();
+      return;
+    }
+    const r = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+    setNotif(r === PermissionsAndroid.RESULTS.GRANTED ? "on" : r === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ? "denied" : "off");
+    // Requests that waited for this show up straight away.
+    if (r === PermissionsAndroid.RESULTS.GRANTED) await engine.syncNow();
+  }
 
   useEffect(() => {
     void refresh();
@@ -90,6 +112,22 @@ export function Protect() {
           {note && <Text style={s.quiet}>{note}</Text>}
         </View>
       )}
+
+      {/* T3.2 (D46): key requests for someone whose key this person holds. */}
+      <View style={s.panel}>
+        <Text style={s.h2}>
+          {copy.phoneKey.allowTitle} · {notif === "on" ? copy.protect.on : copy.protect.off}
+        </Text>
+        <Text style={s.quiet}>{copy.phoneKey.allowBody}</Text>
+        {notif === "on" ? (
+          <Text style={s.text}>{copy.phoneKey.allowed}</Text>
+        ) : (
+          <>
+            {notif === "denied" && <Text style={s.text}>{copy.phoneKey.denied}</Text>}
+            <Button primary label={copy.phoneKey.allow} onPress={allowNotifications} />
+          </>
+        )}
+      </View>
 
       {/* M5b-5: optional, off by default, with its own disclosure before anything is switched on. */}
       <View style={s.panel}>
