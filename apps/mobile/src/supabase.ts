@@ -22,6 +22,12 @@ export function errorText(e: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
+/** Fire and forget: tells the server a proof was shared, so the partner hears about it (D38). */
+export function notifyPartner(kind: "proof_shared", ref: string | null | undefined) {
+  if (!ref) return;
+  void supabase.functions.invoke("notify", { body: { kind, ref } }).catch(() => {});
+}
+
 /**
  * A session started, or ended early: wakes the person's Sparrow extensions on their computers at once (D44)
  * instead of at their next 30-second check. Fire and forget; nothing is shown anywhere.

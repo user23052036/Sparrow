@@ -426,6 +426,18 @@ export const copy = {
     voiceTooBig: "That recording is too large to save. Try a shorter one.",
     loadingVoice: "Loading voice note…",
     olderPhoto: "Photo saved. It looks like it was taken on an earlier day; if you share it, your partner sees that note too.",
+    cameraDenied: "Sparrow couldn't use the camera. You can allow it in the phone's settings, or write a note instead.",
+    saving: "Saving…",
+  },
+  /** The Android app's Today screen (T3.1). */
+  phoneToday: {
+    planOnWebsite: "Planning your morning happens on the website for now. Your plan shows up here once it's set.",
+    notPlanned: "You haven't planned today yet.",
+    goodMorning: "Good morning",
+    markDone: "Done",
+    markPartly: "Partly",
+    reviewHint: "When the day winds down, look back at it here.",
+    status: { pending: "Not yet", done: "Done", partial: "Partly done", missed: "Didn't happen", rescheduled: "Moved" },
   },
   proofContext: {
     title: "About this proof",

@@ -94,7 +94,18 @@ function readTiff(t: Uint8Array): ExifDate | null {
  * in the future (a clock that is a little off should not look like anything).
  */
 export function photoAgeHours(bytes: Uint8Array, now: Date): number | null {
-  const d = exifDate(bytes);
+  return ageHours(exifDate(bytes), now);
+}
+
+/**
+ * The same, from a date the phone's camera already read out of the photo (expo-image-picker's `exif`,
+ * for example its DateTimeOriginal: "2026:11:09 08:15:30"). Anything else answers null.
+ */
+export function exifTextAgeHours(raw: unknown, now: Date): number | null {
+  return typeof raw === "string" ? ageHours(parseDate(raw), now) : null;
+}
+
+function ageHours(d: ExifDate | null, now: Date): number | null {
   if (!d) return null;
   const taken = new Date(d.year, d.month - 1, d.day, d.hour, d.minute, d.second).getTime();
   if (Number.isNaN(taken)) return null;

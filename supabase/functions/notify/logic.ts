@@ -107,3 +107,11 @@ export async function notify(kind: PushKind, ref: string, deps: Deps): Promise<T
   if (target.to === "user" && SYNC_KINDS.includes(kind)) await deliver(target.id, SYNC_PAYLOAD, { ...deps, subscriptionsOf: deps.extensionsOf }, tally);
   return tally;
 }
+
+/**
+ * Whether the database refused the caller rather than failing: a guest key that is no longer valid (28000, from
+ * _guest_by_secret in 0030). The function answers 403 for these instead of a server error.
+ */
+export function isRefusal(e: unknown): boolean {
+  return (e as { code?: unknown } | null)?.code === "28000";
+}

@@ -8,7 +8,7 @@
 // Secrets (set by .github/workflows/deploy-db.yml on first deploy): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
-import { notify, parseRequest, type Recipient } from "./logic.ts";
+import { isRefusal, notify, parseRequest, type Recipient } from "./logic.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -45,24 +45,30 @@ Deno.serve(async (req) => {
     if (error) throw error;
     return data ?? [];
   };
-  const result = await notify(parsed.kind, parsed.ref, {
-    async claim(kind, ref) {
-      // A guest's claim is server-only (0030), so the owner's account id never reaches the guest's browser.
-      const { data, error } = parsed.guestKey
-        ? await admin.rpc("claim_guest_push", { p_key: parsed.guestKey, p_kind: kind, p_ref: ref })
-        : await asUser.rpc("claim_push", { p_kind: kind, p_ref: ref });
-      if (error) throw error;
-      return (data as Recipient | null) ?? null;
-    },
-    subscriptionsOf: (userId) => subscriptions("user_id", userId),
-    guestSubscriptionsOf: (guestId) => subscriptions("guest_key_id", guestId),
-    extensionsOf: (userId) => subscriptions("user_id", userId, true),
-    async send(sub, payload) {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: "high" });
-    },
-    async remove(id) {
-      await admin.from("push_subscriptions").delete().eq("id", id);
-    },
-  });
+  let result;
+  try {
+    result = await notify(parsed.kind, parsed.ref, {
+      async claim(kind, ref) {
+        // A guest's claim is server-only (0030), so the owner's account id never reaches the guest's browser.
+        const { data, error } = parsed.guestKey
+          ? await admin.rpc("claim_guest_push", { p_key: parsed.guestKey, p_kind: kind, p_ref: ref })
+          : await asUser.rpc("claim_push", { p_kind: kind, p_ref: ref });
+        if (error) throw error;
+        return (data as Recipient | null) ?? null;
+      },
+      subscriptionsOf: (userId) => subscriptions("user_id", userId),
+      guestSubscriptionsOf: (guestId) => subscriptions("guest_key_id", guestId),
+      extensionsOf: (userId) => subscriptions("user_id", userId, true),
+      async send(sub, payload) {
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: "high" });
+      },
+      async remove(id) {
+        await admin.from("push_subscriptions").delete().eq("id", id);
+      },
+    });
+  } catch (e) {
+    if (isRefusal(e)) return json(403, { error: "This key link isn't valid anymore." });
+    throw e;
+  }
   return json(200, result);
 });

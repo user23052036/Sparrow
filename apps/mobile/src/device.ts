@@ -14,7 +14,7 @@ export const ENGINE_READY = isNativeAvailable;
 
 const KEY = "sparrow:deviceId";
 
-function uuid(): string {
+export function uuid(): string {
   const hex = (n: number) => Array.from({ length: n }, () => Math.floor(Math.random() * 16).toString(16)).join("");
   return `${hex(8)}-${hex(4)}-4${hex(3)}-${"89ab"[Math.floor(Math.random() * 4)]}${hex(3)}-${hex(12)}`;
 }

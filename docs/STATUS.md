@@ -1,15 +1,16 @@
-# Sparrow: current status (2026-11-16, second local run)
+# Sparrow: current status (2026-11-16, second local run, backend live)
 
-Repo: github.com/user23052036/Sparrow. `main` has everything through T2.5 (instant start on the laptop): D1 to D44
-and migrations to `0031` plus `0036` (T2.5 had no number; see D44). Live site (static export, no backend yet): https://user23052036.github.io/Sparrow/
+Repo: github.com/user23052036/Sparrow. `main` has everything through T3.1 (evening review and proofs on Android):
+D1 to D45 and migrations to `0031` plus `0036` (T2.5 had no number; see D44). Live site:
+https://user23052036.github.io/Sparrow/, backed since 2026-11-16 by the owner's Supabase project (Tokyo, free plan;
+the ref is in the repo secrets).
 
 ## Start here
 1. `docs/AUTONOMY.md`: how to run without the owner (preflight, modes A/B/C, agents, credentials).
 2. `docs/ROADMAP.md`: audit, position, tasks T0.1 to T5.4 with pre-assigned migration numbers.
-3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D44).
+3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D45).
 
-**Next task: T3.1 (evening review and proofs on Android).** Then T3.2 (`0032`), T3.3, WS4 (`0033`, `0034`),
-WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not touch `claim_push`,
+**Next task: T3.2 (partner requests on Android, `0032`).** Then T3.3, WS4 (`0033`, `0034`), WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not touch `claim_push`,
 `save_push_subscription`, `save_extension_push`, `convert_guest_key` or the `silent` column (a test checks); such a change goes in a
 migration after `0036`.
 
@@ -34,6 +35,7 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
 | T2.4 | #26 | Partner fatigue guard (D43, `0031`): 3 asks per session, 5 per local day; quiet hours for account partners (profile) and guests (key page); requests wait and the reminder job delivers them when quiet hours end; `key_request_status` for kind notes on Focus. |
 | T2.3 | #24 | Guest partner (D39, `0030`): key link `/key#spg_…`, anonymous guest functions, one key holder at a time, `claim_push` answers `{to, id}`, guest push, `convert_guest_key`. Run 2026-11-16; two review rounds (a race between invites and guests, push state, key memory on the page), all fixed before merging. |
 | T2.5 | #27 | Instant start on the laptop (D44, `0036`): Chrome allows silent push in extensions since 121, so the extension subscribes (`userVisibleOnly: false`), saves a silent address, and syncs on each push; `session_started`/`session_ended` from the web and phone apps and `key_answer` wake it; 30 s polling stays. Deploy pushes with `--include-all` (remove it once `0035` lands). Two review rounds (a sign-out race, per-kind address limits, migration-order pin), all fixed before merging. |
+| T3.1 | see git log | Evening review and proofs on Android (D45): photo through the system camera (`expo-image-picker`), re-encoded on the phone (`expo-image-manipulator`, which drops its hidden details), its own date read for the D32 note; written notes; share with the partner; the evening review with `review_day`. Review helpers moved to shared. Also: `notify` answers 403 instead of 500 for a guest key that is no longer valid. |
 
 ## Checks run in this run
 - Locally, per task, with Node 24 (`fnm exec --using=24`; the Mac's default Node 20 is below the repo's
@@ -49,9 +51,20 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
 After the T2.3 merge, every workflow on `main` was green (CI, Android build, Deploy database skipped without
 secrets, Deploy web, Live smoke test).
 
-## Not verified yet (needs the owner's Supabase project)
-- Anything against a real Supabase project: deploy, live smoke test, Web Push delivery through a real
-  push service (`npm:web-push` under Supabase's Deno runtime), pg_cron/pg_net reminders.
+## The live backend (connected 2026-11-16)
+- The project already held an early hand-made schema (14 empty tables, no migration history), so the first
+  `db push` stopped at `0001`. With the owner's go-ahead the old `public` schema, its storage policies and the old
+  sign-up trigger were removed in the SQL editor (the auth user and the empty `proofs` bucket kept), Supabase's
+  default grants on `public` restored, and the deploy rerun: 32 migrations, VAPID keys created, `notify`,
+  `remind` and `delete-account` deployed, reminders and heartbeat checks scheduled (2 cron jobs). The one
+  existing user got the profile and blocklist rows the sign-up trigger makes.
+- Deploy web rebuilt the site with the project's URL and publishable key; the live smoke test passed against it
+  (sign up, commit a day, focus start and stop, delete account).
+- The publishable key (`sb_publishable_…`) works as the functions' bearer for anonymous calls (checked: `GET
+  notify` answers the VAPID key).
+
+## Not verified yet
+- Web Push delivery through a real push service to a real browser or phone, and the reminder job sending one.
 - The extension in a real Chrome (optional site access prompt and redirect after granting).
 - The Android engine on a real phone (the emulator run covers app blocking only, not the VPN filter).
 - The reminder job delivering key requests that waited through quiet hours (T2.4) on a real project.
@@ -61,13 +74,9 @@ secrets, Deploy web, Live smoke test).
   converting (the e2e fake has one user; the SQL suite covers it).
 
 ## Parked for the owner (nothing here blocks the next tasks)
-- Create a Supabase project, then add repository secrets `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`,
-  `SUPABASE_DB_PASSWORD` and variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Then run
-  the "Deploy database" workflow once: it pushes the migrations, deploys the functions, creates the VAPID
-  keys and schedules reminders. Enable pg_cron and pg_net in Database > Extensions first.
-- In Supabase: Site URL `https://user23052036.github.io/Sparrow/`, allowed redirect
-  `https://user23052036.github.io/Sparrow/auth/callback`, "Confirm email" off for the beta (D14).
-- One phone test, store developer accounts, testers.
+- Done 2026-11-16: Supabase project, secrets and variables, URL configuration.
+- One phone test (now including a photo proof and the evening review, T3.1), store developer accounts, testers.
+- The free plan pauses a project after about a week without use; the five-minute reminder job should keep it awake.
 
 ## Working notes
 - SQL test user prefixes used so far: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1,

@@ -273,3 +273,14 @@ Each entry: decision, reason, status. Do not reverse a decision without adding a
 **Why:** a session started on the phone should block the laptop in seconds, not up to 30 s later.
 **Tested:** SQL suite (silent addresses, the two kinds, once each, only one's own sessions, natural ends wake nothing, guests can't be silent), the notify function (silent kinds reach only extensions with an empty body; an answer also wakes them), the extension against a fake service worker and server (subscribe once with `userVisibleOnly: false`, push syncs at once, daily re-check replaces an old key, sign-out removes the address, a server without keys keeps polling), e2e (the web app reports starts and early ends). **Not verified:** a real push through FCM to an installed extension (needs the owner's Supabase project and the extension loaded in Chrome).
 **Status:** Built (T2.5).
+
+## D45 — Proofs and the evening review on Android
+**Decision:** ROADMAP T3.1. The phone's Today screen does what the website does at the end of the day: mark items, add proof, review the day.
+- **Photo:** the system camera through `expo-image-picker` (`launchCameraAsync`, asking for the camera permission only then; the app declares no microphone or photo-library permission). The photo's own date comes from the camera's EXIF (`exifTextAgeHours` in shared) before `expo-image-manipulator` re-encodes it as JPEG within the same size steps as the website (`compressWithin`), which drops its hidden details. Uploaded to the same private `proofs` bucket under the person's folder.
+- **No similar-photo check from the phone:** the website's dHash needs pixels, which the phone's image tools don't hand to JavaScript without more native code. Phone photos are saved without `image_phash`, so `flagged_similar` stays false for them; the D32 notes (date taken, days late) still apply.
+- **Notes and sharing:** a written note, and a switch to share with the key holder (on by default when there is one, as on the website); a shared proof calls `notify` like the website.
+- **Evening review:** the same `review_day()` with the four answers and the mood; `reviewStartStatuses` and `reviewMessage` now live in shared and the website uses them too.
+- **Not on the phone yet:** voice notes, closing earlier days, kind acts and make-up steps (the website has them).
+**Tested:** shared unit tests (EXIF text ages, review start and message, base64), typecheck, the Android JS bundle, the Gradle build and emulator job in CI. **Not verified:** taking a photo on a real phone.
+**Status:** Built (T3.1).
+

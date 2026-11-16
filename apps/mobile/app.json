@@ -8,6 +8,16 @@
     "platforms": ["android"],
     "android": {
       "package": "com.sparrow.app"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Sparrow uses the camera only when you take a photo as proof.",
+          "microphonePermission": false,
+          "photosPermission": false
+        }
+      ]
+    ]
   }
 }
