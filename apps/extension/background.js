@@ -131,16 +131,20 @@ async function ensurePush(config) {
   }
 }
 
-/** Forgets this extension's push address: on the server with the sign-in being ended (if any), and in the browser. */
+/**
+ * Forgets this extension's push address: on the server with the sign-in being ended (if any), and in the browser.
+ * Answers that sign-in, refreshed if the call had to, so signing it out afterwards uses a live token.
+ */
 async function dropPush(config, auth) {
   const { push } = await get("push");
   await set({ push: null });
+  let current = auth;
   if (config && auth && push?.endpoint) {
     await api
       .rpc(
         config,
-        async () => auth,
-        async () => {},
+        async () => current,
+        async (a) => void (current = a),
         "remove_push_subscription",
         { p_endpoint: push.endpoint },
       )
@@ -148,6 +152,7 @@ async function dropPush(config, auth) {
   }
   const sub = await self.registration?.pushManager?.getSubscription().catch(() => null);
   await sub?.unsubscribe().catch(() => false);
+  return current;
 }
 
 // -------------------------------------------------------------- blocking
@@ -297,13 +302,14 @@ async function handle(msg, sender) {
     }
 
     case "SPARROW_SIGN_OUT": {
-      // One step in the queue, signed-out state first: a sync or push arriving meanwhile can't save the address again.
+      // One step in the queue, signed-out state first: a sync or push arriving meanwhile can't save the address
+      // again. Sites unblock before any network call, so a slow server never keeps them blocked.
       await queue(async () => {
         const { config, auth } = await get(["config", "auth"]);
         await set({ auth: null, focus: { active: false } });
-        await dropPush(config, auth);
-        if (config && auth) await api.signOut(config, auth);
         await applyBlocking({ active: false });
+        const current = await dropPush(config, auth);
+        if (config && current) await api.signOut(config, current);
       });
       return status();
     }

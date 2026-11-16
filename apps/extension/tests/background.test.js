@@ -127,12 +127,14 @@ const server = {
   vapid: VAPID,
   pushSaved: [],
   pushRemoved: [],
+  onLogout: null,
 };
 const json = (status, body) => ({ ok: status < 300, status, json: async () => body, text: async () => JSON.stringify(body) });
 
 globalThis.fetch = async (url, init = {}) => {
   if (server.offline) throw new TypeError("fetch failed");
   const u = String(url);
+  if (u.includes("/auth/v1/logout")) await server.onLogout?.();
   const body = init.body ? JSON.parse(init.body) : {};
   if (u.includes("/auth/v1/token?grant_type=password")) {
     if (body.password !== server.password) return json(400, { error_description: "Invalid login credentials" });
@@ -321,9 +323,15 @@ test("a push arriving while disconnecting can't save the address again", async (
   await send(connectMsg());
   const saves = server.pushSaved.length;
   const removed = server.pushRemoved.length;
-  const out = send({ type: "SPARROW_SIGN_OUT" });
-  const woke = fire("push");
-  await Promise.all([out, woke]);
+  // The push arrives while the server is still signing the extension out.
+  let woke;
+  server.onLogout = async () => {
+    woke = fire("push");
+    await new Promise((r) => setTimeout(r, 20));
+  };
+  await send({ type: "SPARROW_SIGN_OUT" });
+  server.onLogout = null;
+  await woke;
   await send({ type: "SPARROW_SYNC_NOW" });
   assert.equal(server.pushSaved.length, saves, "not saved again");
   assert.equal(server.pushRemoved.length, removed + 1);

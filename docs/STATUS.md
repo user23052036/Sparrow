@@ -10,7 +10,7 @@ and migrations to `0031` plus `0036` (T2.5 had no number; see D44). Live site (s
 
 **Next task: T3.1 (evening review and proofs on Android).** Then T3.2 (`0032`), T3.3, WS4 (`0033`, `0034`),
 WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not touch `claim_push`,
-`save_push_subscription`, `save_extension_push` or the `silent` column (a test checks); such a change goes in a
+`save_push_subscription`, `save_extension_push`, `convert_guest_key` or the `silent` column (a test checks); such a change goes in a
 migration after `0036`.
 
 ## Done in this run (Mode C: Claude Code on the owner's Mac, `gh` signed in, PR loop)

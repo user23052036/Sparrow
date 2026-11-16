@@ -40,6 +40,37 @@ begin
 end;
 $$;
 
+-- 0031's function, unchanged except that the guest's browsers joining the account trim only notifying ones.
+create or replace function public.convert_guest_key(p_key text) returns public.buddy_links
+language plpgsql security definer set search_path = '' as $$
+declare uid uuid := public.require_user(); g public.guest_keys := public._guest_by_secret(p_key); l public.buddy_links;
+begin
+  perform public._lock_profiles(uid, g.owner_id);
+  select * into g from public.guest_keys where id = g.id for update;
+  if g.id is null then raise exception 'this key link isn''t valid anymore' using errcode = '28000'; end if;
+  if g.owner_id = uid then raise exception 'this is your own key link: send it to the friend who holds your key'; end if;
+  if public._partner_of(uid) is not null then raise exception 'you already have an accountability partner'; end if;
+  if public._guest_key_of(uid) is not null then raise exception 'a friend already holds your key through a link: take it back first'; end if;
+  if public._partner_of(g.owner_id) is not null then raise exception 'they already have an accountability partner'; end if;
+  update public.buddy_links set status = 'ended' where requester_id in (uid, g.owner_id) and status = 'pending';
+  insert into public.buddy_links (requester_id, partner_id, status, mutual)
+    values (g.owner_id, uid, 'active', true) returning * into l;
+  update public.push_subscriptions set user_id = uid, guest_key_id = null where guest_key_id = g.id;
+  delete from public.push_subscriptions
+   where user_id = uid and not silent
+     and id not in (select id from public.push_subscriptions where user_id = uid and not silent order by created_at desc limit public._push_limit());
+  -- quiet hours the friend set as a guest stay, unless their account already has its own. A brand-new
+  -- account (not through onboarding yet, so still on the default time zone) takes the guest's time zone too,
+  -- so the hours keep meaning the same moments.
+  update public.profiles
+     set quiet_from = g.quiet_from, quiet_to = g.quiet_to,
+         timezone = case when onboarded then timezone else g.quiet_tz end
+   where id = uid and quiet_from is null and g.quiet_from is not null;
+  delete from public.guest_keys where id = g.id;
+  return l;
+end;
+$$;
+
 -- claim_push (0031) with two more kinds, which only ever reach the caller's own extensions:
 --   session_started  the caller started a focus session that is still running (focus_sessions id)
 --   session_ended    the caller's session ended before its time (focus_sessions id)

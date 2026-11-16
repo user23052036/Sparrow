@@ -1864,6 +1864,23 @@ select save_extension_push('https://fcm.googleapis.com/fcm/send/x1-ext-' || n, r
 select pg_temp.check((select count(*) from push_subscriptions where silent) = 10 and (select count(*) from push_subscriptions where not silent) = 10,
   'and many extensions never push a browser out');
 reset role;
+-- a friend holding a guest key converts: their guest browser joins, and their extensions stay
+update push_subscriptions set created_at = now() - interval '2 days' where silent and user_id = '32323232-0000-0000-0000-000000000001';
+insert into auth.users values ('32323232-0000-0000-0000-000000000003', 'x3@test');
+select pg_temp.as_user('32323232-0000-0000-0000-000000000003');
+select set_config('test.x_key', create_guest_key('Xavi') ->> 'key', false);
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select save_guest_push(current_setting('test.x_key'), 'https://fcm.googleapis.com/fcm/send/x-guest', repeat('p', 40), repeat('a', 16));
+reset role;
+select pg_temp.as_user('32323232-0000-0000-0000-000000000001');
+select convert_guest_key(current_setting('test.x_key'));
+select pg_temp.check((select count(*) from push_subscriptions where silent) = 10
+                     and (select count(*) from push_subscriptions where not silent) = 10
+                     and exists (select 1 from push_subscriptions where endpoint = 'https://fcm.googleapis.com/fcm/send/x-guest'),
+  'signing up from a key link keeps the account''s extensions and its ten newest browsers');
+reset role;
 set role anon;
 select pg_temp.expect_error($q$select save_extension_push('https://fcm.googleapis.com/fcm/send/anon', repeat('p', 40), repeat('a', 16))$q$,
   'saving an extension address needs an account');

@@ -230,7 +230,7 @@ describe("migration 0036 lands before 0032 to 0035 on live databases (D44)", () 
     const dir = new URL("../../migrations/", import.meta.url);
     for (const f of readdirSync(dir).filter((f) => /^003[2-5]_/.test(f))) {
       const sql = readFileSync(new URL(f, dir), "utf8");
-      for (const name of ["claim_push", "save_extension_push", "save_push_subscription", "silent"])
+      for (const name of ["claim_push", "save_extension_push", "save_push_subscription", "convert_guest_key", "silent"])
         assert.ok(!sql.includes(name), `${f} mentions ${name}: put that change in a migration after 0036`);
     }
   });
