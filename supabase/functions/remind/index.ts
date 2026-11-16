@@ -19,7 +19,50 @@ Deno.serve(async (req) => {
   const { data: ok } = await admin.rpc("reminder_secret_ok", { p_secret: req.headers.get("x-reminder-secret") ?? "" });
   if (ok !== true) return json(401, { error: "Not the reminder job." });
 
-  // Proof retention needs no notifications, so it runs first and on its own (files first, then rows: D20, D48).
+  const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
+  const privateKey = Deno.env.get("VAPID_PRIVATE_KEY");
+  const notSetUp = "Notifications aren't set up on this server yet.";
+  let reminders: unknown = notSetUp;
+  let keyRequests: unknown = notSetUp;
+  if (publicKey && privateKey) {
+    webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") ?? "mailto:sparrow@example.com", publicKey, privateKey);
+    // Never the extensions' silent addresses (0036): they only wake up, they show nothing.
+    const subscriptions = async (column: "user_id" | "guest_key_id", id: string) => {
+      const { data, error } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq(column, id).eq("silent", false);
+      if (error) throw error;
+      return data ?? [];
+    };
+    const delivery = {
+      subscriptionsOf: (userId: string) => subscriptions("user_id", userId),
+      async send(sub: { endpoint: string; p256dh: string; auth: string }, payload: string) {
+        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 1800 });
+      },
+      async remove(id: string) {
+        await admin.from("push_subscriptions").delete().eq("id", id);
+      },
+    };
+    // Each part runs even when the other one fails, so a reminder problem never holds key requests back.
+    reminders = await runReminders({
+      ...delivery,
+      async claimDue() {
+        const { data, error } = await admin.rpc("claim_due_reminders");
+        if (error) throw error;
+        return data ?? [];
+      },
+    }).catch((e) => ({ error: String(e) }));
+    keyRequests = await runWaitingKeyRequests({
+      ...delivery,
+      guestSubscriptionsOf: (guestId) => subscriptions("guest_key_id", guestId),
+      async claimWaiting() {
+        const { data, error } = await admin.rpc("claim_waiting_key_requests");
+        if (error) throw error;
+        return data ?? [];
+      },
+    }).catch((e) => ({ error: String(e) }));
+  }
+
+  // Proof retention needs no notifications and runs last, within its own time budget, so a struggling Storage API
+  // never holds up reminders (files first, then rows: D20, D48).
   const retention = await runRetention({
     async claimExpired() {
       const { data, error } = await admin.rpc("claim_expired_proofs", { p_limit: 200 });
@@ -37,43 +80,5 @@ Deno.serve(async (req) => {
     },
   }).catch((e) => ({ error: String(e) }));
 
-  const publicKey = Deno.env.get("VAPID_PUBLIC_KEY");
-  const privateKey = Deno.env.get("VAPID_PRIVATE_KEY");
-  if (!publicKey || !privateKey) return json(200, { retention, reminders: "Notifications aren't set up on this server yet." });
-
-  webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") ?? "mailto:sparrow@example.com", publicKey, privateKey);
-  // Never the extensions' silent addresses (0036): they only wake up, they show nothing.
-  const subscriptions = async (column: "user_id" | "guest_key_id", id: string) => {
-    const { data, error } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq(column, id).eq("silent", false);
-    if (error) throw error;
-    return data ?? [];
-  };
-  const delivery = {
-    subscriptionsOf: (userId: string) => subscriptions("user_id", userId),
-    async send(sub: { endpoint: string; p256dh: string; auth: string }, payload: string) {
-      await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 1800 });
-    },
-    async remove(id: string) {
-      await admin.from("push_subscriptions").delete().eq("id", id);
-    },
-  };
-  // Each part runs even when the other one fails, so a reminder problem never holds key requests back.
-  const reminders = await runReminders({
-    ...delivery,
-    async claimDue() {
-      const { data, error } = await admin.rpc("claim_due_reminders");
-      if (error) throw error;
-      return data ?? [];
-    },
-  }).catch((e) => ({ error: String(e) }));
-  const keyRequests = await runWaitingKeyRequests({
-    ...delivery,
-    guestSubscriptionsOf: (guestId) => subscriptions("guest_key_id", guestId),
-    async claimWaiting() {
-      const { data, error } = await admin.rpc("claim_waiting_key_requests");
-      if (error) throw error;
-      return data ?? [];
-    },
-  }).catch((e) => ({ error: String(e) }));
-  return json(200, { retention, reminders, key_requests: keyRequests });
+  return json(200, { reminders, key_requests: keyRequests, retention });
 });

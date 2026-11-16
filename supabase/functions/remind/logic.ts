@@ -69,6 +69,8 @@ export interface ExpiredProof {
 }
 
 export interface RetentionDeps {
+  /** Milliseconds, for the time budget (Date.now in the function, a fake clock in tests). */
+  now?(): number;
   claimExpired(): Promise<ExpiredProof[]>;
   /** Removes files from the private proofs bucket through the Storage API; rejects when it couldn't. */
   removeFiles(paths: string[]): Promise<void>;
@@ -78,6 +80,10 @@ export interface RetentionDeps {
 
 /** How many files one Storage API call removes. */
 export const FILES_PER_CALL = 100;
+/** Retention never takes more of a run than this; whatever is left waits for the next run. */
+export const RETENTION_BUDGET_MS = 30_000;
+/** A batch refused this quickly is an answer about its files, worth trying one by one; a slow one is the service. */
+export const QUICK_REFUSAL_MS = 5_000;
 
 /**
  * A file the job may remove: inside its owner's own folder ("<user id>/..."), with no empty, "." or ".." parts.
@@ -90,11 +96,16 @@ export function ownFile(p: ExpiredProof): boolean {
 }
 
 /**
- * Proof retention (D48): files first, then rows, as account deletion does (D20). A batch the Storage API refuses is
- * tried one file at a time, so one odd name holds back only its own row; a held row is tried again next run. A row
- * whose path isn't in its owner's folder loses only the row: Sparrow never removes a file that isn't theirs.
+ * Proof retention (D48): files first, then rows, as account deletion does (D20). A batch the Storage API refuses
+ * quickly is tried one file at a time, so one odd name holds back only its own row; a slow refusal (the service is
+ * struggling) holds the batch, and nothing more is tried once the run's time budget is used. Held rows are tried
+ * again next run. A row whose path isn't in its owner's folder loses only the row: Sparrow never removes a file
+ * that isn't theirs.
  */
 export async function runRetention(deps: RetentionDeps): Promise<{ files: number; proofs: number; held: number }> {
+  const now = deps.now ?? Date.now;
+  const start = now();
+  const inBudget = () => now() - start < RETENTION_BUDGET_MS;
   const expired = await deps.claimExpired();
   const files = expired.filter(ownFile);
   const gone = expired.filter((p) => !ownFile(p)).map((p) => p.id);
@@ -107,10 +118,22 @@ export async function runRetention(deps: RetentionDeps): Promise<{ files: number
   };
   for (let i = 0; i < files.length; i += FILES_PER_CALL) {
     const batch = files.slice(i, i + FILES_PER_CALL);
+    if (!inBudget()) {
+      held += batch.length;
+      continue;
+    }
+    const tried = now();
     try {
       await remove(batch);
     } catch {
-      for (const p of batch) await remove([p]).catch(() => held++);
+      if (now() - tried >= QUICK_REFUSAL_MS) {
+        held += batch.length;
+        continue;
+      }
+      for (const p of batch) {
+        if (!inBudget()) held++;
+        else await remove([p]).catch(() => held++);
+      }
     }
   }
   const proofs = gone.length ? await deps.deleteRows(gone) : 0;
