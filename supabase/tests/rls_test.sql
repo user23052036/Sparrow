@@ -1798,3 +1798,98 @@ select convert_guest_key(current_setting('test.qg_key2'));
 select pg_temp.check((select quiet_from = '23:00' and quiet_to = '06:30' from profiles), 'a guest who signs up keeps the quiet hours they set');
 select pg_temp.check((select timezone from profiles) = 'Europe/Berlin', 'and a brand-new account takes their time zone, so the hours mean the same moments');
 reset role;
+
+-- ------------------------------------------------------------ instant start on the laptop (0036)
+insert into auth.users values
+  ('32323232-0000-0000-0000-000000000001', 'x1@test'), ('32323232-0000-0000-0000-000000000002', 'x2@test');
+select pg_temp.as_user('32323232-0000-0000-0000-000000000001');
+update blocklists set domains = '{youtube.com}';
+select save_extension_push('https://fcm.googleapis.com/fcm/send/x1-extension', repeat('p', 40), repeat('a', 16));
+select save_push_subscription('https://fcm.googleapis.com/fcm/send/x1-phone', repeat('p', 40), repeat('a', 16));
+select pg_temp.check((select array_agg(silent order by silent) from push_subscriptions) = '{f,t}',
+  'the extension''s address is kept as a silent one, the website''s as a normal one');
+select set_config('test.xs', (start_focus_session(25)).id::text, false);
+reset role;
+-- someone else can't claim it, even before the owner has
+select pg_temp.as_user('32323232-0000-0000-0000-000000000002');
+select pg_temp.check(claim_push('session_started', current_setting('test.xs')::uuid) is null, 'nobody can wake someone else''s extensions for a start');
+reset role;
+-- a session started on the phone wakes the extension, once
+select pg_temp.as_user('32323232-0000-0000-0000-000000000001');
+select pg_temp.check(claim_push('session_started', current_setting('test.xs')::uuid)
+                     = jsonb_build_object('to', 'user', 'id', '32323232-0000-0000-0000-000000000001'),
+  'starting a session wakes the person''s own extensions');
+select pg_temp.check(claim_push('session_started', current_setting('test.xs')::uuid) is null, 'only once per session');
+select pg_temp.check(claim_push('session_ended', current_setting('test.xs')::uuid) is null, 'a running session has not ended');
+-- ending early wakes it again, once, and only for the owner
+select end_focus_session(current_setting('test.xs')::uuid, 'done sooner');
+reset role;
+select pg_temp.as_user('32323232-0000-0000-0000-000000000002');
+select pg_temp.check(claim_push('session_ended', current_setting('test.xs')::uuid) is null, 'nobody can wake someone else''s extensions for an end');
+select pg_temp.expect_error($q$select save_extension_push('https://evil.example.com/push', repeat('p', 40), repeat('a', 16))$q$,
+  'an extension address must be a browser push service too');
+-- the same extension, now signed in as someone else, belongs to them
+select save_extension_push('https://fcm.googleapis.com/fcm/send/x1-extension', repeat('q', 40), repeat('b', 16));
+select pg_temp.check((select count(*) from push_subscriptions where silent) = 1, 'an extension address belongs to whoever saved it last');
+select remove_push_subscription('https://fcm.googleapis.com/fcm/send/x1-extension');
+select pg_temp.check(not exists (select 1 from push_subscriptions), 'signing the extension out forgets its address');
+reset role;
+select pg_temp.check((select count(*) from push_subscriptions where user_id = '32323232-0000-0000-0000-000000000001') = 1,
+  'and the first person keeps only their website');
+select pg_temp.as_user('32323232-0000-0000-0000-000000000001');
+select pg_temp.check(claim_push('session_ended', current_setting('test.xs')::uuid) ->> 'to' = 'user', 'ending a session early wakes the extensions');
+select pg_temp.check(claim_push('session_ended', current_setting('test.xs')::uuid) is null, 'once');
+-- a session that simply ran out wakes nothing (the extension ends it on its own clock), and is never "started"
+select set_config('test.xs2', (start_focus_session(25)).id::text, false);
+reset role;
+update focus_sessions set started_at = now() - interval '30 minutes', ends_at = now() - interval '5 minutes' where id = current_setting('test.xs2')::uuid;
+select pg_temp.as_user('32323232-0000-0000-0000-000000000001');
+select end_focus_session(current_setting('test.xs2')::uuid);
+select pg_temp.check(claim_push('session_ended', current_setting('test.xs2')::uuid) is null, 'a session that ran its time wakes nothing');
+select pg_temp.check(claim_push('session_started', current_setting('test.xs2')::uuid) is null, 'an ended session is not started again');
+-- extensions and notifying browsers keep separate limits; the daily re-check keeps its place
+select save_extension_push('https://fcm.googleapis.com/fcm/send/x1-extension', repeat('p', 40), repeat('a', 16));
+reset role;
+update push_subscriptions set created_at = now() - interval '1 day' where endpoint = 'https://fcm.googleapis.com/fcm/send/x1-extension';
+select pg_temp.as_user('32323232-0000-0000-0000-000000000001');
+select save_extension_push('https://fcm.googleapis.com/fcm/send/x1-extension', repeat('r', 40), repeat('c', 16));
+select pg_temp.check((select created_at < now() - interval '23 hours' and p256dh = repeat('r', 40) from push_subscriptions
+                       where endpoint = 'https://fcm.googleapis.com/fcm/send/x1-extension'),
+  'saving the same extension again refreshes its keys without moving it');
+select save_push_subscription('https://fcm.googleapis.com/fcm/send/x1-browser-' || n, repeat('p', 40), repeat('a', 16)) from generate_series(1, 12) n;
+select pg_temp.check((select count(*) from push_subscriptions where not silent) = 10
+                     and exists (select 1 from push_subscriptions where silent),
+  'many browsers never push the extension out');
+select save_extension_push('https://fcm.googleapis.com/fcm/send/x1-ext-' || n, repeat('p', 40), repeat('a', 16)) from generate_series(1, 12) n;
+select pg_temp.check((select count(*) from push_subscriptions where silent) = 10 and (select count(*) from push_subscriptions where not silent) = 10,
+  'and many extensions never push a browser out');
+reset role;
+-- a friend holding a guest key converts: their guest browser joins, and their extensions stay
+update push_subscriptions set created_at = now() - interval '2 days' where silent and user_id = '32323232-0000-0000-0000-000000000001';
+insert into auth.users values ('32323232-0000-0000-0000-000000000003', 'x3@test');
+select pg_temp.as_user('32323232-0000-0000-0000-000000000003');
+select set_config('test.x_key', create_guest_key('Xavi') ->> 'key', false);
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select save_guest_push(current_setting('test.x_key'), 'https://fcm.googleapis.com/fcm/send/x-guest', repeat('p', 40), repeat('a', 16));
+reset role;
+select pg_temp.as_user('32323232-0000-0000-0000-000000000001');
+select convert_guest_key(current_setting('test.x_key'));
+select pg_temp.check((select count(*) from push_subscriptions where silent) = 10
+                     and (select count(*) from push_subscriptions where not silent) = 10
+                     and exists (select 1 from push_subscriptions where endpoint = 'https://fcm.googleapis.com/fcm/send/x-guest'),
+  'signing up from a key link keeps the account''s extensions and its ten newest browsers');
+reset role;
+set role anon;
+select pg_temp.expect_error($q$select save_extension_push('https://fcm.googleapis.com/fcm/send/anon', repeat('p', 40), repeat('a', 16))$q$,
+  'saving an extension address needs an account');
+reset role;
+select pg_temp.as_user('32323232-0000-0000-0000-000000000002');
+select create_guest_key('Gil');
+reset role;
+insert into push_subscriptions (guest_key_id, endpoint, p256dh, auth)
+  values ((select id from guest_keys where owner_id = '32323232-0000-0000-0000-000000000002'), 'https://fcm.googleapis.com/fcm/send/g1', repeat('p', 40), repeat('a', 16));
+select pg_temp.expect_error($q$insert into push_subscriptions (guest_key_id, endpoint, p256dh, auth, silent)
+  values ((select id from guest_keys where owner_id = '32323232-0000-0000-0000-000000000002'), 'https://fcm.googleapis.com/fcm/send/g2', repeat('p', 40), repeat('a', 16), true)$q$,
+  'a guest''s browser is never a silent one');

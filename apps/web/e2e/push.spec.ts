@@ -72,7 +72,28 @@ test("asking for the key tells the server, which notifies the partner", async ({
   await page.getByLabel(copy.focus.askWhy("Ravi")).fill("My train is early");
   await page.getByRole("button", { name: copy.partnerKeyRequest("Ravi") }).click();
   await expect(page.getByText(copy.partnerWaiting("Ravi"))).toBeVisible();
-  await expect.poll(() => fake.notifyCalls).toEqual([{ kind: "key_request", ref: fake.db.end_requests[0].id }]);
+  await expect
+    .poll(() => fake.notifyCalls)
+    .toEqual([
+      { kind: "session_started", ref: fake.db.focus_sessions[0].id },
+      { kind: "key_request", ref: fake.db.end_requests[0].id },
+    ]);
+});
+
+test("starting a session and ending it early wake the person's extensions on other computers", async ({ page, fake }) => {
+  await page.clock.install();
+  fake.seedUser();
+  fake.db.blocklists = [{ user_id: "11111111-1111-4111-8111-111111111111", domains: ["youtube.com"] }];
+  await signIn(page, fake);
+  await page.getByRole("link", { name: copy.nav.focus, exact: true }).click();
+  await page.getByRole("button", { name: copy.focus.minutes(25) }).click();
+  await expect.poll(() => fake.notifyCalls).toEqual([{ kind: "session_started", ref: fake.db.focus_sessions[0].id }]);
+  await page.getByRole("button", { name: copy.focus.endEarly }).click();
+  for (let i = 0; i < 31; i++) await page.clock.runFor(1000); // the breathing pause counts down a second at a time
+  await page.getByLabel(copy.earlyExitPrompt).fill("Done sooner");
+  await page.getByRole("button", { name: copy.focus.endSession }).click();
+  await expect.poll(() => fake.notifyCalls.map((c) => c.kind)).toEqual(["session_started", "session_ended"]);
+  expect(fake.notifyCalls[1].ref).toBe(fake.db.focus_sessions[0].id);
 });
 
 test("the notification's 'Let them out' points at that answer, and one tap sends it", async ({ page, fake }) => {

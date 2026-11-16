@@ -26,11 +26,12 @@ Block the websites a signed-in user chose, only while that user has an active fo
 | `declarativeNetRequest` | Applies the block rules for the sites the user chose, without reading page content. |
 | `storage` | Keeps the user's own sign-in tokens and the current block list on this device. |
 | `alarms` | Wakes the extension to start and end sessions on time and send a heartbeat. |
+| `notifications` | Chrome requires it for Web Push. The extension never shows a notification: it subscribes with `userVisibleOnly: false`, and an empty push from Sparrow only tells it to check the user's focus session at once (a session started on their phone reaches this browser in seconds instead of up to 30). |
 | `optional_host_permissions: *://*/*` | Nothing is granted at install. When the user's block list has a site the extension may not touch yet, the popup offers to allow it, and Chrome asks for that site only (and its subdomains). With it, a blocked page is replaced by the calm "This can wait" page; without it, the site is still blocked, with the browser's own page. The extension does not read or modify page content; its only content script runs on the Sparrow site itself. |
 
 ## Data disclosures
 
-- **Collected:** the account email the user signs in with; the sites the user chose to block; focus session times; a heartbeat that says blocking is on. All of it belongs to the user and is stored in their Sparrow account.
+- **Collected:** the account email the user signs in with; the sites the user chose to block; focus session times; a heartbeat that says blocking is on; the push address Chrome gives the extension (forgotten when the user disconnects it). All of it belongs to the user and is stored in their Sparrow account.
 - **Not collected:** browsing history or page content. The extension is given the list of sites to block and does not send back which sites you visit.
 - **Not sold, not shared** with third parties, not used for advertising or credit decisions.
 - Privacy policy URL: `<your site>/privacy` (the page ships in `apps/web/app/privacy`). Replace the placeholder with the deployed address before submitting.

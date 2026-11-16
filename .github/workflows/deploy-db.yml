@@ -97,9 +97,10 @@ jobs:
       - name: Link the project
         if: steps.secrets.outputs.ready == 'true'
         run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+      # --include-all: T2.5's 0036 lands before the roadmap's 0032 to 0035 (D44), which must still apply after it.
       - name: Apply new migrations
         if: steps.secrets.outputs.ready == 'true'
-        run: supabase db push --password "$SUPABASE_DB_PASSWORD" --yes
+        run: supabase db push --include-all --password "$SUPABASE_DB_PASSWORD" --yes
       # Web Push (D38): a VAPID key pair is made once and kept in the project's function secrets. The
       # private key is masked and never printed; the public key is served by the notify function.
       - name: Create the Web Push keys (first deploy only)

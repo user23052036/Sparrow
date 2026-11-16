@@ -3,6 +3,7 @@
 // POST { kind, ref } → the database (claim_push, migrations 0028 and 0030) decides, as the caller, who should hear
 //      about that event; this function then sends to that person's (or guest's) browsers with VAPID.
 // POST { kind: "key_answer", ref, key } → a guest partner (D39) answered; claim_guest_push checks their key.
+// POST { kind: "session_started" | "session_ended", ref } → wakes the caller's own extensions with a silent push (D44, 0036).
 // JWT verification stays on (a guest's page sends the public anon key).
 // Secrets (set by .github/workflows/deploy-db.yml on first deploy): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -38,8 +39,9 @@ Deno.serve(async (req) => {
 
   webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") ?? "mailto:sparrow@example.com", publicKey, privateKey);
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-  const subscriptions = async (column: "user_id" | "guest_key_id", id: string) => {
-    const { data, error } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq(column, id);
+  // Extensions (silent) only ever get the empty wake-up push; everything else gets the notifications.
+  const subscriptions = async (column: "user_id" | "guest_key_id", id: string, silent = false) => {
+    const { data, error } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq(column, id).eq("silent", silent);
     if (error) throw error;
     return data ?? [];
   };
@@ -54,6 +56,7 @@ Deno.serve(async (req) => {
     },
     subscriptionsOf: (userId) => subscriptions("user_id", userId),
     guestSubscriptionsOf: (guestId) => subscriptions("guest_key_id", guestId),
+    extensionsOf: (userId) => subscriptions("user_id", userId, true),
     async send(sub, payload) {
       await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, payload, { TTL: 3600, urgency: "high" });
     },

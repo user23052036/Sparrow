@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, Text, TextInput, View } from "react-native";
 import { copy } from "@sparrow/shared";
-import { errorText, supabase } from "../supabase";
+import { errorText, notifyMyExtensions, supabase } from "../supabase";
 import { Button, Err } from "../ui";
 import { s } from "../theme";
 import { engine, isNativeAvailable } from "../../modules/sparrow-blocker/src";
@@ -62,9 +62,10 @@ export function Focus() {
   }, [exiting, wait]);
 
   async function start() {
-    const { error } = await supabase.rpc("start_focus_session", { p_minutes: minutes });
+    const { data, error } = await supabase.rpc("start_focus_session", { p_minutes: minutes });
     if (error) setErr(errorText(error));
     else {
+      notifyMyExtensions("session_started", (data as { id?: string } | null)?.id);
       void load();
       void engine.syncNow(); // start blocking on this phone right away
     }
@@ -74,6 +75,7 @@ export function Focus() {
     const { error } = await supabase.rpc("end_focus_session", { p_session_id: state.session_id, p_reason: reason });
     if (error) setErr(errorText(error));
     else {
+      notifyMyExtensions("session_ended", state.session_id);
       setExiting(false);
       setReason("");
       void load();

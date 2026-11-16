@@ -575,6 +575,7 @@ export const copy = {
       "If you hold someone's key and set quiet hours: those two times (for a friend holding a key through a link, also the time zone their browser reported).",
       "Badges you crafted, and any circle goal you started.",
       "If you turn on notifications: the push address your browser gives Sparrow for this, one per browser, until you turn them off there. A notification only says what happened (for example that your partner answered), never what anyone wrote. It travels through your browser maker's push service (Google, Mozilla or Apple).",
+      "If you connect the Sparrow extension: the push address Chrome gives it, so a focus session you start or end on another device reaches it in seconds. It never shows a notification, and the push itself carries nothing; the extension then asks Sparrow, as before. It is forgotten when you disconnect the extension.",
       "Feedback you choose to send.",
     ],
     seeTitle: "Who can see it",

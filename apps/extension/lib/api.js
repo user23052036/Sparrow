@@ -69,17 +69,22 @@ export async function signOut(config, auth) {
 }
 
 /**
- * Call a Postgres function. `getAuth`/`saveAuth` let the caller persist rotated
+ * A request as the signed-in person. `getAuth`/`saveAuth` let the caller persist rotated
  * tokens. Refreshes when the token is near expiry or the server says 401.
+ * Without a body it is a GET.
  */
-export async function rpc(config, getAuth, saveAuth, fn, args = {}) {
+async function authed(config, getAuth, saveAuth, path, body) {
   let auth = await getAuth();
   if (!auth) throw new AuthError("not signed in");
   if (auth.expires_at - 60 < Date.now() / 1000) {
     auth = await refresh(config, auth);
     await saveAuth(auth);
   }
-  const call = (token) => fetch(`${config.url}/rest/v1/rpc/${fn}`, { method: "POST", headers: headers(config, token), body: JSON.stringify(args) });
+  const call = (token) =>
+    fetch(
+      `${config.url}${path}`,
+      body === undefined ? { headers: headers(config, token) } : { method: "POST", headers: headers(config, token), body: JSON.stringify(body) },
+    );
   let res = await call(auth.access_token);
   if (res.status === 401) {
     auth = await refresh(config, auth);
@@ -89,4 +94,14 @@ export async function rpc(config, getAuth, saveAuth, fn, args = {}) {
   if (!res.ok) throw new Error(await readError(res));
   const text = await res.text();
   return text ? JSON.parse(text) : null;
+}
+
+/** Call a Postgres function. */
+export function rpc(config, getAuth, saveAuth, fn, args = {}) {
+  return authed(config, getAuth, saveAuth, `/rest/v1/rpc/${fn}`, args);
+}
+
+/** Call an Edge Function (GET when there is no body). */
+export function invoke(config, getAuth, saveAuth, fn, body) {
+  return authed(config, getAuth, saveAuth, `/functions/v1/${fn}`, body);
 }

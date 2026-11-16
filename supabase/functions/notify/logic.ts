@@ -3,8 +3,17 @@
 import { deliver, type Delivery, type Tally } from "../_shared/push.ts";
 export { PUSH_ENDPOINT, type Subscription } from "../_shared/push.ts";
 
-export const PUSH_KINDS = ["key_request", "key_answer", "proof_shared"] as const;
+/** Events that show a notification to the recipient. */
+export const VISIBLE_KINDS = ["key_request", "key_answer", "proof_shared"] as const;
+export type VisibleKind = (typeof VISIBLE_KINDS)[number];
+/** Events that only wake the person's own Sparrow extensions (D44, migration 0036); nothing is shown. */
+export const SESSION_KINDS = ["session_started", "session_ended"] as const;
+export const PUSH_KINDS = [...VISIBLE_KINDS, ...SESSION_KINDS] as const;
 export type PushKind = (typeof PUSH_KINDS)[number];
+/** After these the recipient's extensions check their focus state at once: an approved key ends the session. */
+export const SYNC_KINDS: readonly PushKind[] = ["key_answer", "session_started", "session_ended"];
+/** All a silent push says. The extension asks the database for everything else. */
+export const SYNC_PAYLOAD = JSON.stringify({ sync: true });
 
 /**
  * The only words a notification ever carries. Mirrors copy.push in packages/shared/src/copy.ts (logic.test.ts
@@ -59,7 +68,7 @@ export interface Recipient {
 }
 
 /** A guest has no account, so their notifications open the key page (it remembers their key) instead of Partner. */
-export function buildPayload(kind: PushKind, ref: string, to: Recipient["to"] = "user"): PushPayload {
+export function buildPayload(kind: VisibleKind, ref: string, to: Recipient["to"] = "user"): PushPayload {
   const t = PUSH_TEXT[kind];
   if (kind === "key_request")
     return {
@@ -80,12 +89,21 @@ export interface Deps extends Delivery {
   claim(kind: PushKind, ref: string): Promise<Recipient | null>;
   /** The browsers of a guest partner (push_subscriptions.guest_key_id). */
   guestSubscriptionsOf(guestId: string): Promise<Subscription[]>;
+  /** A person's Sparrow extensions (push_subscriptions.silent); `subscriptionsOf` never includes them. */
+  extensionsOf(userId: string): Promise<Subscription[]>;
 }
 
-/** Claims the event, then sends to every browser of the recipient. */
+const isVisible = (kind: PushKind): kind is VisibleKind => (VISIBLE_KINDS as readonly string[]).includes(kind);
+
+/** Claims the event, then sends to every browser of the recipient and wakes their extensions when the session may have changed. */
 export async function notify(kind: PushKind, ref: string, deps: Deps): Promise<Tally> {
+  const tally: Tally = { sent: 0, removed: 0, failed: 0 };
   const target = await deps.claim(kind, ref);
-  if (!target) return { sent: 0, removed: 0, failed: 0 };
-  const delivery = target.to === "guest" ? { ...deps, subscriptionsOf: deps.guestSubscriptionsOf } : deps;
-  return deliver(target.id, JSON.stringify(buildPayload(kind, ref, target.to)), delivery);
+  if (!target) return tally;
+  if (isVisible(kind)) {
+    const delivery = target.to === "guest" ? { ...deps, subscriptionsOf: deps.guestSubscriptionsOf } : deps;
+    await deliver(target.id, JSON.stringify(buildPayload(kind, ref, target.to)), delivery, tally);
+  }
+  if (target.to === "user" && SYNC_KINDS.includes(kind)) await deliver(target.id, SYNC_PAYLOAD, { ...deps, subscriptionsOf: deps.extensionsOf }, tally);
+  return tally;
 }
