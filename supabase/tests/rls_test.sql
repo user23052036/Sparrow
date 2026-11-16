@@ -2045,7 +2045,7 @@ select pg_temp.check((select array_agg(coalesce(c.storage_path, 'text') order by
                      = array['35353535-0000-0000-0000-000000000001/old.jpg', 'text'],
   'past their week: the photo first, then the note; the new note and the other person''s photo stay');
 select id as rp1 from proofs where storage_path = '35353535-0000-0000-0000-000000000001/old.jpg' \gset
-insert into verifications (proof_id, verifier_id, verdict) values (:'rp1', '35353535-0000-0000-0000-000000000002', 'approve');
+insert into verifications (proof_id, verifier_id, verdict, comment) values (:'rp1', '35353535-0000-0000-0000-000000000002', 'question', 'is that your desk?');
 select array_agg(c.id)::text as rids from claim_expired_proofs(1000) c join proofs p on p.id = c.id where p.user_id::text like '35353535%' \gset
 set role service_role;
 select pg_temp.check(delete_expired_proofs(:'rids'::uuid[]) = 2, 'the server removes them once their files are gone');
@@ -2053,6 +2053,19 @@ reset role;
 select pg_temp.check((select array_agg(coalesce(text_body, storage_path) order by text_body) from proofs where user_id::text like '35353535%')
                      = array['new note', '35353535-0000-0000-0000-000000000002/keep.jpg'],
   'only the expired ones went');
-select pg_temp.check(not exists (select 1 from verifications where proof_id = :'rp1'), 'a partner''s note on a removed proof goes with it');
+select pg_temp.check((select proof_id is null and comment is null and verdict = 'question' from verifications where verifier_id = '35353535-0000-0000-0000-000000000002'),
+  'a partner''s note stays (their support history counts it), without its words or the proof');
+-- a written note whose owner chose to keep everything again in the meantime stays
+select pg_temp.as_user('35353535-0000-0000-0000-000000000001');
+insert into proofs (plan_item_id, kind, text_body) values ((select id from plan_items limit 1), 'text', 'second thoughts');
+reset role;
+set session_replication_role = replica;
+update proofs set server_created_at = now() - interval '9 days' where text_body = 'second thoughts';
+set session_replication_role = origin;
+select array_agg(c.id)::text as rids2 from claim_expired_proofs(1000) c where c.user_id = '35353535-0000-0000-0000-000000000001' \gset
+update profiles set proof_keep_days = null where id = '35353535-0000-0000-0000-000000000001';
+set role service_role;
+select pg_temp.check(delete_expired_proofs(:'rids2'::uuid[]) = 0, 'a written note stays if its owner chose to keep everything in the meantime');
+reset role;
 select pg_temp.check(exists (select 1 from pg_proc where proname = 'claim_expired_proofs' and has_function_privilege('service_role', oid, 'execute')),
   'the five-minute job can claim them');

@@ -11,7 +11,11 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json(405, { error: "Use POST." });
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  // Every call has a time limit, so a slow Storage API can't hold up this run's reminders.
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+    global: { fetch: (input, init) => fetch(input, { ...init, signal: init?.signal ?? AbortSignal.timeout(20_000) }) },
+  });
   const { data: ok } = await admin.rpc("reminder_secret_ok", { p_secret: req.headers.get("x-reminder-secret") ?? "" });
   if (ok !== true) return json(401, { error: "Not the reminder job." });
 

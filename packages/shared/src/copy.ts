@@ -462,7 +462,7 @@ export const copy = {
     save: "Save",
     saved: "Saved.",
     confirm: (n: number) =>
-      `Proofs older than ${n} days, photos and voice notes included, are removed within a few minutes, and from then on each one after ${n} days. They can't be brought back. Shared ones go from your partner's view too.`,
+      `Proofs older than ${n} days, photos and voice notes included, are removed within a few minutes, and from then on each one after ${n} days. They can't be brought back. Shared ones go from your partner's view too, and notes your partner wrote on them lose their words.`,
     confirmYes: "Yes, keep them for that long",
     cancel: "Cancel",
   },

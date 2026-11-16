@@ -122,6 +122,8 @@ describe("key requests that waited through quiet hours", () => {
 
 describe("proof retention (D48)", () => {
   const U = "33333333-3333-4333-8333-333333333333";
+  const OTHER = "44444444-4444-4444-8444-444444444444";
+  const file = (id: string, path: string | null, user = U): ExpiredProof => ({ id, user_id: user, storage_path: path });
   function retention(expired: ExpiredProof[], refuse: (paths: string[]) => boolean = () => false) {
     const removed: string[][] = [];
     const deleted: string[][] = [];
@@ -147,33 +149,43 @@ describe("proof retention (D48)", () => {
   }
 
   it("removes files first, then the rows, written notes included", async () => {
-    const r = retention([
-      { id: "p1", storage_path: `${U}/a.jpg` },
-      { id: "p2", storage_path: `${U}/b.webm` },
-      { id: "t1", storage_path: null },
-    ]);
+    const r = retention([file("p1", `${U}/a.jpg`), file("p2", `${U}/b.webm`), file("t1", null)]);
     assert.deepEqual(await runRetention(r.d), { files: 2, proofs: 3, held: 0 });
     assert.deepEqual(r.removed, [[`${U}/a.jpg`, `${U}/b.webm`]]);
-    assert.deepEqual(r.deleted, [["t1", "p1", "p2"]]);
+    assert.deepEqual([...r.deleted[0]].sort(), ["p1", "p2", "t1"]);
     assert.deepEqual(r.order, ["files", "rows"]);
   });
 
-  it("keeps the rows of files it couldn't remove, so the next run tries again", async () => {
-    const many = Array.from({ length: FILES_PER_CALL + 1 }, (_, i) => ({ id: `p${i}`, storage_path: `${U}/${i}.jpg` }));
-    const r = retention(many, (paths) => paths.length === 1);
-    assert.deepEqual(await runRetention(r.d), { files: FILES_PER_CALL, proofs: FILES_PER_CALL, held: 1 });
-    assert.ok(!r.deleted[0].includes(`p${FILES_PER_CALL}`));
+  it("a refused batch is tried one file at a time, so one odd name holds back only itself", async () => {
+    const many = Array.from({ length: FILES_PER_CALL }, (_, i) => file(`p${i}`, `${U}/${i}.jpg`));
+    const r = retention(many, (paths) => paths.includes(`${U}/7.jpg`));
+    assert.deepEqual(await runRetention(r.d), { files: FILES_PER_CALL - 1, proofs: FILES_PER_CALL - 1, held: 1 });
+    assert.ok(!r.deleted[0].includes("p7"));
   });
 
-  it("never touches a path outside a person's own folder", async () => {
+  it("removes files in folders inside the owner's own folder too", async () => {
+    const r = retention([file("n1", `${U}/2026/a.jpg`)]);
+    assert.deepEqual(await runRetention(r.d), { files: 1, proofs: 1, held: 0 });
+  });
+
+  it("never removes a file outside its owner's folder: such a row goes, the file stays", async () => {
     const r = retention([
-      { id: "x1", storage_path: "../other/secret.jpg" },
-      { id: "x2", storage_path: `${U}/nested/deep.jpg` },
-      { id: "x3", storage_path: "not-a-user/a.jpg" },
+      file("x1", `${OTHER}/their.jpg`),
+      file("x2", `${U}/../${OTHER}/their.jpg`),
+      file("x3", "no-folder.jpg"),
+      file("x4", `${U}//double.jpg`),
     ]);
-    assert.deepEqual(await runRetention(r.d), { files: 0, proofs: 0, held: 3 });
+    assert.deepEqual(await runRetention(r.d), { files: 0, proofs: 4, held: 0 });
     assert.deepEqual(r.removed, []);
-    assert.deepEqual(r.deleted, []);
+    assert.deepEqual([...r.deleted[0]].sort(), ["x1", "x2", "x3", "x4"]);
+  });
+
+  it("odd rows can't hold up everyone else's: they are cleared in the same run", async () => {
+    const odd = Array.from({ length: 150 }, (_, i) => file(`o${i}`, `${OTHER}/${i}.jpg`));
+    const r = retention([...odd, file("good", `${U}/a.jpg`)]);
+    const out = await runRetention(r.d);
+    assert.equal(out.files, 1);
+    assert.equal(out.proofs, 151);
   });
 
   it("does nothing when nothing is past its time", async () => {
@@ -182,8 +194,9 @@ describe("proof retention (D48)", () => {
     assert.deepEqual(r.order, []);
   });
 
-  it("the claim is the server's only, and lists files before notes (0033)", () => {
+  it("the claim is the server's only, lists files before notes and says whose they are (0033)", () => {
     const sql = readFileSync(new URL("../../migrations/0033_proof_retention.sql", import.meta.url), "utf8");
+    assert.match(sql, /returns table \(id uuid, user_id uuid, storage_path text\)/);
     assert.match(sql, /order by \(p\.storage_path is null\), p\.server_created_at/);
     assert.match(sql, /grant execute on function public\.claim_expired_proofs\(int\), public\.delete_expired_proofs\(uuid\[\]\) to service_role;/);
   });

@@ -10,7 +10,8 @@ const CHOICES: Keep[] = [null, 90, 30, 7];
 /** How long proofs are kept (T4.2, D48). A shorter time removes older proofs within minutes, so it asks first. */
 export function ProofRetention() {
   const { profile } = useAuth();
-  return profile ? <RetentionForm profile={profile} /> : null;
+  // Remount when the saved choice changes elsewhere, so the form never shows an old one.
+  return profile ? <RetentionForm key={String(profile.proof_keep_days ?? "forever")} profile={profile} /> : null;
 }
 
 /** Shorter than before (or a limit where there was none): older proofs will go. */
