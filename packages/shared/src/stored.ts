@@ -16,11 +16,95 @@ export interface StoredTable {
 
 const ME = "Only you.";
 
+/**
+ * Server functions a signed-in person (or, marked, anyone with the public key) can call that read data as the
+ * database itself (SECURITY DEFINER). Each was checked against the "who" sentences above. schema.json lists them
+ * from the migrations, and stored.test.ts fails on a new one until it is checked and added here, so a new way of
+ * showing someone's data can't land without this page being looked at again.
+ */
+export const REVIEWED_FUNCTIONS = [
+  "accept_buddy_invite",
+  "check_my_heartbeats",
+  "circle_goal",
+  "circle_overview",
+  "claim_push",
+  "commit_day",
+  "convert_guest_key",
+  "craft_badge",
+  "create_buddy_invite",
+  "create_circle",
+  "create_focus_link",
+  "create_guest_key",
+  "decide_end_request",
+  "device_decide_end_request",
+  "device_sync",
+  "end_buddy_link",
+  "end_focus_session",
+  "export_my_data",
+  "forget_device_secret",
+  "get_focus_state",
+  "get_today",
+  "guest_decide",
+  "guest_overview",
+  "guest_push_is_on",
+  "guest_set_quiet",
+  "heartbeat",
+  "is_buddy_of",
+  "issue_device_secret",
+  "join_circle",
+  "join_leaderboard",
+  "key_request_status",
+  "leave_circle",
+  "leave_leaderboard",
+  "let_go_circle_goal",
+  "log_kind_act",
+  "monthly_leaderboard",
+  "my_collection",
+  "my_progress",
+  "my_rating",
+  "partner_badge",
+  "partner_overview",
+  "partner_rating",
+  "partner_support_nudge",
+  "penalty_status",
+  "pledge_limit",
+  "points_balance",
+  "preview_buddy_invite",
+  "preview_circle_invite",
+  "proof_context",
+  "recent_completion",
+  "remove_focus_link",
+  "remove_guest_key",
+  "remove_guest_push",
+  "remove_push_subscription",
+  "request_end_session",
+  "review_day",
+  "save_extension_push",
+  "save_guest_push",
+  "save_push_subscription",
+  "send_cheer",
+  "set_circle_alias",
+  "set_circle_sharing",
+  "set_item_status",
+  "set_my_sharing",
+  "set_penalty_optin",
+  "set_pledge",
+  "set_push_token",
+  "set_quiet_hours",
+  "set_share_rating",
+  "settle_makeup_step",
+  "start_circle_goal",
+  "start_focus_session",
+  "unreviewed_days",
+  "use_focus_link",
+  "verify_proof",
+];
+
 export const STORED: Record<string, StoredTable> = {
   profiles: {
     title: "Your profile",
     what: "Your name and how Sparrow should behave for you.",
-    who: "Only you. Your partner and circle see your name where you show it to them.",
+    who: "You. Your name reaches your partner, your circle (unless you use a made-up name there), a friend holding your key through a link, and anyone you give an invite code to. If you join the leaderboard, other people on it see your made-up name there. Someone who asks you for the key sees when your quiet hours end, while they are on.",
     columns: {
       id: "Your account's id.",
       display_name: "The name you chose.",
@@ -42,7 +126,7 @@ export const STORED: Record<string, StoredTable> = {
   tasks: {
     title: "Tasks",
     what: "The things you want to do.",
-    who: ME,
+    who: "You. Your partner sees the title of a task you share a proof for, and today's planned titles if you share your activity. A friend holding your key through a link sees the titles of tasks you shared proofs for.",
     columns: {
       id: "The task's id.",
       user_id: "Whose task it is.",
@@ -72,7 +156,7 @@ export const STORED: Record<string, StoredTable> = {
   daily_plans: {
     title: "Days",
     what: "Each day you plan: when you committed to it, how it went and how you felt.",
-    who: "Only you. Your partner sees whether a day was planned and closed only if you share your activity.",
+    who: "You. If you share your activity, your partner sees a streak of closed days, and with the practice rating on, a rating worked out from your days; they may also get a gentle note when recent days were hard. A circle sees whether today is planned and closed, unless you switch sharing off. If you join the leaderboard, others on it see how many days moved forward this month. The people running the beta see anonymous totals, such as the average morning mood across everyone.",
     columns: {
       id: "The day's id.",
       user_id: "Whose day it is.",
@@ -89,7 +173,7 @@ export const STORED: Record<string, StoredTable> = {
   plan_items: {
     title: "Planned things",
     what: "The tasks you picked for a day, and how each went.",
-    who: "Only you. A circle sees only how many moved forward, unless you switch that off.",
+    who: "You. If you share your activity, your partner sees today's planned things and how each went. A circle sees how many were planned, done and partly done today, unless you switch sharing off. The practice rating and the leaderboard (only if you turn them on) are worked out from them.",
     columns: {
       id: "The item's id.",
       daily_plan_id: "Which day.",
@@ -147,7 +231,7 @@ export const STORED: Record<string, StoredTable> = {
   focus_sessions: {
     title: "Focus sessions",
     what: "Each focus session: when it started and ended, and whether it was locked.",
-    who: "Only you. Your partner sees running sessions and focus minutes only if you share your activity; a circle sees focus minutes unless you switch that off.",
+    who: "You. If you share your activity, your partner sees running sessions and focus minutes; a circle sees today's focus minutes unless you switch sharing off. While you ask for the key, the person holding it sees when that session ends. Someone using one of your focus links learns whether a session is running and when it ends.",
     columns: {
       id: "The session's id.",
       user_id: "Whose session.",
@@ -186,7 +270,7 @@ export const STORED: Record<string, StoredTable> = {
       last_heartbeat_at: "When it last checked in.",
       protection_enabled: "Whether blocking was on at that moment.",
       created_at: "When it first checked in.",
-      push_token: "Not used.",
+      push_token: "Not used yet: empty unless a phone saves one.",
       secret_hash: "A fingerprint of the phone's own sign-in, not the sign-in itself.",
       asleep: "Whether the phone said its screen was off.",
     },
@@ -242,7 +326,7 @@ export const STORED: Record<string, StoredTable> = {
   guest_keys: {
     title: "A friend's key link",
     what: "A friend who holds your key through a link, without an account.",
-    who: "Only you can read the name and dates. Their quiet hours and time zone are theirs: you can't read those.",
+    who: "You can read the name and dates. Your friend's quiet hours and time zone are theirs: you can't read them, and only see when their quiet hours end, while they are on, if you ask for the key.",
     columns: {
       id: "The link's id.",
       owner_id: "Whose key it is.",
@@ -252,7 +336,7 @@ export const STORED: Record<string, StoredTable> = {
       last_seen_at: "When your friend last opened it.",
       quiet_from: "Your friend's quiet hours start, if they set them.",
       quiet_to: "Their quiet hours end.",
-      quiet_tz: "The time zone their browser reported, for those hours.",
+      quiet_tz: "The time zone their browser reported, for those hours. Only Sparrow's server reads it, to work out when the hours end.",
     },
   },
   focus_links: {
@@ -346,7 +430,7 @@ export const STORED: Record<string, StoredTable> = {
   pledges: {
     title: "Pledges (practice)",
     what: "Practice pledges to a cause: no real money moves.",
-    who: ME,
+    who: "You. If you and your partner both turned the practice partner penalty on, your partner learns that a pledged day ended owing, and a small practice amount, through their own partner pledge.",
     columns: {
       id: "The pledge's id.",
       user_id: "Whose it is.",
@@ -380,7 +464,7 @@ export const STORED: Record<string, StoredTable> = {
   charities: {
     title: "Causes",
     what: "The causes practice pledges can name.",
-    who: "Anyone (it's a public list).",
+    who: "Anyone signed in (it's a public list).",
     columns: {
       id: "The cause's id.",
       name: "Its name.",
@@ -408,7 +492,7 @@ export const STORED: Record<string, StoredTable> = {
     columns: {
       circle_id: "Which circle.",
       user_id: "Who.",
-      member_key: "A random id for the circle page, so it never shows account ids.",
+      member_key: "A random id the circle page uses for each member instead of their account id.",
       shares: "Whether they share their day's numbers with the circle.",
       joined_at: "When they joined.",
       alias: "The made-up name they chose for this circle, if any.",
@@ -470,9 +554,16 @@ export const STORED: Record<string, StoredTable> = {
 /** One table in schema.json (supabase/tests/snapshot.sql). */
 export interface SchemaTable {
   table: string;
+  kind?: "table" | "view";
   rls: boolean;
   readPolicies: string[];
   columns: { name: string; readable: boolean }[];
+}
+
+/** schema.json as a whole: tables and views, and the server functions people can call. */
+export interface Schema {
+  tables: SchemaTable[];
+  functions: string[];
 }
 
 export interface StoredRow extends Omit<StoredTable, "columns"> {

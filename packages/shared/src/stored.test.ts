@@ -1,11 +1,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { STORED, storedTables, type SchemaTable } from "./stored";
+import { BANNED_WORDS } from "./copy";
+import { REVIEWED_FUNCTIONS, STORED, storedTables, type Schema } from "./stored";
 
 // schema.json is written from the migrations by supabase/tests/snapshot.sh, and CI checks it is up to date.
 // So a migration that adds a table or a column fails here until stored.ts describes it.
-const schema = JSON.parse(readFileSync(resolve(__dirname, "schema.json"), "utf8")) as SchemaTable[];
+const snapshot = JSON.parse(readFileSync(resolve(__dirname, "schema.json"), "utf8")) as Schema;
+const schema = snapshot.tables;
 
 describe("What Sparrow stores", () => {
   it("the snapshot has the tables the migrations make", () => {
@@ -36,6 +38,14 @@ describe("What Sparrow stores", () => {
     const guest = rows.find((r) => r.table === "guest_keys")!;
     expect(guest.columns.filter((c) => c.hidden).map((c) => c.name)).toEqual(["quiet_from", "quiet_to", "quiet_tz"]);
     expect(guest.columns.find((c) => c.name === "name")!.hidden).toBe(false);
+  });
+  it("every server function people can call has been checked against the who sentences", () => {
+    for (const f of snapshot.functions) expect(REVIEWED_FUNCTIONS, `${f} is new: check what it shows, update stored.ts, then add it`).toContain(f);
+    for (const f of REVIEWED_FUNCTIONS) expect(snapshot.functions, `${f} no longer exists`).toContain(f);
+  });
+  it("its words follow the same gentle-language rules as copy.ts", () => {
+    const text = JSON.stringify(STORED).toLowerCase();
+    for (const w of BANNED_WORDS) expect(text).not.toMatch(new RegExp(`\\b${w}\\b`));
   });
   it("a table without a description stops the build", () => {
     expect(() => storedTables([...schema, { table: "secret_new_table", rls: true, readPolicies: [], columns: [] }])).toThrow(/secret_new_table/);
