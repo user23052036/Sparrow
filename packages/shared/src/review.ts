@@ -22,7 +22,7 @@ export function reviewMessage(r: ReviewResult, isToday: boolean): string {
       : r.done < r.countable && isToday
         ? `${copy.partialWin(r.done, r.countable)} ${copy.oneSmallWin}`
         : copy.partialWin(r.done, r.countable);
-  return `${line} (+${r.total} points)`;
+  return copy.reviewPoints(line, r.total);
 }
 
 /** Bytes from base64 (the phone's image tools hand photos over this way). Throws on anything else. */

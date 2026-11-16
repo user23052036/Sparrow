@@ -13,6 +13,7 @@
     "@sparrow/shared": "*",
     "@supabase/supabase-js": "^2.119.0",
     "expo": "^58.0.23",
+    "expo-crypto": "~58.0.8",
     "expo-device": "^58.0.5",
     "expo-image-manipulator": "~58.0.16",
     "expo-image-picker": "~58.0.10",

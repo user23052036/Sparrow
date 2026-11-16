@@ -27,12 +27,14 @@ export function Today({ name, userId }: { name: string | null; userId: string })
       return;
     }
     const p = t.data as DailyPlan;
-    const [it, tk, pr, po] = await Promise.all([
+    const [it, tk, po] = await Promise.all([
       supabase.from("plan_items").select("*").eq("daily_plan_id", p.id),
       supabase.from("tasks").select("*").eq("archived", false),
-      supabase.from("proofs").select("plan_item_id"),
       supabase.rpc("partner_overview"),
     ]);
+    // Only today's items: a long history of proofs would otherwise run past the server's row limit.
+    const ids = ((it.data ?? []) as PlanItem[]).map((i) => i.id);
+    const pr = ids.length ? await supabase.from("proofs").select("plan_item_id").in("plan_item_id", ids) : { data: [], error: null };
     setBusy(false);
     if (it.error || tk.error || pr.error) {
       setErr(errorText(it.error ?? tk.error ?? pr.error));
@@ -84,6 +86,10 @@ export function Today({ name, userId }: { name: string | null; userId: string })
           onDone={(msg) => {
             setReviewing(false);
             setNote(msg);
+            void load();
+          }}
+          onClose={() => {
+            setReviewing(false);
             void load();
           }}
         />

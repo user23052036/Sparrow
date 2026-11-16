@@ -14,6 +14,8 @@ export const copy = {
   partialWin: (done: number, total: number) =>
     total === 0 ? "You showed up today. That counts." : `You moved ${done} of ${total} forward today. That's real progress.`,
   fullDay: "Everything you planned, done. Take a moment with that.",
+  /** After a review sentence: what the day brought. */
+  reviewPoints: (line: string, n: number) => `${line} (+${n} points)`,
   oneSmallWin: "Some things didn't happen today, and that's okay. Want one five-minute win before bed?",
   heavyStretch: "The last few days have been hard. Want to make tomorrow lighter?",
   heavyStretchToday: "The last few days have been hard. Want to keep today small?",
@@ -436,6 +438,7 @@ export const copy = {
     goodMorning: "Good morning",
     markDone: "Done",
     markPartly: "Partly",
+    notNow: "Not now",
     reviewHint: "When the day winds down, look back at it here.",
     status: { pending: "Not yet", done: "Done", partial: "Partly done", missed: "Didn't happen", rescheduled: "Moved" },
   },

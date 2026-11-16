@@ -9,7 +9,20 @@ const OPTIONS = ["done", "partial", "missed", "rescheduled"] as const;
 const MOODS = copy.moods.map((label, i) => ({ value: i + 1, label }));
 
 /** The evening review on the phone (ROADMAP T3.1): the same review_day() the website calls. */
-export function Review({ plan, items, tasks, onDone }: { plan: DailyPlan; items: PlanItem[]; tasks: Task[]; onDone: (msg: string) => void }) {
+export function Review({
+  plan,
+  items,
+  tasks,
+  onDone,
+  onClose,
+}: {
+  plan: DailyPlan;
+  items: PlanItem[];
+  tasks: Task[];
+  onDone: (msg: string) => void;
+  /** Back to the list, also after the day was closed somewhere else. */
+  onClose: () => void;
+}) {
   const [statuses, setStatuses] = useState<Record<string, ItemStatus>>(() => reviewStartStatuses(items));
   const [mood, setMood] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -20,7 +33,8 @@ export function Review({ plan, items, tasks, onDone }: { plan: DailyPlan; items:
     setErr(null);
     const { data, error } = await supabase.rpc("review_day", { p_plan_id: plan.id, p_statuses: statuses, p_mood: mood });
     setBusy(false);
-    if (error) setErr(errorText(error));
+    if (error && /already reviewed/i.test(error.message)) onClose();
+    else if (error) setErr(errorText(error));
     else onDone(reviewMessage(data as ReviewResult, true));
   }
 
@@ -44,7 +58,10 @@ export function Review({ plan, items, tasks, onDone }: { plan: DailyPlan; items:
           <Button key={m.value} label={m.label} on={mood === m.value} onPress={() => setMood(m.value)} />
         ))}
       </View>
-      <Button label={copy.today.finishDay} primary disabled={busy} onPress={finish} />
+      <View style={s.row}>
+        <Button label={copy.today.finishDay} primary disabled={busy} onPress={finish} />
+        <Button label={copy.phoneToday.notNow} disabled={busy} onPress={onClose} />
+      </View>
       <Err>{err}</Err>
     </View>
   );

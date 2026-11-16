@@ -1,17 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Switch, Text, TextInput, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import { randomUUID } from "expo-crypto";
 import { base64ToBytes, compressWithin, copy, exifTextAgeHours, PHOTO_OLDER_AFTER_HOURS } from "@sparrow/shared";
 import { errorText, notifyPartner, supabase } from "./supabase";
-import { uuid } from "./device";
 import { Button, Err } from "./ui";
 import { s } from "./theme";
 
+/** Which item the camera was opened for, so a photo taken while Android closed Sparrow still finds its place. */
+const CAMERA_ITEM = "sparrow:cameraItem";
+type Photo = ImagePicker.ImagePickerAsset;
+
+/** A photo the camera returned after Android closed Sparrow, read once and handed to the item it belongs to. */
+let pending: Promise<{ itemId: string; photo: Photo } | null> | null = null;
+function pendingPhoto() {
+  pending ??= (async () => {
+    try {
+      const [res, itemId] = await Promise.all([ImagePicker.getPendingResultAsync(), AsyncStorage.getItem(CAMERA_ITEM)]);
+      await AsyncStorage.removeItem(CAMERA_ITEM);
+      const photo = res && "assets" in res && !res.canceled ? res.assets?.[0] : null;
+      return photo && itemId ? { itemId, photo } : null;
+    } catch {
+      return null;
+    }
+  })();
+  return pending;
+}
+
+/**
+ * Re-encodes on the phone, which drops the photo's hidden details (place, camera) before upload. Each size step
+ * decodes the photo already scaled down, so a large camera photo is never held in memory at full size.
+ */
+async function encode(photo: Photo): Promise<Uint8Array> {
+  const { bytes } = await compressWithin(async ({ max, quality }) => {
+    const image = await ImageManipulator.manipulate(photo.uri, { maxWidth: max, maxHeight: max }).renderAsync();
+    try {
+      const out = await image.saveAsync({ compress: quality, format: SaveFormat.JPEG, base64: true });
+      if (!out.base64) throw new Error(copy.proof.processError);
+      const b = base64ToBytes(out.base64);
+      return { bytes: b, size: b.length };
+    } finally {
+      image.release();
+    }
+  });
+  return bytes;
+}
+
 /**
  * Proof for one planned item on the phone (ROADMAP T3.1): a photo through the system camera, or a written note.
- * The photo is re-encoded on the phone, which drops its hidden details (place, camera) before upload; its own
- * date is read first, for the same gentle note the website gives (D32).
+ * The photo's own date is read before re-encoding, for the same gentle note the website gives (D32).
  */
 export function ProofCapture({
   itemId,
@@ -31,27 +70,14 @@ export function ProofCapture({
   const [err, setErr] = useState<string | null>(null);
   const visibility = share && partnerName ? "buddy" : "private";
 
-  async function takePhoto() {
-    setErr(null);
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      setErr(copy.proof.cameraDenied);
-      return;
-    }
-    const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 1, exif: true });
-    const photo = shot.canceled ? null : shot.assets?.[0];
-    if (!photo) return;
+  async function savePhoto(photo: Photo) {
     setBusy(true);
+    setErr(null);
     try {
       const exif = photo.exif ?? {};
       const age = exifTextAgeHours(exif.DateTimeOriginal ?? exif.DateTimeDigitized ?? exif.DateTime, new Date());
-      const { bytes } = await compressWithin(async ({ max, quality }) => {
-        const resize = photo.width >= photo.height ? { width: Math.min(max, photo.width) } : { height: Math.min(max, photo.height) };
-        const out = await manipulateAsync(photo.uri, [{ resize }], { compress: quality, format: SaveFormat.JPEG, base64: true });
-        const b = base64ToBytes(out.base64 ?? "");
-        return { bytes: b, size: b.length };
-      });
-      const path = `${userId}/${uuid()}.jpg`;
+      const bytes = await encode(photo);
+      const path = `${userId}/${randomUUID()}.jpg`;
       const up = await supabase.storage.from("proofs").upload(path, bytes.buffer as ArrayBuffer, { contentType: "image/jpeg" });
       if (up.error) throw up.error;
       const { data, error } = await supabase
@@ -67,6 +93,39 @@ export function ProofCapture({
     } finally {
       setBusy(false);
     }
+  }
+
+  useEffect(() => {
+    let live = true;
+    void pendingPhoto().then((p) => {
+      if (live && p?.itemId === itemId) void savePhoto(p.photo);
+    });
+    return () => {
+      live = false;
+    };
+    // Once, when the item appears: a photo from before Android closed Sparrow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemId]);
+
+  async function takePhoto() {
+    setErr(null);
+    let photo: Photo | null | undefined;
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        setErr(copy.proof.cameraDenied);
+        return;
+      }
+      await AsyncStorage.setItem(CAMERA_ITEM, itemId);
+      const shot = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 1, exif: true });
+      await AsyncStorage.removeItem(CAMERA_ITEM);
+      photo = shot.canceled ? null : shot.assets?.[0];
+    } catch {
+      // No camera app, or Android said no (older phones also ask for storage access here).
+      setErr(copy.proof.cameraDenied);
+      return;
+    }
+    if (photo) await savePhoto(photo);
   }
 
   async function saveNote() {

@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
       },
     });
   } catch (e) {
-    if (isRefusal(e)) return json(403, { error: "This key link isn't valid anymore." });
+    if (isRefusal(e)) return json(403, { error: parsed.guestKey ? "This key link isn't valid anymore." : "Please sign in again, then try once more." });
     throw e;
   }
   return json(200, result);
