@@ -93,6 +93,9 @@ secrets, Deploy web, Live smoke test).
 - Extension push (D44): `push_subscriptions.silent` rows are extensions; `notify` and `remind` read only
   `silent = false` rows for notifications. The extension's push logic is in `apps/extension/lib/push.js`
   and `ensurePush`/`dropPush` in `background.js`; its tests fake `self.registration.pushManager`.
+- For T4.4 (found building T4.1): `log_kind_act`, `partner_support_nudge`, `penalty_status`, `pledge_limit`,
+  `set_penalty_optin` and `set_pledge` are executable by `anon` (never revoked from it). Each starts with
+  `require_user()`, so nothing is exposed, but they should be revoked from `anon` in a later migration.
 - The test stub now has Supabase's `service_role` role (bypass RLS); grant server-only functions to it.
 - The e2e fake answers `use_focus_link` and the four guest RPCs (`guest_overview`, `guest_decide`,
   `save_guest_push`, `remove_guest_push`) before its signed-in check; they are the anonymous RPCs.

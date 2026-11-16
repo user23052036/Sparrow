@@ -1,1200 +1,1310 @@
-[
-    {
-        "rls": true,
-        "table": "blocklists",
-        "columns": [
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "domains",
-                "readable": true
-            },
-            {
-                "name": "android_packages",
-                "readable": true
-            },
-            {
-                "name": "updated_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "blocklist_all"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "buddy_links",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "requester_id",
-                "readable": true
-            },
-            {
-                "name": "partner_id",
-                "readable": true
-            },
-            {
-                "name": "invite_code",
-                "readable": true
-            },
-            {
-                "name": "status",
-                "readable": true
-            },
-            {
-                "name": "mutual",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            },
-            {
-                "name": "requester_shares",
-                "readable": true
-            },
-            {
-                "name": "partner_shares",
-                "readable": true
-            },
-            {
-                "name": "requester_penalty_ok",
-                "readable": true
-            },
-            {
-                "name": "partner_penalty_ok",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "buddy_select"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "charities",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "name",
-                "readable": true
-            },
-            {
-                "name": "blurb",
-                "readable": true
-            },
-            {
-                "name": "active",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "charities_select"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "circle_cheers",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "circle_id",
-                "readable": true
-            },
-            {
-                "name": "from_id",
-                "readable": true
-            },
-            {
-                "name": "to_id",
-                "readable": true
-            },
-            {
-                "name": "day",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "circle_cheers_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "circle_goals",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "circle_id",
-                "readable": true
-            },
-            {
-                "name": "target",
-                "readable": true
-            },
-            {
-                "name": "started_at",
-                "readable": true
-            },
-            {
-                "name": "ends_at",
-                "readable": true
-            },
-            {
-                "name": "reached_at",
-                "readable": true
-            },
-            {
-                "name": "let_go_at",
-                "readable": true
-            },
-            {
-                "name": "started_by",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "circle_goals_select_member"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "circle_members",
-        "columns": [
-            {
-                "name": "circle_id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "member_key",
-                "readable": true
-            },
-            {
-                "name": "shares",
-                "readable": true
-            },
-            {
-                "name": "joined_at",
-                "readable": true
-            },
-            {
-                "name": "alias",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "circle_members_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "circles",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "name",
-                "readable": true
-            },
-            {
-                "name": "invite_code",
-                "readable": true
-            },
-            {
-                "name": "created_by",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "circles_select_member"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "crafted_badges",
-        "columns": [
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "key",
-                "readable": true
-            },
-            {
-                "name": "crafted_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "crafted_badges_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "daily_plans",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "date",
-                "readable": true
-            },
-            {
-                "name": "committed_at",
-                "readable": true
-            },
-            {
-                "name": "stake_type",
-                "readable": true
-            },
-            {
-                "name": "stake_amount",
-                "readable": true
-            },
-            {
-                "name": "mood_morning",
-                "readable": true
-            },
-            {
-                "name": "mood_evening",
-                "readable": true
-            },
-            {
-                "name": "reviewed_at",
-                "readable": true
-            },
-            {
-                "name": "points_earned",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "plans_select"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "devices",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "platform",
-                "readable": true
-            },
-            {
-                "name": "label",
-                "readable": true
-            },
-            {
-                "name": "last_heartbeat_at",
-                "readable": true
-            },
-            {
-                "name": "protection_enabled",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            },
-            {
-                "name": "push_token",
-                "readable": true
-            },
-            {
-                "name": "secret_hash",
-                "readable": true
-            },
-            {
-                "name": "asleep",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "devices_select"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "end_requests",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "session_id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "reason",
-                "readable": true
-            },
-            {
-                "name": "status",
-                "readable": true
-            },
-            {
-                "name": "decided_by",
-                "readable": true
-            },
-            {
-                "name": "decided_at",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            },
-            {
-                "name": "decided_by_guest",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "end_requests_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "feedback",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "message",
-                "readable": true
-            },
-            {
-                "name": "helpful",
-                "readable": true
-            },
-            {
-                "name": "page",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "feedback_select"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "focus_links",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "label",
-                "readable": true
-            },
-            {
-                "name": "minutes",
-                "readable": true
-            },
-            {
-                "name": "key_hash",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            },
-            {
-                "name": "last_used_at",
-                "readable": true
-            },
-            {
-                "name": "use_count",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "focus_links_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "focus_sessions",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "started_at",
-                "readable": true
-            },
-            {
-                "name": "planned_minutes",
-                "readable": true
-            },
-            {
-                "name": "ends_at",
-                "readable": true
-            },
-            {
-                "name": "ended_at",
-                "readable": true
-            },
-            {
-                "name": "ended_early",
-                "readable": true
-            },
-            {
-                "name": "exit_reason",
-                "readable": true
-            },
-            {
-                "name": "started_from_device_id",
-                "readable": true
-            },
-            {
-                "name": "plan_item_id",
-                "readable": true
-            },
-            {
-                "name": "locked",
-                "readable": true
-            },
-            {
-                "name": "started_by_link",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "focus_select"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "guest_keys",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "owner_id",
-                "readable": true
-            },
-            {
-                "name": "name",
-                "readable": true
-            },
-            {
-                "name": "key_hash",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            },
-            {
-                "name": "last_seen_at",
-                "readable": true
-            },
-            {
-                "name": "quiet_from",
-                "readable": false
-            },
-            {
-                "name": "quiet_to",
-                "readable": false
-            },
-            {
-                "name": "quiet_tz",
-                "readable": false
-            }
-        ],
-        "readPolicies": [
-            "guest_keys_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "kind_acts",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "plan_id",
-                "readable": true
-            },
-            {
-                "name": "note",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "kind_acts_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "makeup_steps",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "from_plan_id",
-                "readable": true
-            },
-            {
-                "name": "due_on",
-                "readable": true
-            },
-            {
-                "name": "title",
-                "readable": true
-            },
-            {
-                "name": "status",
-                "readable": true
-            },
-            {
-                "name": "settled_at",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "makeup_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "partner_pledges",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "plan_id",
-                "readable": true
-            },
-            {
-                "name": "payer_id",
-                "readable": true
-            },
-            {
-                "name": "for_user_id",
-                "readable": true
-            },
-            {
-                "name": "charity_id",
-                "readable": true
-            },
-            {
-                "name": "amount",
-                "readable": true
-            },
-            {
-                "name": "currency",
-                "readable": true
-            },
-            {
-                "name": "mode",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "partner_pledges_select_payer"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "plan_items",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "daily_plan_id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "task_id",
-                "readable": true
-            },
-            {
-                "name": "status",
-                "readable": true
-            },
-            {
-                "name": "completed_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "items_select"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "pledges",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "plan_id",
-                "readable": true
-            },
-            {
-                "name": "charity_id",
-                "readable": true
-            },
-            {
-                "name": "amount",
-                "readable": true
-            },
-            {
-                "name": "currency",
-                "readable": true
-            },
-            {
-                "name": "mode",
-                "readable": true
-            },
-            {
-                "name": "status",
-                "readable": true
-            },
-            {
-                "name": "owed",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            },
-            {
-                "name": "settled_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "pledges_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "points_ledger",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "delta",
-                "readable": true
-            },
-            {
-                "name": "reason",
-                "readable": true
-            },
-            {
-                "name": "ref_id",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "points_select"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "profiles",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "display_name",
-                "readable": true
-            },
-            {
-                "name": "timezone",
-                "readable": true
-            },
-            {
-                "name": "gentle_mode",
-                "readable": true
-            },
-            {
-                "name": "onboarded",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            },
-            {
-                "name": "light_day",
-                "readable": true
-            },
-            {
-                "name": "share_rating",
-                "readable": true
-            },
-            {
-                "name": "leaderboard_optin",
-                "readable": true
-            },
-            {
-                "name": "leaderboard_handle",
-                "readable": true
-            },
-            {
-                "name": "remind_morning",
-                "readable": true
-            },
-            {
-                "name": "remind_evening",
-                "readable": true
-            },
-            {
-                "name": "quiet_from",
-                "readable": true
-            },
-            {
-                "name": "quiet_to",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "profiles_select"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "proofs",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "plan_item_id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "kind",
-                "readable": true
-            },
-            {
-                "name": "storage_path",
-                "readable": true
-            },
-            {
-                "name": "text_body",
-                "readable": true
-            },
-            {
-                "name": "image_phash",
-                "readable": true
-            },
-            {
-                "name": "flagged_similar",
-                "readable": true
-            },
-            {
-                "name": "visibility",
-                "readable": true
-            },
-            {
-                "name": "server_created_at",
-                "readable": true
-            },
-            {
-                "name": "duration_s",
-                "readable": true
-            },
-            {
-                "name": "photo_age_hours",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "proofs_select_buddy",
-            "proofs_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "push_sent",
-        "columns": [
-            {
-                "name": "kind",
-                "readable": false
-            },
-            {
-                "name": "ref",
-                "readable": false
-            },
-            {
-                "name": "created_at",
-                "readable": false
-            }
-        ],
-        "readPolicies": [
-        ]
-    },
-    {
-        "rls": true,
-        "table": "push_subscriptions",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "endpoint",
-                "readable": true
-            },
-            {
-                "name": "p256dh",
-                "readable": true
-            },
-            {
-                "name": "auth",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            },
-            {
-                "name": "guest_key_id",
-                "readable": true
-            },
-            {
-                "name": "silent",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "push_subscriptions_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "reminder_job",
-        "columns": [
-            {
-                "name": "id",
-                "readable": false
-            },
-            {
-                "name": "function_url",
-                "readable": false
-            },
-            {
-                "name": "secret",
-                "readable": false
-            }
-        ],
-        "readPolicies": [
-        ]
-    },
-    {
-        "rls": true,
-        "table": "reminder_sent",
-        "columns": [
-            {
-                "name": "user_id",
-                "readable": false
-            },
-            {
-                "name": "local_date",
-                "readable": false
-            },
-            {
-                "name": "slot",
-                "readable": false
-            },
-            {
-                "name": "sent_at",
-                "readable": false
-            }
-        ],
-        "readPolicies": [
-        ]
-    },
-    {
-        "rls": true,
-        "table": "tamper_events",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "device_id",
-                "readable": true
-            },
-            {
-                "name": "focus_session_id",
-                "readable": true
-            },
-            {
-                "name": "kind",
-                "readable": true
-            },
-            {
-                "name": "detail",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "tamper_select_buddy",
-            "tamper_select_own"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "tasks",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "title",
-                "readable": true
-            },
-            {
-                "name": "notes",
-                "readable": true
-            },
-            {
-                "name": "proof_required",
-                "readable": true
-            },
-            {
-                "name": "archived",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            },
-            {
-                "name": "if_cue",
-                "readable": true
-            },
-            {
-                "name": "then_action",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "tasks_all"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "task_steps",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "task_id",
-                "readable": true
-            },
-            {
-                "name": "user_id",
-                "readable": true
-            },
-            {
-                "name": "title",
-                "readable": true
-            },
-            {
-                "name": "est_minutes",
-                "readable": true
-            },
-            {
-                "name": "position",
-                "readable": true
-            },
-            {
-                "name": "done_on",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "steps_all"
-        ]
-    },
-    {
-        "rls": true,
-        "table": "verifications",
-        "columns": [
-            {
-                "name": "id",
-                "readable": true
-            },
-            {
-                "name": "proof_id",
-                "readable": true
-            },
-            {
-                "name": "verifier_id",
-                "readable": true
-            },
-            {
-                "name": "verdict",
-                "readable": true
-            },
-            {
-                "name": "comment",
-                "readable": true
-            },
-            {
-                "name": "created_at",
-                "readable": true
-            }
-        ],
-        "readPolicies": [
-            "verif_select"
-        ]
-    }
-]
+{
+    "tables": [
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "blocklists",
+            "columns": [
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "domains",
+                    "readable": true
+                },
+                {
+                    "name": "android_packages",
+                    "readable": true
+                },
+                {
+                    "name": "updated_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "blocklist_all"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "buddy_links",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "requester_id",
+                    "readable": true
+                },
+                {
+                    "name": "partner_id",
+                    "readable": true
+                },
+                {
+                    "name": "invite_code",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "mutual",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "requester_shares",
+                    "readable": true
+                },
+                {
+                    "name": "partner_shares",
+                    "readable": true
+                },
+                {
+                    "name": "requester_penalty_ok",
+                    "readable": true
+                },
+                {
+                    "name": "partner_penalty_ok",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "buddy_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "charities",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "name",
+                    "readable": true
+                },
+                {
+                    "name": "blurb",
+                    "readable": true
+                },
+                {
+                    "name": "active",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "charities_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "circle_cheers",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "circle_id",
+                    "readable": true
+                },
+                {
+                    "name": "from_id",
+                    "readable": true
+                },
+                {
+                    "name": "to_id",
+                    "readable": true
+                },
+                {
+                    "name": "day",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "circle_cheers_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "circle_goals",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "circle_id",
+                    "readable": true
+                },
+                {
+                    "name": "target",
+                    "readable": true
+                },
+                {
+                    "name": "started_at",
+                    "readable": true
+                },
+                {
+                    "name": "ends_at",
+                    "readable": true
+                },
+                {
+                    "name": "reached_at",
+                    "readable": true
+                },
+                {
+                    "name": "let_go_at",
+                    "readable": true
+                },
+                {
+                    "name": "started_by",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "circle_goals_select_member"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "circle_members",
+            "columns": [
+                {
+                    "name": "circle_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "member_key",
+                    "readable": true
+                },
+                {
+                    "name": "shares",
+                    "readable": true
+                },
+                {
+                    "name": "joined_at",
+                    "readable": true
+                },
+                {
+                    "name": "alias",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "circle_members_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "circles",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "name",
+                    "readable": true
+                },
+                {
+                    "name": "invite_code",
+                    "readable": true
+                },
+                {
+                    "name": "created_by",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "circles_select_member"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "crafted_badges",
+            "columns": [
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "key",
+                    "readable": true
+                },
+                {
+                    "name": "crafted_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "crafted_badges_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "daily_plans",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "date",
+                    "readable": true
+                },
+                {
+                    "name": "committed_at",
+                    "readable": true
+                },
+                {
+                    "name": "stake_type",
+                    "readable": true
+                },
+                {
+                    "name": "stake_amount",
+                    "readable": true
+                },
+                {
+                    "name": "mood_morning",
+                    "readable": true
+                },
+                {
+                    "name": "mood_evening",
+                    "readable": true
+                },
+                {
+                    "name": "reviewed_at",
+                    "readable": true
+                },
+                {
+                    "name": "points_earned",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "plans_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "devices",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "platform",
+                    "readable": true
+                },
+                {
+                    "name": "label",
+                    "readable": true
+                },
+                {
+                    "name": "last_heartbeat_at",
+                    "readable": true
+                },
+                {
+                    "name": "protection_enabled",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "push_token",
+                    "readable": true
+                },
+                {
+                    "name": "secret_hash",
+                    "readable": true
+                },
+                {
+                    "name": "asleep",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "devices_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "end_requests",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "session_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "reason",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "decided_by",
+                    "readable": true
+                },
+                {
+                    "name": "decided_at",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "decided_by_guest",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "end_requests_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "feedback",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "message",
+                    "readable": true
+                },
+                {
+                    "name": "helpful",
+                    "readable": true
+                },
+                {
+                    "name": "page",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "feedback_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "focus_links",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "label",
+                    "readable": true
+                },
+                {
+                    "name": "minutes",
+                    "readable": true
+                },
+                {
+                    "name": "key_hash",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "last_used_at",
+                    "readable": true
+                },
+                {
+                    "name": "use_count",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "focus_links_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "focus_sessions",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "started_at",
+                    "readable": true
+                },
+                {
+                    "name": "planned_minutes",
+                    "readable": true
+                },
+                {
+                    "name": "ends_at",
+                    "readable": true
+                },
+                {
+                    "name": "ended_at",
+                    "readable": true
+                },
+                {
+                    "name": "ended_early",
+                    "readable": true
+                },
+                {
+                    "name": "exit_reason",
+                    "readable": true
+                },
+                {
+                    "name": "started_from_device_id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_item_id",
+                    "readable": true
+                },
+                {
+                    "name": "locked",
+                    "readable": true
+                },
+                {
+                    "name": "started_by_link",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "focus_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "guest_keys",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "owner_id",
+                    "readable": true
+                },
+                {
+                    "name": "name",
+                    "readable": true
+                },
+                {
+                    "name": "key_hash",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "last_seen_at",
+                    "readable": true
+                },
+                {
+                    "name": "quiet_from",
+                    "readable": false
+                },
+                {
+                    "name": "quiet_to",
+                    "readable": false
+                },
+                {
+                    "name": "quiet_tz",
+                    "readable": false
+                }
+            ],
+            "readPolicies": [
+                "guest_keys_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "kind_acts",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "note",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "kind_acts_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "makeup_steps",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "from_plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "due_on",
+                    "readable": true
+                },
+                {
+                    "name": "title",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "settled_at",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "makeup_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "partner_pledges",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "payer_id",
+                    "readable": true
+                },
+                {
+                    "name": "for_user_id",
+                    "readable": true
+                },
+                {
+                    "name": "charity_id",
+                    "readable": true
+                },
+                {
+                    "name": "amount",
+                    "readable": true
+                },
+                {
+                    "name": "currency",
+                    "readable": true
+                },
+                {
+                    "name": "mode",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "partner_pledges_select_payer"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "plan_items",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "daily_plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "task_id",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "completed_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "items_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "pledges",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_id",
+                    "readable": true
+                },
+                {
+                    "name": "charity_id",
+                    "readable": true
+                },
+                {
+                    "name": "amount",
+                    "readable": true
+                },
+                {
+                    "name": "currency",
+                    "readable": true
+                },
+                {
+                    "name": "mode",
+                    "readable": true
+                },
+                {
+                    "name": "status",
+                    "readable": true
+                },
+                {
+                    "name": "owed",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "settled_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "pledges_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "points_ledger",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "delta",
+                    "readable": true
+                },
+                {
+                    "name": "reason",
+                    "readable": true
+                },
+                {
+                    "name": "ref_id",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "points_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "profiles",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "display_name",
+                    "readable": true
+                },
+                {
+                    "name": "timezone",
+                    "readable": true
+                },
+                {
+                    "name": "gentle_mode",
+                    "readable": true
+                },
+                {
+                    "name": "onboarded",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "light_day",
+                    "readable": true
+                },
+                {
+                    "name": "share_rating",
+                    "readable": true
+                },
+                {
+                    "name": "leaderboard_optin",
+                    "readable": true
+                },
+                {
+                    "name": "leaderboard_handle",
+                    "readable": true
+                },
+                {
+                    "name": "remind_morning",
+                    "readable": true
+                },
+                {
+                    "name": "remind_evening",
+                    "readable": true
+                },
+                {
+                    "name": "quiet_from",
+                    "readable": true
+                },
+                {
+                    "name": "quiet_to",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "profiles_select"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "proofs",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "plan_item_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "kind",
+                    "readable": true
+                },
+                {
+                    "name": "storage_path",
+                    "readable": true
+                },
+                {
+                    "name": "text_body",
+                    "readable": true
+                },
+                {
+                    "name": "image_phash",
+                    "readable": true
+                },
+                {
+                    "name": "flagged_similar",
+                    "readable": true
+                },
+                {
+                    "name": "visibility",
+                    "readable": true
+                },
+                {
+                    "name": "server_created_at",
+                    "readable": true
+                },
+                {
+                    "name": "duration_s",
+                    "readable": true
+                },
+                {
+                    "name": "photo_age_hours",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "proofs_select_buddy",
+                "proofs_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "push_sent",
+            "columns": [
+                {
+                    "name": "kind",
+                    "readable": false
+                },
+                {
+                    "name": "ref",
+                    "readable": false
+                },
+                {
+                    "name": "created_at",
+                    "readable": false
+                }
+            ],
+            "readPolicies": [
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "push_subscriptions",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "endpoint",
+                    "readable": true
+                },
+                {
+                    "name": "p256dh",
+                    "readable": true
+                },
+                {
+                    "name": "auth",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "guest_key_id",
+                    "readable": true
+                },
+                {
+                    "name": "silent",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "push_subscriptions_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "reminder_job",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": false
+                },
+                {
+                    "name": "function_url",
+                    "readable": false
+                },
+                {
+                    "name": "secret",
+                    "readable": false
+                }
+            ],
+            "readPolicies": [
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "reminder_sent",
+            "columns": [
+                {
+                    "name": "user_id",
+                    "readable": false
+                },
+                {
+                    "name": "local_date",
+                    "readable": false
+                },
+                {
+                    "name": "slot",
+                    "readable": false
+                },
+                {
+                    "name": "sent_at",
+                    "readable": false
+                }
+            ],
+            "readPolicies": [
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "tamper_events",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "device_id",
+                    "readable": true
+                },
+                {
+                    "name": "focus_session_id",
+                    "readable": true
+                },
+                {
+                    "name": "kind",
+                    "readable": true
+                },
+                {
+                    "name": "detail",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "tamper_select_buddy",
+                "tamper_select_own"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "task_steps",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "task_id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "title",
+                    "readable": true
+                },
+                {
+                    "name": "est_minutes",
+                    "readable": true
+                },
+                {
+                    "name": "position",
+                    "readable": true
+                },
+                {
+                    "name": "done_on",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "steps_all"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "tasks",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "user_id",
+                    "readable": true
+                },
+                {
+                    "name": "title",
+                    "readable": true
+                },
+                {
+                    "name": "notes",
+                    "readable": true
+                },
+                {
+                    "name": "proof_required",
+                    "readable": true
+                },
+                {
+                    "name": "archived",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                },
+                {
+                    "name": "if_cue",
+                    "readable": true
+                },
+                {
+                    "name": "then_action",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "tasks_all"
+            ]
+        },
+        {
+            "rls": true,
+            "kind": "table",
+            "table": "verifications",
+            "columns": [
+                {
+                    "name": "id",
+                    "readable": true
+                },
+                {
+                    "name": "proof_id",
+                    "readable": true
+                },
+                {
+                    "name": "verifier_id",
+                    "readable": true
+                },
+                {
+                    "name": "verdict",
+                    "readable": true
+                },
+                {
+                    "name": "comment",
+                    "readable": true
+                },
+                {
+                    "name": "created_at",
+                    "readable": true
+                }
+            ],
+            "readPolicies": [
+                "verif_select"
+            ]
+        }
+    ],
+    "functions": [
+        "accept_buddy_invite",
+        "check_my_heartbeats",
+        "circle_goal",
+        "circle_overview",
+        "claim_push",
+        "commit_day",
+        "convert_guest_key",
+        "craft_badge",
+        "create_buddy_invite",
+        "create_circle",
+        "create_focus_link",
+        "create_guest_key",
+        "decide_end_request",
+        "device_decide_end_request",
+        "device_sync",
+        "end_buddy_link",
+        "end_focus_session",
+        "export_my_data",
+        "forget_device_secret",
+        "get_focus_state",
+        "get_today",
+        "guest_decide",
+        "guest_overview",
+        "guest_push_is_on",
+        "guest_set_quiet",
+        "heartbeat",
+        "is_buddy_of",
+        "issue_device_secret",
+        "join_circle",
+        "join_leaderboard",
+        "key_request_status",
+        "leave_circle",
+        "leave_leaderboard",
+        "let_go_circle_goal",
+        "log_kind_act",
+        "monthly_leaderboard",
+        "my_collection",
+        "my_progress",
+        "my_rating",
+        "partner_badge",
+        "partner_overview",
+        "partner_rating",
+        "partner_support_nudge",
+        "penalty_status",
+        "pledge_limit",
+        "points_balance",
+        "preview_buddy_invite",
+        "preview_circle_invite",
+        "proof_context",
+        "recent_completion",
+        "remove_focus_link",
+        "remove_guest_key",
+        "remove_guest_push",
+        "remove_push_subscription",
+        "request_end_session",
+        "review_day",
+        "save_extension_push",
+        "save_guest_push",
+        "save_push_subscription",
+        "send_cheer",
+        "set_circle_alias",
+        "set_circle_sharing",
+        "set_item_status",
+        "set_my_sharing",
+        "set_penalty_optin",
+        "set_pledge",
+        "set_push_token",
+        "set_quiet_hours",
+        "set_share_rating",
+        "settle_makeup_step",
+        "start_circle_goal",
+        "start_focus_session",
+        "unreviewed_days",
+        "use_focus_link",
+        "verify_proof"
+    ]
+}

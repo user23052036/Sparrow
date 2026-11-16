@@ -457,13 +457,18 @@ export const copy = {
   stored: {
     title: "What Sparrow stores",
     intro:
-      "Every table in Sparrow's database and every column in it, in plain words, with who can read it. The site builds this page from the database's own setup, so it can't fall behind.",
+      "Every table Sparrow's own setup creates and every column in it, in plain words, with who can read it. The site builds the list from the database's setup, and a check stops the build when a table, a column or a new way of showing data isn't described here.",
+    operators:
+      "The people running Sparrow, and the company hosting its database, can technically reach every row. They read only feedback you send and anonymous totals.",
+    signInTitle: "Your sign-in",
+    signIn:
+      "Supabase, which runs Sparrow's database, keeps your email address, a scrambled form of your password that can't be turned back into it, when you signed in, and sign-in records with the internet address and browser used. Only Sparrow's server and the people running it can reach these.",
     who: "Who can read it",
     hidden: "No one can read this through the app.",
     columns: (n: number) => `${n} column${n === 1 ? "" : "s"}`,
     filesTitle: "Files",
     files:
-      "Proof photos and voice notes are kept as private files in a folder under your account. Only you can open them, and your partner can open one you shared with them.",
+      "Proof photos and voice notes are kept as private files in a folder under your account, with their name, size and type. Only you can open them, and your partner can open one you shared with them.",
     privacyLink: "See every table and column Sparrow stores",
   },
   /** "Check my setup" on the phone (T3.3): the BETA.md device checklist, run by the app. Lines match setupcheck.ts. */
