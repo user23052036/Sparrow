@@ -26,9 +26,16 @@ object KeyRequestNotifier {
   fun update(context: Context) {
     val store = EngineStore(context)
     val nm = context.getSystemService(NotificationManager::class.java) ?: return
-    // Signed out, or the server refused this phone: nothing it shows can be answered any more.
-    if (store.config() == null || store.status() == "signed_out") {
+    // Signed out on this phone: nothing it shows can be answered any more.
+    if (store.config() == null) {
       clearAll(context)
+      return
+    }
+    // The server refused this phone: what it shows can't be answered here, so each says to answer on the website.
+    if (store.status() == "signed_out") {
+      store.shownRequests().forEach { notSent(context, it) }
+      store.saveShownRequests(emptySet())
+      store.saveWaitingRequests(emptyList())
       return
     }
     val plan = KeyRequests.plan(store.waitingRequests(), store.shownRequests())

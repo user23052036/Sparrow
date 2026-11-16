@@ -67,11 +67,15 @@ export async function setUpEngine(): Promise<boolean> {
 /** Signing out: the phone forgets its secret, the server stops accepting it (0032), and blocking stops with it. */
 export async function forgetEngine(): Promise<void> {
   const id = engine.configuredDeviceId();
+  // Best effort, and never more than three seconds: signing out must not wait on a stalled network.
   if (id)
-    await supabase.rpc("forget_device_secret", { p_device_id: id }).then(
-      () => undefined,
-      () => undefined,
-    );
+    await Promise.race([
+      supabase.rpc("forget_device_secret", { p_device_id: id }).then(
+        () => undefined,
+        () => undefined,
+      ),
+      new Promise<void>((done) => setTimeout(done, 3000)),
+    ]);
   await AsyncStorage.removeItem(SETUP_TEST_KEY);
   engine.clear();
 }
