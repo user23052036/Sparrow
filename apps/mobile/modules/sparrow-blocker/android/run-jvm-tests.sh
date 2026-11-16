@@ -8,8 +8,11 @@ trap 'rm -rf "$OUT"' EXIT
 KLIB="$(dirname "$(dirname "$(command -v kotlinc)")")/lib"
 kotlinc src/main/java/expo/modules/sparrowblocker/engine/BlockRules.kt \
   src/main/java/expo/modules/sparrowblocker/engine/DnsRules.kt \
+  src/main/java/expo/modules/sparrowblocker/engine/KeyRequests.kt \
   src/test/java/expo/modules/sparrowblocker/engine/BlockRulesTest.kt \
   src/test/java/expo/modules/sparrowblocker/engine/DnsRulesTest.kt \
+  src/test/java/expo/modules/sparrowblocker/engine/KeyRequestsTest.kt \
   -cp "$KLIB/kotlin-test.jar" -d "$OUT/t.jar" 2>&1 | grep -v "^warning" || true
 kotlin -cp "$OUT/t.jar:$KLIB/kotlin-test.jar" expo.modules.sparrowblocker.engine.BlockRulesTest
 kotlin -cp "$OUT/t.jar:$KLIB/kotlin-test.jar" expo.modules.sparrowblocker.engine.DnsRulesTest
+kotlin -cp "$OUT/t.jar:$KLIB/kotlin-test.jar" expo.modules.sparrowblocker.engine.KeyRequestsTest

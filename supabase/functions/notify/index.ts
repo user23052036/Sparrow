@@ -3,6 +3,7 @@
 // POST { kind, ref } → the database (claim_push, migrations 0028 and 0030) decides, as the caller, who should hear
 //      about that event; this function then sends to that person's (or guest's) browsers with VAPID.
 // POST { kind: "key_answer", ref, key } → a guest partner (D39) answered; claim_guest_push checks their key.
+// POST { kind: "key_answer", ref, device: { id, secret } } → a key holder answered from their phone (D46, 0032).
 // POST { kind: "session_started" | "session_ended", ref } → wakes the caller's own extensions with a silent push (D44, 0036).
 // JWT verification stays on (a guest's page sends the public anon key).
 // Secrets (set by .github/workflows/deploy-db.yml on first deploy): VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
@@ -32,7 +33,7 @@ Deno.serve(async (req) => {
   });
   const parsed = parseRequest(await req.json().catch(() => null));
   if (!parsed) return json(400, { error: "Unknown notification." });
-  if (!parsed.guestKey) {
+  if (!parsed.guestKey && !parsed.device) {
     const { data: who, error: authError } = await asUser.auth.getUser();
     if (authError || !who.user) return json(401, { error: "Please sign in again, then try once more." });
   }
@@ -52,7 +53,9 @@ Deno.serve(async (req) => {
         // A guest's claim is server-only (0030), so the owner's account id never reaches the guest's browser.
         const { data, error } = parsed.guestKey
           ? await admin.rpc("claim_guest_push", { p_key: parsed.guestKey, p_kind: kind, p_ref: ref })
-          : await asUser.rpc("claim_push", { p_kind: kind, p_ref: ref });
+          : parsed.device
+            ? await admin.rpc("claim_device_push", { p_device_id: parsed.device.id, p_secret: parsed.device.secret, p_kind: kind, p_ref: ref })
+            : await asUser.rpc("claim_push", { p_kind: kind, p_ref: ref });
         if (error) throw error;
         return (data as Recipient | null) ?? null;
       },
@@ -67,7 +70,14 @@ Deno.serve(async (req) => {
       },
     });
   } catch (e) {
-    if (isRefusal(e)) return json(403, { error: parsed.guestKey ? "This key link isn't valid anymore." : "Please sign in again, then try once more." });
+    if (isRefusal(e)) {
+      const why = parsed.guestKey
+        ? "This key link isn't valid anymore."
+        : parsed.device
+          ? "This phone needs to sign in again."
+          : "Please sign in again, then try once more.";
+      return json(403, { error: why });
+    }
     throw e;
   }
   return json(200, result);

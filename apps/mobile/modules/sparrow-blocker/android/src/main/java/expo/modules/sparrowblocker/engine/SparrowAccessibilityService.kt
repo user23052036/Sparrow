@@ -112,6 +112,8 @@ class SparrowAccessibilityService : AccessibilityService() {
       }
       // M5b-5: start or stop website blocking to match the session (does nothing unless the person switched it on).
       SparrowVpnService.apply(this)
+      // T3.2: key requests waiting on this phone's owner, as notifications with two answers.
+      KeyRequestNotifier.update(this)
       // A session that just arrived should cover the app that is already open.
       main.post { currentPkg?.let { if (screenOn) evaluate(it) } }
     }

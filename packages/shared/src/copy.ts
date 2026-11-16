@@ -431,6 +431,28 @@ export const copy = {
     cameraDenied: "Sparrow couldn't use the camera. You can allow it in the phone's settings, or write a note instead.",
     saving: "Saving…",
   },
+  /**
+   * Key requests on the key holder's phone (T3.2, D46). Mirrored in the native module's res/values/strings.xml
+   * (a test compares them). Like Web Push, never who asked or why: a lock screen is not private.
+   */
+  phoneKey: {
+    channel: "Key requests",
+    title: "Your partner is asking for the key",
+    body: "They'd like to end a locked focus session early. You can answer right here.",
+    letOut: "Let them out",
+    keepGoing: "Keep going",
+    confirmTitle: "Let them out?",
+    confirmBody: "This ends their locked session now.",
+    confirmYes: "Yes, let them out",
+    notSent: "Sparrow couldn't send your answer. Open Sparrow's website to answer.",
+    unlock: "Unlock your phone to answer.",
+    allowTitle: "Key requests on this phone",
+    allowBody:
+      "If you hold someone's key, their requests to end a session early can show here as a notification you answer right away. It never says who asked or why.",
+    allow: "Allow notifications",
+    allowed: "Notifications are on.",
+    denied: "Notifications are off for Sparrow. You can switch them on in the phone's settings.",
+  },
   /** The Android app's Today screen (T3.1). */
   phoneToday: {
     planOnWebsite: "Planning your morning happens on the website for now. Your plan shows up here once it's set.",

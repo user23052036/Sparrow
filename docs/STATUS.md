@@ -1,16 +1,16 @@
 # Sparrow: current status (2026-11-16, second local run, backend live)
 
-Repo: github.com/user23052036/Sparrow. `main` has everything through T3.1 (evening review and proofs on Android):
-D1 to D45 and migrations to `0031` plus `0036` (T2.5 had no number; see D44). Live site:
+Repo: github.com/user23052036/Sparrow. `main` has everything through T3.2 (partner requests on Android):
+D1 to D46 and migrations to `0032` plus `0036` (T2.5 had no number; see D44). Live site:
 https://user23052036.github.io/Sparrow/, backed since 2026-11-16 by the owner's Supabase project (Tokyo, free plan;
 the ref is in the repo secrets).
 
 ## Start here
 1. `docs/AUTONOMY.md`: how to run without the owner (preflight, modes A/B/C, agents, credentials).
 2. `docs/ROADMAP.md`: audit, position, tasks T0.1 to T5.4 with pre-assigned migration numbers.
-3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D45).
+3. Repo `CLAUDE.md` and `docs/DECISIONS.md` (D1 to D46).
 
-**Next task: T3.2 (partner requests on Android, `0032`).** Then T3.3, WS4 (`0033`, `0034`), WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not touch `claim_push`,
+**Next task: T3.3 ("Check my setup" screen on the phone).** Then WS4 (`0033`, `0034`), WS5 (`0035`). `0036` is already applied before them (D44): `0032` to `0035` must not touch `claim_push`,
 `save_push_subscription`, `save_extension_push`, `convert_guest_key` or the `silent` column (a test checks); such a change goes in a
 migration after `0036`.
 
@@ -36,6 +36,7 @@ T2.1 and T2.2 also had an independent reviewer agent; every defect it found was 
 | T2.3 | #24 | Guest partner (D39, `0030`): key link `/key#spg_…`, anonymous guest functions, one key holder at a time, `claim_push` answers `{to, id}`, guest push, `convert_guest_key`. Run 2026-11-16; two review rounds (a race between invites and guests, push state, key memory on the page), all fixed before merging. |
 | T2.5 | #27 | Instant start on the laptop (D44, `0036`): Chrome allows silent push in extensions since 121, so the extension subscribes (`userVisibleOnly: false`), saves a silent address, and syncs on each push; `session_started`/`session_ended` from the web and phone apps and `key_answer` wake it; 30 s polling stays. Deploy pushes with `--include-all` (remove it once `0035` lands). Two review rounds (a sign-out race, per-kind address limits, migration-order pin), all fixed before merging. |
 | T3.1 | see git log | Evening review and proofs on Android (D45): photo through the system camera (`expo-image-picker`), re-encoded on the phone (`expo-image-manipulator`, which drops its hidden details), its own date read for the D32 note; written notes; share with the partner; the evening review with `review_day`. Review helpers moved to shared. Also: `notify` answers 403 instead of 500 for a guest key that is no longer valid. |
+| T3.2 | see git log | Partner requests on Android (D46, `0032`): `device_sync` lists waiting key requests (ids only, quiet hours respected); the engine posts a notification with "Keep going" and a two-step "Let them out"; `device_decide_end_request` and `notify`'s device path (`claim_device_push`) answer with the phone's own credential; Protect asks for the notification permission. `0032` also requires every proof file to be in its author's folder. |
 
 ## Checks run in this run
 - Locally, per task, with Node 24 (`fnm exec --using=24`; the Mac's default Node 20 is below the repo's
@@ -81,7 +82,8 @@ secrets, Deploy web, Live smoke test).
 ## Working notes
 - SQL test user prefixes used so far: 2-9, a-f repeated, a1a1a1a1, c1c1c1c1, d1d1d1d1, e1e1e1e1,
   f1f1f1f1, 24242424, 25252525, 26262626, 28282828 (push), 29292929 (reminders), 30303030 (guest partner),
-  31313131 (fatigue guard), 32323232 (extension push). Next: 33333333.
+  31313131 (fatigue guard), 32323232 (extension push), 34343434 (phone key requests). `33333333` is taken by the
+  early "3 repeated" tests. Next: 35353535.
 - Extension push (D44): `push_subscriptions.silent` rows are extensions; `notify` and `remind` read only
   `silent = false` rows for notifications. The extension's push logic is in `apps/extension/lib/push.js`
   and `ensurePush`/`dropPush` in `background.js`; its tests fake `self.registration.pushManager`.

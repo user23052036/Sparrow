@@ -991,7 +991,7 @@ insert into proofs (id, plan_item_id, kind, storage_path, image_phash, photo_age
 insert into proofs (id, plan_item_id, kind, text_body, visibility)
   values ('f1f1f1f1-9999-0000-0000-000000000003', (select id from plan_items), 'text', 'Did it', 'buddy');
 select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, text_body, photo_age_hours) values ((select id from plan_items), 'text', 'x', 3)$q$, 'only a photo has a photo age');
-select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path, photo_age_hours) values ((select id from plan_items), 'photo', 'p.jpg', -5)$q$, 'a photo age cannot be negative');
+select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path, photo_age_hours) values ((select id from plan_items), 'photo', auth.uid() || '/p.jpg', -5)$q$, 'a photo age cannot be negative');
 update proofs set photo_age_hours = 0 where id = 'f1f1f1f1-9999-0000-0000-000000000001';
 select pg_temp.check((select photo_age_hours from proofs where id = 'f1f1f1f1-9999-0000-0000-000000000001') = 72, 'the photo age cannot be changed after saving');
 select pg_temp.check((proof_context('f1f1f1f1-9999-0000-0000-000000000001') ->> 'photo_age') = 'older', 'a photo dated days earlier is noted as older');
@@ -1893,3 +1893,119 @@ insert into push_subscriptions (guest_key_id, endpoint, p256dh, auth)
 select pg_temp.expect_error($q$insert into push_subscriptions (guest_key_id, endpoint, p256dh, auth, silent)
   values ((select id from guest_keys where owner_id = '32323232-0000-0000-0000-000000000002'), 'https://fcm.googleapis.com/fcm/send/g2', repeat('p', 40), repeat('a', 16), true)$q$,
   'a guest''s browser is never a silent one');
+
+-- ------------------------------------------------------------ partner requests on Android (0032)
+insert into auth.users values
+  ('34343434-0000-0000-0000-000000000001', 'k1@test'), ('34343434-0000-0000-0000-000000000002', 'k2@test'),
+  ('34343434-0000-0000-0000-000000000003', 'k3@test');
+-- k1 asks, k2 holds the key and has a phone running Sparrow, k3 is a stranger with a phone
+select pg_temp.as_user('34343434-0000-0000-0000-000000000001');
+update blocklists set domains = '{youtube.com}';
+select set_config('test.k_code', (create_buddy_invite()).invite_code, false);
+reset role;
+select pg_temp.as_user('34343434-0000-0000-0000-000000000002');
+select accept_buddy_invite(current_setting('test.k_code'));
+select heartbeat('34343434-aaaa-0000-0000-000000000002', 'android', 'Pixel', true);
+select set_config('test.k_secret', issue_device_secret('34343434-aaaa-0000-0000-000000000002'), false);
+reset role;
+select pg_temp.as_user('34343434-0000-0000-0000-000000000003');
+select heartbeat('34343434-aaaa-0000-0000-000000000003', 'android', 'Pixel', true);
+select set_config('test.k3_secret', issue_device_secret('34343434-aaaa-0000-0000-000000000003'), false);
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check(device_sync('34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), true, false) -> 'key_requests' = '[]'::jsonb,
+  'with nothing waiting, the phone gets an empty list');
+reset role;
+select pg_temp.as_user('34343434-0000-0000-0000-000000000001');
+select start_focus_session(60, null, null, true);
+select request_end_session((select id from focus_sessions where ended_at is null), 'my train is early');
+reset role;
+select id as kreq from end_requests where reason = 'my train is early' \gset
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check(device_sync('34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), true, false) -> 'key_requests'
+                     = jsonb_build_array(jsonb_build_object('id', :'kreq')),
+  'the key holder''s phone hears about the request, by id only');
+select pg_temp.check(device_sync('34343434-aaaa-0000-0000-000000000003', current_setting('test.k3_secret'), true, false) -> 'key_requests' = '[]'::jsonb,
+  'a stranger''s phone hears nothing');
+select pg_temp.check(not (device_sync('34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), true, false)::text ~ 'train'),
+  'the reason never reaches the phone''s lock screen');
+-- a stranger's phone, a wrong secret, or someone's sign-in can't answer it
+select pg_temp.expect_error(format('select device_decide_end_request(%L, %L, %L, true)', '34343434-aaaa-0000-0000-000000000003', current_setting('test.k3_secret'), :'kreq'),
+  'a stranger''s phone cannot let anyone out');
+select pg_temp.expect_error(format('select device_decide_end_request(%L, %L, %L, true)', '34343434-aaaa-0000-0000-000000000002', 'wrong', :'kreq'),
+  'a wrong secret cannot answer');
+select pg_temp.expect_error(format('select claim_device_push(%L, %L, %L, %L)', '34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), 'key_answer', :'kreq'),
+  'only the notify function claims a phone''s notification');
+reset role;
+-- quiet hours hold the phone's notification back too
+select pg_temp.as_user('34343434-0000-0000-0000-000000000002');
+select set_quiet_hours(to_char(now() at time zone 'UTC' - interval '1 hour', 'HH24:MI')::time, to_char(now() at time zone 'UTC' + interval '1 hour', 'HH24:MI')::time);
+reset role;
+update profiles set timezone = 'UTC' where id = '34343434-0000-0000-0000-000000000002';
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check(device_sync('34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), true, false) -> 'key_requests' = '[]'::jsonb,
+  'during the holder''s quiet hours the phone stays quiet too');
+reset role;
+select pg_temp.as_user('34343434-0000-0000-0000-000000000002');
+select set_quiet_hours(null, null);
+reset role;
+-- "Keep going" from the phone
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check(device_decide_end_request('34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), :'kreq', false) ->> 'status' = 'denied',
+  'the key holder''s phone can say keep going');
+select pg_temp.check(device_sync('34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), true, false) -> 'key_requests' = '[]'::jsonb,
+  'an answered request leaves the phone''s list');
+select pg_temp.expect_error(format('select device_decide_end_request(%L, %L, %L, true)', '34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), :'kreq'),
+  'an answered request cannot be answered again');
+reset role;
+select pg_temp.check((select decided_by from end_requests where id = :'kreq') = '34343434-0000-0000-0000-000000000002', 'the answer is the key holder''s');
+set role service_role;
+select pg_temp.check(claim_device_push('34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), 'key_answer', :'kreq')
+                     = jsonb_build_object('to', 'user', 'id', '34343434-0000-0000-0000-000000000001'),
+  'the asker hears the phone''s answer');
+select pg_temp.check(claim_device_push('34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), 'key_answer', :'kreq') is null, 'once');
+select pg_temp.check(claim_device_push('34343434-aaaa-0000-0000-000000000003', current_setting('test.k3_secret'), 'key_answer', :'kreq') is null,
+  'another phone can''t announce someone else''s answer');
+select pg_temp.expect_error(format('select claim_device_push(%L, %L, %L, %L)', '34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), 'key_request', :'kreq'),
+  'a phone can only announce an answer');
+reset role;
+-- "Let them out" from the phone ends the session
+select pg_temp.as_user('34343434-0000-0000-0000-000000000001');
+select request_end_session((select id from focus_sessions where ended_at is null), 'really need to go');
+reset role;
+select id as kreq2 from end_requests where reason = 'really need to go' \gset
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select device_decide_end_request('34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret'), :'kreq2', true);
+reset role;
+select pg_temp.check((select ended_at is not null and ended_early and not locked from focus_sessions
+                       where id = (select session_id from end_requests where id = :'kreq2')),
+  'letting them out from the phone ends the locked session');
+select pg_temp.check(exists (select 1 from tamper_events where user_id = '34343434-0000-0000-0000-000000000001' and detail like 'partner approved:%'),
+  'and it is noted like any partner approval');
+select pg_temp.check(exists (select 1 from pg_proc where proname = '_device_by_secret' and not has_function_privilege('anon', oid, 'execute')),
+  'the device check itself is internal');
+-- signing out on the phone revokes its secret on the server
+select pg_temp.as_user('34343434-0000-0000-0000-000000000003');
+select forget_device_secret('34343434-aaaa-0000-0000-000000000002');
+reset role;
+select pg_temp.check((select secret_hash is not null from devices where id = '34343434-aaaa-0000-0000-000000000002'), 'nobody can revoke someone else''s phone');
+select pg_temp.as_user('34343434-0000-0000-0000-000000000002');
+select forget_device_secret('34343434-aaaa-0000-0000-000000000002');
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error(format('select device_sync(%L, %L, true, false)', '34343434-aaaa-0000-0000-000000000002', current_setting('test.k_secret')),
+  'a signed-out phone''s secret no longer works');
+reset role;
+-- every proof file, not only a recording, must be in the author's own folder (0032)
+select pg_temp.as_user('a1a1a1a1-0000-0000-0000-000000000001');
+select pg_temp.expect_error($q$insert into proofs (plan_item_id, kind, storage_path) values ((select id from plan_items limit 1), 'photo', 'a1a1a1a1-0000-0000-0000-000000000002/someone-else.jpg')$q$,
+  'a photo row cannot name someone else''s file');
+insert into proofs (plan_item_id, kind, storage_path) values ((select id from plan_items limit 1), 'photo', 'a1a1a1a1-0000-0000-0000-000000000001/mine.jpg');
+select pg_temp.check(exists (select 1 from proofs where storage_path = 'a1a1a1a1-0000-0000-0000-000000000001/mine.jpg'), 'a photo in my own folder is fine');
+reset role;

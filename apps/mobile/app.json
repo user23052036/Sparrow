@@ -8,7 +8,8 @@
     "platforms": ["android"],
     "android": {
       "package": "com.sparrow.app",
-      "blockedPermissions": ["android.permission.READ_EXTERNAL_STORAGE", "android.permission.RECORD_AUDIO"]
+      "blockedPermissions": ["android.permission.READ_EXTERNAL_STORAGE", "android.permission.RECORD_AUDIO"],
+      "allowBackup": false
     },
     "plugins": [
       [

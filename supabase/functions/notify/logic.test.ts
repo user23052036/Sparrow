@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import {
   buildPayload,
+  DEVICE_SECRET,
   GUEST_KEY as GUEST_KEY_SHAPE,
   isRefusal,
   notify,
@@ -212,6 +213,30 @@ describe("the push-service check matches migration 0028", () => {
   });
 });
 
+describe("a key holder's phone (D46)", () => {
+  const device = { id: PARTNER, secret: "ab".repeat(32) };
+  it("can report its answer to a key request, with its own credential only", () => {
+    assert.deepEqual(parseRequest({ kind: "key_answer", ref: REF, device }), { kind: "key_answer", ref: REF, device });
+    for (const bad of [
+      { kind: "key_request", ref: REF, device },
+      { kind: "session_started", ref: REF, device },
+      { kind: "key_answer", ref: REF, device, key: GUEST_KEY },
+      { kind: "key_answer", ref: REF, device: { id: "not-a-uuid", secret: device.secret } },
+      { kind: "key_answer", ref: REF, device: { id: PARTNER, secret: "short" } },
+      { kind: "key_answer", ref: REF, device: null },
+    ])
+      assert.equal(parseRequest(bad), null, JSON.stringify(bad));
+  });
+  it("the secret shape is the one 0020 issues, and notify claims through the server-only 0032 function", () => {
+    const sql = readFileSync(new URL("../../migrations/0020_android_engine.sql", import.meta.url), "utf8");
+    assert.match(sql, /secret := replace\(gen_random_uuid\(\)::text, '-', ''\) \|\| replace\(gen_random_uuid\(\)::text, '-', ''\);/);
+    assert.ok(DEVICE_SECRET.test("0123456789abcdef".repeat(4)));
+    const m32 = readFileSync(new URL("../../migrations/0032_phone_key_requests.sql", import.meta.url), "utf8");
+    assert.match(m32, /grant execute on function public\.claim_device_push\(uuid, text, text, uuid\) to service_role;/);
+    assert.match(readFileSync(new URL("./index.ts", import.meta.url), "utf8"), /admin\.rpc\("claim_device_push"/);
+  });
+});
+
 describe("a refused guest key is a 403, not a server error", () => {
   it("knows the database's refusal and nothing else", () => {
     assert.equal(isRefusal({ code: "28000", message: "this key link isn't valid anymore" }), true);
@@ -220,7 +245,7 @@ describe("a refused guest key is a 403, not a server error", () => {
   it("0030 refuses keys with that code, and notify answers 403 for it", () => {
     const sql = readFileSync(new URL("../../migrations/0030_guest_partner.sql", import.meta.url), "utf8");
     assert.match(sql, /errcode = '28000'/);
-    assert.match(readFileSync(new URL("./index.ts", import.meta.url), "utf8"), /if \(isRefusal\(e\)\) return json\(403/);
+    assert.match(readFileSync(new URL("./index.ts", import.meta.url), "utf8"), /if \(isRefusal\(e\)\) \{[\s\S]{0,300}?return json\(403/);
   });
 });
 
