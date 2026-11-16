@@ -413,7 +413,7 @@ export class FakeSupabase {
     const now = new Date().toISOString();
     return this.db.focus_sessions.filter((x) => !x.ended_at && String(x.ends_at) > now).at(-1);
   }
-  /** The guest partner's four calls (0030); anything but the current key is refused like the database does. */
+  /** The guest partner's calls (0030); anything but the current key is refused like the database does. */
   private guestRpc(route: Route, name: string, args: Row) {
     const g = this.guestKey;
     if (!g || args.p_key !== g.key) return this.send(route, 400, { code: "28000", message: "this key link isn't valid anymore", details: null, hint: null });
@@ -459,6 +459,8 @@ export class FakeSupabase {
         }
         return ok({ id: r.id, status: r.status });
       }
+      case "guest_push_is_on":
+        return ok(this.db.push_subscriptions.some((x) => x.guest_key_id === g.id && x.endpoint === args.p_endpoint));
       case "save_guest_push":
         this.db.push_subscriptions = this.db.push_subscriptions.filter((x) => x.endpoint !== args.p_endpoint);
         this.db.push_subscriptions.push({ id: uid(), user_id: null, guest_key_id: g.id, endpoint: args.p_endpoint, p256dh: args.p_p256dh, auth: args.p_auth });
@@ -488,7 +490,7 @@ export class FakeSupabase {
       return ok({ started: true, running: true, ...this.linkSession });
     }
     // a guest partner's calls (0030): the key is the permission, as with focus links
-    if (["guest_overview", "guest_decide", "save_guest_push", "remove_guest_push"].includes(name)) return this.guestRpc(route, name, args);
+    if (["guest_overview", "guest_decide", "save_guest_push", "remove_guest_push", "guest_push_is_on"].includes(name)) return this.guestRpc(route, name, args);
     if (!this.signedIn) return this.send(route, 401, { message: "JWT expired" });
 
     switch (name) {
@@ -497,7 +499,8 @@ export class FakeSupabase {
           .trim()
           .replace(/\s+/g, " ");
         if (!nm || nm.length > 40) throw new RpcError("give your friend a short name (up to 40 letters)");
-        if (this.partnerOverview.state !== "none") throw new RpcError("you already have an accountability partner");
+        if (this.partnerOverview.state === "active") throw new RpcError("you already have an accountability partner");
+        if (this.partnerOverview.state === "pending") this.partnerOverview = { state: "none" }; // a guest replaces a waiting invite
         const hex = Array.from({ length: 64 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
         this.guestKey = { id: this.guestKey?.id ?? uid(), name: nm, key: `spg_${hex}`, last_seen_at: null };
         this.db.push_subscriptions = this.db.push_subscriptions.filter((x) => !x.guest_key_id);

@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { buildPayload, notify, parseRequest, PUSH_ENDPOINT, PUSH_TEXT, type Deps, type Subscription } from "./logic.ts";
+import { buildPayload, GUEST_KEY as GUEST_KEY_SHAPE, notify, parseRequest, PUSH_ENDPOINT, PUSH_TEXT, type Deps, type Subscription } from "./logic.ts";
 import { copy } from "../../../packages/shared/src/copy.ts";
 
 const REF = "11111111-1111-4111-8111-111111111111";
@@ -153,6 +153,13 @@ describe("the push-service check matches migration 0028", () => {
   it("the table and the function accept the same addresses", () => {
     const sql = readFileSync(new URL("../../migrations/0028_web_push.sql", import.meta.url), "utf8");
     assert.ok(sql.includes(PUSH_ENDPOINT.source.replace(/\\\//g, "/")), "the regex in 0028 differs from PUSH_ENDPOINT");
+  });
+});
+
+describe("the guest key shape matches migration 0030", () => {
+  it("the function accepts exactly the keys the database does", () => {
+    const sql = readFileSync(new URL("../../migrations/0030_guest_partner.sql", import.meta.url), "utf8");
+    assert.ok(sql.includes(`p_key !~ '${GUEST_KEY_SHAPE.source}'`), "the key pattern in 0030 differs from GUEST_KEY");
   });
 });
 

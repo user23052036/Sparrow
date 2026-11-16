@@ -69,23 +69,6 @@ export async function turnOnPush(): Promise<TurnOnResult> {
 }
 
 // ------------------------------------------------------------ a guest partner's browser (D39), no account
-// A guest cannot read push addresses back, so this browser remembers which address it saved for the key.
-const GUEST_PUSH = "sparrow:guest-push";
-function remembered(): string | null {
-  try {
-    return localStorage.getItem(GUEST_PUSH);
-  } catch {
-    return null;
-  }
-}
-function remember(endpoint: string | null) {
-  try {
-    if (endpoint) localStorage.setItem(GUEST_PUSH, endpoint);
-    else localStorage.removeItem(GUEST_PUSH);
-  } catch {
-    /* storage unavailable */
-  }
-}
 
 /** Tells the server a guest answered a key request, so the owner hears about it. Fire and forget. */
 export function notifyAsGuest(key: string, ref: string) {
@@ -94,9 +77,12 @@ export function notifyAsGuest(key: string, ref: string) {
     .catch(() => {});
 }
 
-export async function guestPushIsOn(): Promise<boolean> {
+/** On for this guest: the browser is subscribed and the server has that address for this key (an account may have taken it since). */
+export async function guestPushIsOn(key: string): Promise<boolean> {
   const sub = await currentSubscription();
-  return !!sub && sub.endpoint === remembered();
+  if (!sub) return false;
+  const { data } = await supabase().rpc("guest_push_is_on", { p_key: key, p_endpoint: sub.endpoint });
+  return data === true;
 }
 
 export async function turnOnGuestPush(key: string): Promise<TurnOnResult> {
@@ -104,13 +90,12 @@ export async function turnOnGuestPush(key: string): Promise<TurnOnResult> {
   if (typeof json === "string") return json;
   const { error } = await supabase().rpc("save_guest_push", { p_key: key, p_endpoint: json.endpoint, p_p256dh: json.keys?.p256dh, p_auth: json.keys?.auth });
   if (error) throw error;
-  remember(json.endpoint ?? null);
   return "on";
 }
 
+/** Shown only while the server has this browser for the key, so this never switches off someone's account. */
 export async function turnOffGuestPush(key: string): Promise<void> {
   const sub = await currentSubscription();
-  remember(null);
   if (!sub) return;
   const endpoint = sub.endpoint;
   await sub.unsubscribe().catch(() => false);

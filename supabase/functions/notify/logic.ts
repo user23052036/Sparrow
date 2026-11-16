@@ -33,7 +33,7 @@ export interface PushPayload {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** A guest's key link secret (D39, migration 0030). */
-const GUEST_KEY = /^spg_[0-9a-f]{64}$/;
+export const GUEST_KEY = /^spg_[0-9a-f]{64}$/;
 
 export interface NotifyRequest {
   kind: PushKind;

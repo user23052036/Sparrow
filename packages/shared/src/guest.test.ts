@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { GUEST_KEY_PATTERN, GUEST_NAME_MAX, guestKeyUrl, normalizeGuestName, parseGuestKey } from "./guest";
+import { copy } from "./copy";
+import { GUEST_KEY_PATTERN, GUEST_NAME_MAX, GUEST_PROOF_DAYS, guestKeyUrl, normalizeGuestName, parseGuestKey } from "./guest";
 
 const KEY = "spg_" + "0123456789abcdef".repeat(4);
 
@@ -29,5 +30,7 @@ describe("guest key links", () => {
     expect(sql).toContain(`check (char_length(name) between 1 and ${GUEST_NAME_MAX})`);
     expect(sql).toContain(`char_length(nm) > ${GUEST_NAME_MAX}`);
     expect(sql).toContain(`p_key !~ '${GUEST_KEY_PATTERN.source}'`);
+    expect(sql).toContain(`p.server_created_at > now() - interval '${GUEST_PROOF_DAYS} days'`);
+    expect(copy.keyPage.noProofs).toContain(["zero", "one", "two", "three"][GUEST_PROOF_DAYS] + " days");
   });
 });

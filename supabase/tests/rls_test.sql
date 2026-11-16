@@ -1425,11 +1425,23 @@ reset role;
 -- someone else with their own guest and their own request
 select pg_temp.as_user('30303030-0000-0000-0000-000000000003');
 select set_config('test.other_key', create_guest_key('Other') ->> 'key', false);
+insert into tasks (title) values ('Other owner task');
+select commit_day(array(select id from tasks), 3, 0);
+insert into proofs (plan_item_id, kind, text_body, visibility) values ((select id from plan_items limit 1), 'text', 'other owner shared', 'buddy');
 select start_focus_session(30, null, null, true);
 select request_end_session((select id from focus_sessions where ended_at is null), 'Other reason');
 reset role;
 select id as greq from end_requests where user_id = '30303030-0000-0000-0000-000000000001' \gset
 select id as oreq from end_requests where user_id = '30303030-0000-0000-0000-000000000003' \gset
+
+-- what a key must not show either: a shared proof older than three days, a request on a session that already ended
+set session_replication_role = replica; -- skips the proof trigger that stamps the time
+insert into proofs (plan_item_id, user_id, kind, text_body, visibility, server_created_at)
+  values ((select id from plan_items where user_id = '30303030-0000-0000-0000-000000000001' limit 1), '30303030-0000-0000-0000-000000000001', 'text', 'old shared note', 'buddy', now() - interval '4 days');
+insert into focus_sessions (id, user_id, planned_minutes, started_at, ends_at, ended_at, locked)
+  values ('30303030-5555-0000-0000-000000000001', '30303030-0000-0000-0000-000000000001', 30, now() - interval '2 hours', now() - interval '90 minutes', now() - interval '90 minutes', true);
+insert into end_requests (session_id, user_id, reason) values ('30303030-5555-0000-0000-000000000001', '30303030-0000-0000-0000-000000000001', 'stale ask');
+set session_replication_role = origin;
 
 -- the guest: no session at all, just the anon role and the key
 set role anon;
@@ -1445,8 +1457,10 @@ select pg_temp.check(jsonb_array_length(current_setting('test.gov')::jsonb -> 'p
 select pg_temp.check(jsonb_array_length(current_setting('test.gov')::jsonb -> 'proofs') = 2
   and exists (select 1 from jsonb_array_elements(current_setting('test.gov')::jsonb -> 'proofs') p where p ->> 'text' = 'walked by the river'),
   'the guest sees the shared proofs');
-select pg_temp.check(not (current_setting('test.gov') ~ 'private diary|Owner secret|secret-site|river\.jpg|30303030|Other reason'),
-  'and nothing else: no private proof, other task, site, photo address, account id or someone else''s request');
+select pg_temp.check(not (current_setting('test.gov') ~ 'private diary|Owner secret|secret-site|river\.jpg|30303030|Other reason|other owner|Other owner|old shared|stale ask'),
+  'and nothing else: no private or old proof, other task, site, photo address, account id, ended session, or someone else''s request or proof');
+select pg_temp.expect_error(format('select _guest_by_secret(%L)', current_setting('test.guest_key')), 'the key check itself is internal');
+select pg_temp.expect_error($q$select _lock_profiles(null, null)$q$, 'profile locking is internal');
 select pg_temp.expect_error(format('select guest_decide(%L, %L, true)', current_setting('test.guest_key'), :'oreq'), 'a guest cannot answer someone else''s request');
 select pg_temp.expect_error(format('select guest_decide(%L, %L, true)', 'spg_' || repeat('0', 64), :'greq'), 'an unknown key cannot answer');
 select pg_temp.expect_error(format('select claim_guest_push(%L, %L, %L)', current_setting('test.guest_key'), 'key_answer', :'greq'),
@@ -1458,11 +1472,21 @@ select pg_temp.expect_error(format('select save_guest_push(%L, %L, %L, %L)', cur
   'a guest''s push address must be a browser push service');
 select save_guest_push(current_setting('test.guest_key'), 'https://fcm.googleapis.com/fcm/send/guest-phone', repeat('k', 87), repeat('a', 22));
 select save_guest_push(current_setting('test.guest_key'), 'https://fcm.googleapis.com/fcm/send/guest-laptop', repeat('k', 87), repeat('a', 22));
+select pg_temp.check(guest_push_is_on(current_setting('test.guest_key'), 'https://fcm.googleapis.com/fcm/send/guest-phone')
+  and not guest_push_is_on(current_setting('test.guest_key'), 'https://fcm.googleapis.com/fcm/send/someone-else'), 'the key page can ask whether this browser gets the guest''s notifications');
 select remove_guest_push(current_setting('test.other_key'), 'https://fcm.googleapis.com/fcm/send/guest-laptop');
 select pg_temp.check((select count(*) from push_subscriptions) = 0, 'a guest cannot read push addresses back');
 select pg_temp.check(guest_decide(current_setting('test.guest_key'), :'greq', false) ->> 'status' = 'denied', 'the guest can encourage them to keep going');
 reset role;
 select pg_temp.check((select count(*) from push_subscriptions where guest_key_id is not null) = 2, 'another key cannot switch off this guest''s browser');
+select pg_temp.as_user('30303030-0000-0000-0000-000000000004');
+select save_push_subscription('https://fcm.googleapis.com/fcm/send/guest-laptop', repeat('k', 87), repeat('a', 22));
+reset role;
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.check(not guest_push_is_on(current_setting('test.guest_key'), 'https://fcm.googleapis.com/fcm/send/guest-laptop'),
+  'once an account switches the same browser on, the key page shows it as off');
+reset role;
 select pg_temp.check((select locked and ended_at is null from focus_sessions f join end_requests r on r.session_id = f.id where r.id = :'greq'),
   'keep going leaves the session locked');
 select pg_temp.check((select decided_by is null and decided_by_guest = (select id from guest_keys where owner_id = '30303030-0000-0000-0000-000000000001')
@@ -1477,7 +1501,7 @@ select pg_temp.check(claim_guest_push(current_setting('test.guest_key'), 'key_an
 select pg_temp.as_user('30303030-0000-0000-0000-000000000001');
 select request_end_session((select id from focus_sessions where ended_at is null), 'Kid is really sick');
 reset role;
-select id as greq2 from end_requests where user_id = '30303030-0000-0000-0000-000000000001' and status = 'pending' \gset
+select id as greq2 from end_requests where user_id = '30303030-0000-0000-0000-000000000001' and reason = 'Kid is really sick' \gset
 set role anon;
 select set_config('request.jwt.claim.sub', '', false);
 select pg_temp.check(guest_decide(current_setting('test.guest_key'), :'greq2', true) ->> 'status' = 'approved', 'the guest can let them out');
@@ -1520,6 +1544,14 @@ select accept_buddy_invite(current_setting('test.s_code'));
 select pg_temp.expect_error($q$select create_guest_key('Extra')$q$, 'someone with an account partner cannot add a guest');
 select pg_temp.expect_error(format('select convert_guest_key(%L)', current_setting('test.guest_key')), 'someone with a partner cannot take over a guest''s key');
 reset role;
+-- even if a guest slipped in beside an account partner (the functions lock against it), the key does nothing
+insert into guest_keys (owner_id, name, key_hash)
+  values ('30303030-0000-0000-0000-000000000003', 'Stray', encode(sha256(convert_to('spg_' || repeat('ab', 32), 'UTF8')), 'hex'));
+set role anon;
+select set_config('request.jwt.claim.sub', '', false);
+select pg_temp.expect_error($q$select guest_overview('spg_' || repeat('ab', 32))$q$, 'a key never works beside an account partner');
+reset role;
+delete from guest_keys where name = 'Stray';
 select pg_temp.as_user('30303030-0000-0000-0000-000000000002');
 select set_config('test.f_code', (create_buddy_invite()).invite_code, false);
 reset role;

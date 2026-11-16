@@ -34,8 +34,8 @@ function GuestPush({ guestKey, name }: { guestKey: string; name: string }) {
 
   useEffect(() => {
     if (!pushSupported()) setState("unsupported");
-    else void guestPushIsOn().then((on) => setState(on ? "on" : "off"));
-  }, []);
+    else void guestPushIsOn(guestKey).then((on) => setState(on ? "on" : "off"));
+  }, [guestKey]);
 
   async function run(turnOn: boolean) {
     setBusy(true);
@@ -104,6 +104,7 @@ export default function KeyPage() {
   const [err, setErr] = useState<string | null>(null);
   const [answered, setAnswered] = useState<boolean | null>(null);
   const [signedIn, setSignedIn] = useState(false);
+  const [replaced, setReplaced] = useState(false);
   // Arriving from a notification's button (sw.js adds ?request=…&answer=…): point at that answer, but a tap still confirms it.
   const [fromPush] = useState(() => {
     if (typeof window === "undefined") return null;
@@ -114,16 +115,28 @@ export default function KeyPage() {
 
   useEffect(() => {
     if (!isConfigured) return;
-    const k = parseGuestKey(window.location.hash) ?? storedKey();
+    const fromLink = parseGuestKey(window.location.hash);
+    const before = storedKey();
+    const k = fromLink ?? before;
     if (!k) {
       setLoad({ kind: "no-key" });
       return;
     }
+    // This browser remembers one key link; opening someone else's link takes its place.
+    if (fromLink && before && before !== fromLink) setReplaced(true);
     storeKey(k);
+    // Out of the address bar and history once remembered; the page opens without it from now on.
+    if (fromLink) window.history.replaceState(null, "", window.location.pathname + window.location.search);
     setKey(k);
     void supabase()
       .auth.getSession()
       .then(({ data }) => setSignedIn(!!data.session));
+  }, []);
+  useEffect(() => {
+    // Another key link opened in this same tab changes only the "#…" part: start over with it.
+    const again = () => window.location.reload();
+    window.addEventListener("hashchange", again);
+    return () => window.removeEventListener("hashchange", again);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -135,11 +148,12 @@ export default function KeyPage() {
         (e: unknown) => ({ data: null, error: { message: String(e) } }),
       );
     if (!error) setLoad({ kind: "ok", ov: data as GuestOverview });
-    else if (/fetch|network/i.test(error.message)) setLoad({ kind: "offline" });
-    else {
+    else if ((error as { code?: string }).code === "28000") {
+      // Only the database's "not a valid key" answer forgets the key; anything else is a passing problem.
       if (storedKey() === key) storeKey(null);
+      setKey(null);
       setLoad({ kind: "invalid" });
-    }
+    } else setLoad({ kind: "offline" });
   }, [key]);
   useEffect(() => {
     void refresh();
@@ -200,6 +214,11 @@ export default function KeyPage() {
         <>
           <p className="quiet">{copy.keyPage.intro(ov.name)}</p>
           <p className="small quiet">{copy.keyPage.keepPrivate}</p>
+          {replaced && (
+            <p className="note small" role="status">
+              {copy.keyPage.replacedOther}
+            </p>
+          )}
 
           {ov.pending_end_requests.length > 0 ? (
             <div className="panel stack" role="alert">

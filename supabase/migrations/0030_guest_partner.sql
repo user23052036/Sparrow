@@ -3,6 +3,7 @@
 --   see the owner's pending key requests and the proofs the owner shared in the last three days
 --   (written proofs in full; for a photo or voice note only that there is one),
 --   let them out or encourage them to keep going, and switch notifications on or off for that browser.
+-- A browser keeps one guest's notifications at a time (a push address belongs to one holder, 0028).
 -- Nothing else: no tasks, no day, no focus history, no sites, no verdicts on proofs.
 -- The key is stored hashed (like focus links, 0024, and device secrets, 0020) and shown once. The owner can
 -- take it back at any time; making a new link replaces the old one. The friend becomes a full partner by
@@ -47,10 +48,20 @@ begin
     raise exception 'this key link isn''t valid anymore' using errcode = '28000';
   end if;
   select * into g from public.guest_keys where key_hash = encode(sha256(convert_to(p_key, 'UTF8')), 'hex');
-  if g.id is null then
+  -- one key holder at a time: never a guest beside an account partner, whatever happened first
+  if g.id is null or public._partner_of(g.owner_id) is not null then
     raise exception 'this key link isn''t valid anymore' using errcode = '28000';
   end if;
   return g;
+end;
+$$;
+
+-- Locks both people's profiles, always in the same order, so that two key-holder changes for the same
+-- person (an invite accepted, a guest made or converted) run one after the other.
+create function public._lock_profiles(a uuid, b uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform 1 from public.profiles where id in (a, b) order by id for update;
 end;
 $$;
 
@@ -165,13 +176,24 @@ begin
 end;
 $$;
 
+-- Whether this browser's push address is the guest's (an account may have switched the browser on since).
+create function public.guest_push_is_on(p_key text, p_endpoint text) returns boolean
+language plpgsql stable security definer set search_path = '' as $$
+declare g public.guest_keys := public._guest_by_secret(p_key);
+begin
+  return exists (select 1 from public.push_subscriptions where guest_key_id = g.id and endpoint = p_endpoint);
+end;
+$$;
+
 -- Signed in and holding the link: the guest becomes a full partner, keeping the browsers that had
 -- notifications on. A locked session stays locked; its key now sits with the new account.
 create function public.convert_guest_key(p_key text) returns public.buddy_links
 language plpgsql security definer set search_path = '' as $$
 declare uid uuid := public.require_user(); g public.guest_keys := public._guest_by_secret(p_key); l public.buddy_links;
 begin
+  perform public._lock_profiles(uid, g.owner_id);
   select * into g from public.guest_keys where id = g.id for update;
+  if g.id is null then raise exception 'this key link isn''t valid anymore' using errcode = '28000'; end if;
   if g.owner_id = uid then raise exception 'this is your own key link: send it to the friend who holds your key'; end if;
   if public._partner_of(uid) is not null then raise exception 'you already have an accountability partner'; end if;
   if public._guest_key_of(uid) is not null then raise exception 'a friend already holds your key through a link: take it back first'; end if;
@@ -229,6 +251,8 @@ create or replace function public.accept_buddy_invite(p_code text) returns publi
 language plpgsql security definer set search_path = '' as $$
 declare uid uuid := public.require_user(); l public.buddy_links;
 begin
+  select * into l from public.buddy_links where invite_code = lower(trim(p_code)) and status = 'pending';
+  if l.id is not null then perform public._lock_profiles(uid, l.requester_id); end if;
   select * into l from public.buddy_links where invite_code = lower(trim(p_code)) and status = 'pending' for update;
   if l.id is null then raise exception 'this invite link isn''t valid anymore'; end if;
   if l.requester_id = uid then raise exception 'you can''t accept your own invite'; end if;
@@ -381,7 +405,8 @@ end;
 $$;
 
 -- ------------------------------------------------------------ permissions
-revoke execute on function public._guest_key_of(uuid), public._guest_by_secret(text), public._partner_overview_accounts()
+revoke execute on function public._guest_key_of(uuid), public._guest_by_secret(text), public._partner_overview_accounts(),
+  public._lock_profiles(uuid, uuid)
   from public, anon, authenticated;
 revoke execute on function public.create_guest_key(text), public.remove_guest_key(), public.convert_guest_key(text),
   public.partner_overview(), public.claim_push(text, uuid)
@@ -391,10 +416,10 @@ grant execute on function public.create_guest_key(text), public.remove_guest_key
   to authenticated;
 -- The guest's functions work without a user session: the key is the whole permission.
 revoke execute on function public.guest_overview(text), public.guest_decide(text, uuid, boolean),
-  public.save_guest_push(text, text, text, text), public.remove_guest_push(text, text)
+  public.save_guest_push(text, text, text, text), public.remove_guest_push(text, text), public.guest_push_is_on(text, text)
   from public;
 grant execute on function public.guest_overview(text), public.guest_decide(text, uuid, boolean),
-  public.save_guest_push(text, text, text, text), public.remove_guest_push(text, text)
+  public.save_guest_push(text, text, text, text), public.remove_guest_push(text, text), public.guest_push_is_on(text, text)
   to anon, authenticated;
 revoke execute on function public.claim_guest_push(text, text, uuid) from public, anon, authenticated;
 grant execute on function public.claim_guest_push(text, text, uuid) to service_role;

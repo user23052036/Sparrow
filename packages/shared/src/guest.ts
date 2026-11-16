@@ -5,6 +5,8 @@ import type { PartnerEndRequest } from "./types";
  * The numbers below mirror the checks in create_guest_key(); a test pins them to the migration.
  */
 export const GUEST_NAME_MAX = 40;
+/** How far back a guest sees shared proofs (guest_overview); copy.keyPage.noProofs says it in words. */
+export const GUEST_PROOF_DAYS = 3;
 export const GUEST_KEY_PATTERN = /^spg_[0-9a-f]{64}$/;
 /** Where the guest's browser remembers the key, so a notification can open the page without it in the address. */
 export const GUEST_KEY_STORAGE = "sparrow:guest-key";

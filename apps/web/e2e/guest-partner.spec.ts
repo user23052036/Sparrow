@@ -70,6 +70,7 @@ test("a friend without an account holds the key: they see the request and let th
   const guest = await guestBrowser(browser, fake);
   await guest.goto(url);
   await expect(guest.getByRole("heading", { name: copy.keyPage.title("Sam") })).toBeVisible();
+  expect(guest.url()).not.toContain("spg_"); // out of the address bar and history once remembered
   await expect(guest.getByText(copy.partnerUi.theyWant("My train is early"))).toBeVisible();
   await expect(guest.getByText("Walked by the river")).toBeVisible();
   await expect(guest.getByText(copy.keyPage.photo)).toBeVisible();
@@ -148,4 +149,23 @@ test("a guest who signs in from the link becomes a full partner", async ({ page,
   await guest.waitForURL("**/partner");
   await expect(guest.getByRole("heading", { name: copy.partnerUi.withName("Gita") })).toBeVisible();
   expect(fake.guestKey).toBeNull();
+});
+
+test("a new link replaces the old one in the friend's browser, and the page says so", async ({ page, fake, browser }) => {
+  fake.seedUser();
+  await signIn(page, fake);
+  const first = await makeKeyLink(page, "Ravi");
+  await page.getByRole("button", { name: copy.guestKey.done }).click();
+  const guest = await guestBrowser(browser, fake);
+  await guest.goto(first);
+  await expect(guest.getByRole("heading", { name: copy.keyPage.title("Sam") })).toBeVisible();
+  await expect(guest.getByText(copy.keyPage.replacedOther)).toHaveCount(0);
+
+  await page.getByRole("button", { name: copy.guestKey.newLink }).click();
+  const second = await page.getByLabel(copy.guestKey.linkLabel).inputValue();
+  expect(second).not.toBe(first);
+  await guest.goto(second);
+  await expect(guest.getByText(copy.keyPage.replacedOther)).toBeVisible();
+  await guest.goto(first);
+  await expect(guest.getByText(copy.keyPage.invalid)).toBeVisible();
 });

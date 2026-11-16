@@ -393,6 +393,7 @@ export default function PartnerPage() {
             </div>
             <p className="small quiet">{copy.partnerUi.waiting}</p>
           </div>
+          <GuestKeyCreate onCreated={gotGuest} />
         </>
       )}
 
