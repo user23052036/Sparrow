@@ -168,4 +168,8 @@ test("a new link replaces the old one in the friend's browser, and the page says
   await expect(guest.getByText(copy.keyPage.replacedOther)).toBeVisible();
   await guest.goto(first);
   await expect(guest.getByText(copy.keyPage.invalid)).toBeVisible();
+  // the dead link did not wipe the working key: a notification opening /key still finds it
+  await guest.goto("/key");
+  await expect(guest.getByRole("heading", { name: copy.keyPage.title("Sam") })).toBeVisible();
+  await expect(guest.getByText(copy.keyPage.replacedOther)).toHaveCount(0);
 });

@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { copy, GUEST_KEY_STORAGE, parseGuestKey, type GuestOverview } from "@sparrow/shared";
@@ -105,6 +105,8 @@ export default function KeyPage() {
   const [answered, setAnswered] = useState<boolean | null>(null);
   const [signedIn, setSignedIn] = useState(false);
   const [replaced, setReplaced] = useState(false);
+  // The key this browser remembered before this visit; a link's key replaces it only once the server accepts it.
+  const before = useRef<string | null>(null);
   // Arriving from a notification's button (sw.js adds ?request=…&answer=…): point at that answer, but a tap still confirms it.
   const [fromPush] = useState(() => {
     if (typeof window === "undefined") return null;
@@ -116,16 +118,13 @@ export default function KeyPage() {
   useEffect(() => {
     if (!isConfigured) return;
     const fromLink = parseGuestKey(window.location.hash);
-    const before = storedKey();
-    const k = fromLink ?? before;
+    before.current = storedKey();
+    const k = fromLink ?? before.current;
     if (!k) {
       setLoad({ kind: "no-key" });
       return;
     }
-    // This browser remembers one key link; opening someone else's link takes its place.
-    if (fromLink && before && before !== fromLink) setReplaced(true);
-    storeKey(k);
-    // Out of the address bar and history once remembered; the page opens without it from now on.
+    // Out of the address bar and history; the page remembers the key once the server accepts it.
     if (fromLink) window.history.replaceState(null, "", window.location.pathname + window.location.search);
     setKey(k);
     void supabase()
@@ -147,9 +146,16 @@ export default function KeyPage() {
         (r) => r,
         (e: unknown) => ({ data: null, error: { message: String(e) } }),
       );
-    if (!error) setLoad({ kind: "ok", ov: data as GuestOverview });
-    else if ((error as { code?: string }).code === "28000") {
-      // Only the database's "not a valid key" answer forgets the key; anything else is a passing problem.
+    if (!error) {
+      // This browser remembers one key link: a working one takes the place of the one before.
+      if (storedKey() !== key) {
+        if (before.current && before.current !== key) setReplaced(true);
+        storeKey(key);
+      }
+      setLoad({ kind: "ok", ov: data as GuestOverview });
+    } else if ((error as { code?: string }).code === "28000") {
+      // Only the database's "not a valid key" answer forgets a key, and only that key: a dead link never
+      // wipes the one that works.
       if (storedKey() === key) storeKey(null);
       setKey(null);
       setLoad({ kind: "invalid" });

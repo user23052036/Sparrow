@@ -769,7 +769,7 @@ export const copy = {
     convert: (name: string) => `Be ${name}'s partner with this account`,
     keepPrivate: "Keep this link to yourself: anyone with it can answer for you.",
     replacedOther:
-      "This browser remembers one key link at a time, and now it's this one. Notifications here follow it once you switch them on. To answer for someone else, open their link again.",
+      "This browser remembers one key link at a time, and from now on it's this one. Notifications here follow it once you switch them on. If you also hold someone else's key, open their link again when they ask.",
   },
   go: {
     title: "Focus link",
