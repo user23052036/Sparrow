@@ -93,7 +93,9 @@ export function SetupCheck({ onBack }: { onBack: () => void }) {
     try {
       const startedMs = Date.now();
       // Ask the server first: the phone's copy may be behind (a session from the laptop, or one that ended).
-      const running = (await engine.syncNow())?.active;
+      const first = await engine.syncNow();
+      if (!first?.ok) throw new Error(copy.setupCheck.testNeedsNetwork);
+      const running = first.active;
       if (!running) {
         const { data, error } = await supabase.rpc("start_focus_session", { p_minutes: 5 });
         // Started elsewhere a moment ago: test that one.
@@ -104,7 +106,7 @@ export function SetupCheck({ onBack }: { onBack: () => void }) {
       // The engine checks in every 30 s; asking it directly makes this a few seconds.
       for (let i = 0; i < 12; i++) {
         const r = await engine.syncNow();
-        if (r?.active) {
+        if (r?.ok && r.active) {
           await saveTest({ startedMs, reachedPhone: true, lastCoverMs: 0 });
           return;
         }
@@ -135,7 +137,13 @@ export function SetupCheck({ onBack }: { onBack: () => void }) {
       {lines?.map((l) => {
         const words = copy.setupCheck.lines[l.id];
         return (
-          <View key={l.id} style={s.panel} accessible accessibilityLabel={`${words.title}: ${copy.setupCheck.states[l.state]}`}>
+          <View
+            key={l.id}
+            style={s.panel}
+            accessible
+            accessibilityLabel={`${words.title}: ${copy.setupCheck.states[l.state]}`}
+            accessibilityHint={l.state === "pass" ? undefined : words.todo}
+          >
             <View style={s.spread}>
               <Text style={[s.text, { flex: 1 }]}>{words.title}</Text>
               <Text style={[s.quiet, { color: COLOR[l.state], fontWeight: "700" }]}>{copy.setupCheck.states[l.state]}</Text>
